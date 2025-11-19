@@ -56,36 +56,39 @@ export default function Zmanim() {
 
         try {
             const result = await base44.integrations.Core.InvokeLLM({
-                prompt: `Calculate Jewish zmanim (prayer times) for today's date: ${format(currentDate, 'yyyy-MM-dd')}
-                
-Location:
+                prompt: `Find the accurate Jewish zmanim (prayer times) for today's date: ${format(currentDate, 'yyyy-MM-dd')}
+
+Location coordinates:
 - Latitude: ${location.latitude}
 - Longitude: ${location.longitude}
 
-Please calculate the following zmanim in local time (24-hour format HH:MM):
+Search for accurate zmanim data from reliable Jewish calendar websites (like chabad.org, myzmanim.com, ou.org, hebcal.com, or similar).
 
-1. Alot Hashachar (Dawn - 72 minutes before sunrise)
-2. Misheyakir (Earliest Tallit/Tefillin time)
+Please provide the following zmanim in local time (use 12-hour format with AM/PM):
+
+1. Alot Hashachar (Dawn)
+2. Misheyakir (Earliest Tallit/Tefillin)
 3. Sunrise (Netz Hachamah)
 4. Sof Zman Shma MGA (Latest Shma - Magen Avraham)
 5. Sof Zman Shma GRA (Latest Shma - Gra)
 6. Sof Zman Tefillah MGA (Latest Shacharit - Magen Avraham)
 7. Sof Zman Tefillah GRA (Latest Shacharit - Gra)
-8. Chatzot (Midday/Solar noon)
+8. Chatzot (Midday)
 9. Mincha Gedola (Earliest Mincha)
-10. Mincha Ketana (Preferred Mincha time)
-11. Plag Hamincha (Time for early Maariv)
+10. Mincha Ketana (Preferred Mincha)
+11. Plag Hamincha
 12. Sunset (Shkiah)
-13. Tzait Hakochavim (Nightfall - when 3 stars appear, ~50 minutes after sunset)
+13. Tzait Hakochavim (Nightfall - 3 stars)
 14. Chatzot Laila (Halachic midnight)
 
 Also provide:
-- Hebrew date (with Hebrew month name)
+- Hebrew date (e.g., "15 Tevet 5785")
 - Day of week in Hebrew
 - Parsha of the week (Torah portion)
 - Location timezone
 
-Use accurate astronomical calculations for the given coordinates.`,
+IMPORTANT: Use actual astronomical calculations from reliable sources. Search the web for accurate data.`,
+                add_context_from_internet: true,
                 response_json_schema: {
                     type: "object",
                     properties: {
