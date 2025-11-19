@@ -51,9 +51,16 @@ export default function LocationDisplay({ location }) {
                         {locationName.city}, {locationName.country}
                     </p>
                 ) : (
-                    <p className="font-mono text-sm text-slate-600">
-                        {location.latitude.toFixed(4)}°, {location.longitude.toFixed(4)}°
-                    </p>
+                    <div>
+                        <p className="font-mono text-sm text-slate-600">
+                            {location.latitude.toFixed(6)}°, {location.longitude.toFixed(6)}°
+                        </p>
+                        {location.accuracy && (
+                            <p className="text-xs text-slate-400 mt-0.5">
+                                Accuracy: ±{Math.round(location.accuracy)}m
+                            </p>
+                        )}
+                    </div>
                 )}
             </div>
         </div>
