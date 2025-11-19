@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { MapPin, Calendar, Loader2, RefreshCw } from 'lucide-react';
+import { Input } from "@/components/ui/input";
+import { MapPin, Calendar, Loader2, RefreshCw, Search } from 'lucide-react';
 import { format } from 'date-fns';
 import { base44 } from '@/api/base44Client';
 import ZmanimCard from '../components/zmanim/ZmanimCard';
@@ -9,15 +10,15 @@ import LocationDisplay from '../components/zmanim/LocationDisplay';
 
 export default function Zmanim() {
     const [location, setLocation] = useState(null);
-    const [loading, setLoading] = useState(true);
+    const [loading, setLoading] = useState(false);
     const [calculating, setCalculating] = useState(false);
     const [zmanim, setZmanim] = useState(null);
     const [error, setError] = useState(null);
     const [currentDate, setCurrentDate] = useState(new Date());
+    const [manualLocation, setManualLocation] = useState('');
+    const [searchingLocation, setSearchingLocation] = useState(false);
 
-    useEffect(() => {
-        getLocation();
-    }, []);
+
 
     useEffect(() => {
         if (location) {
@@ -127,45 +128,49 @@ IMPORTANT: Use actual astronomical calculations from reliable sources. Search th
         }
     };
 
+    const handleManualLocation = async (e) => {
+        e.preventDefault();
+        if (!manualLocation.trim()) return;
+
+        setSearchingLocation(true);
+        setError(null);
+
+        try {
+            const result = await base44.integrations.Core.InvokeLLM({
+                prompt: `Get the exact coordinates (latitude and longitude) for this location: "${manualLocation}"
+                
+                Return precise coordinates that can be used for zmanim calculations.`,
+                add_context_from_internet: true,
+                response_json_schema: {
+                    type: "object",
+                    properties: {
+                        latitude: { type: "number" },
+                        longitude: { type: "number" },
+                        city: { type: "string" },
+                        country: { type: "string" }
+                    }
+                }
+            });
+
+            setLocation({
+                latitude: result.latitude,
+                longitude: result.longitude,
+                city: result.city,
+                country: result.country
+            });
+        } catch (err) {
+            setError('Could not find location. Please try a different search.');
+        } finally {
+            setSearchingLocation(false);
+        }
+    };
+
     const handleRefresh = () => {
         setCurrentDate(new Date());
         if (location) {
             calculateZmanim();
-        } else {
-            getLocation();
         }
     };
-
-    if (loading) {
-        return (
-            <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-amber-50 flex items-center justify-center p-4">
-                <Card className="w-full max-w-md shadow-xl border-0">
-                    <CardContent className="flex flex-col items-center justify-center py-12">
-                        <Loader2 className="w-12 h-12 text-blue-600 animate-spin mb-4" />
-                        <p className="text-lg text-slate-700">Detecting your location...</p>
-                        <p className="text-sm text-slate-500 mt-2">Please allow location access</p>
-                    </CardContent>
-                </Card>
-            </div>
-        );
-    }
-
-    if (error && !location) {
-        return (
-            <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-amber-50 flex items-center justify-center p-4">
-                <Card className="w-full max-w-md shadow-xl border-0">
-                    <CardContent className="flex flex-col items-center justify-center py-12">
-                        <MapPin className="w-12 h-12 text-red-500 mb-4" />
-                        <p className="text-lg text-slate-700 text-center mb-4">{error}</p>
-                        <Button onClick={getLocation} className="bg-blue-600 hover:bg-blue-700">
-                            <MapPin className="w-4 h-4 mr-2" />
-                            Try Again
-                        </Button>
-                    </CardContent>
-                </Card>
-            </div>
-        );
-    }
 
     return (
         <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-amber-50">
@@ -178,10 +183,94 @@ IMPORTANT: Use actual astronomical calculations from reliable sources. Search th
                     <p className="text-slate-600 text-lg">זמני היום</p>
                 </div>
 
+                {/* Location Search */}
+                {!location && (
+                    <Card className="mb-6 shadow-lg border-0 bg-white/80 backdrop-blur-sm">
+                        <CardContent className="p-6">
+                            <form onSubmit={handleManualLocation} className="space-y-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700 mb-2">
+                                        Enter Your Location
+                                    </label>
+                                    <div className="flex gap-2">
+                                        <Input
+                                            type="text"
+                                            placeholder="e.g., Jerusalem, New York, London..."
+                                            value={manualLocation}
+                                            onChange={(e) => setManualLocation(e.target.value)}
+                                            className="flex-1"
+                                            disabled={searchingLocation}
+                                        />
+                                        <Button 
+                                            type="submit"
+                                            disabled={searchingLocation || !manualLocation.trim()}
+                                            className="bg-blue-600 hover:bg-blue-700"
+                                        >
+                                            {searchingLocation ? (
+                                                <Loader2 className="w-4 h-4 animate-spin" />
+                                            ) : (
+                                                <Search className="w-4 h-4" />
+                                            )}
+                                        </Button>
+                                    </div>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <div className="flex-1 border-t border-slate-300"></div>
+                                    <span className="text-sm text-slate-500">or</span>
+                                    <div className="flex-1 border-t border-slate-300"></div>
+                                </div>
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    onClick={getLocation}
+                                    disabled={loading}
+                                    className="w-full"
+                                >
+                                    {loading ? (
+                                        <>
+                                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                            Detecting Location...
+                                        </>
+                                    ) : (
+                                        <>
+                                            <MapPin className="w-4 h-4 mr-2" />
+                                            Use My GPS Location
+                                        </>
+                                    )}
+                                </Button>
+                            </form>
+                            {error && (
+                                <p className="text-sm text-red-600 mt-3 text-center">{error}</p>
+                            )}
+                        </CardContent>
+                    </Card>
+                )}
+
+                {!location && (
+                    <div className="text-center text-slate-500 text-sm mt-8">
+                        Enter a city or address to get accurate zmanim for your location
+                    </div>
+                )}
+
                 {/* Location & Date Card */}
-                <Card className="mb-6 shadow-lg border-0 bg-white/80 backdrop-blur-sm">
-                    <CardContent className="p-6">
-                        <LocationDisplay location={location} />
+                {location && (
+                    <Card className="mb-6 shadow-lg border-0 bg-white/80 backdrop-blur-sm">
+                        <CardContent className="p-6">
+                            <div className="flex items-start justify-between">
+                                <LocationDisplay location={location} />
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => {
+                                        setLocation(null);
+                                        setZmanim(null);
+                                        setManualLocation('');
+                                    }}
+                                    className="text-slate-500 hover:text-slate-700"
+                                >
+                                    Change
+                                </Button>
+                            </div>
                         
                         <div className="flex items-center justify-between mt-4 pt-4 border-t border-slate-200">
                             <div className="flex items-center gap-3">
@@ -222,8 +311,9 @@ IMPORTANT: Use actual astronomical calculations from reliable sources. Search th
                                 )}
                             </div>
                         )}
-                    </CardContent>
-                </Card>
+                        </CardContent>
+                    </Card>
+                )}
 
                 {/* Calculating State */}
                 {calculating && (

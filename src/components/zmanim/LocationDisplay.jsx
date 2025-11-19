@@ -7,8 +7,11 @@ export default function LocationDisplay({ location }) {
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        if (location) {
+        if (location && !location.city) {
             getLocationName();
+        } else if (location && location.city) {
+            setLocationName({ city: location.city, country: location.country });
+            setLoading(false);
         }
     }, [location]);
 
