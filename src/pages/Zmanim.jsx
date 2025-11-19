@@ -39,19 +39,13 @@ export default function Zmanim() {
             (position) => {
                 setLocation({
                     latitude: position.coords.latitude,
-                    longitude: position.coords.longitude,
-                    accuracy: position.coords.accuracy
+                    longitude: position.coords.longitude
                 });
                 setLoading(false);
             },
             (error) => {
                 setError('Unable to retrieve your location. Please enable location services.');
                 setLoading(false);
-            },
-            {
-                enableHighAccuracy: true,
-                timeout: 10000,
-                maximumAge: 0
             }
         );
     };
