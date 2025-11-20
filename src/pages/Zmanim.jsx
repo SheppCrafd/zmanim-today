@@ -2,7 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { MapPin, Calendar, Loader2, RefreshCw, Search } from 'lucide-react';
+import { MapPin, Calendar as CalendarIcon, Loader2, RefreshCw, Search, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
 import { format } from 'date-fns';
 import { base44 } from '@/api/base44Client';
 import ZmanimCard from '../components/zmanim/ZmanimCard';
@@ -24,7 +26,7 @@ export default function Zmanim() {
         if (location) {
             calculateZmanim();
         }
-    }, [location]);
+    }, [location, currentDate]);
 
     const getLocation = () => {
         setLoading(true);
@@ -283,25 +285,70 @@ Use actual astronomical calculations. Verify data is correct.`,
                                 </Button>
                             </div>
                         
-                        <div className="flex items-center justify-between mt-4 pt-4 border-t border-slate-200">
-                            <div className="flex items-center gap-3">
-                                <Calendar className="w-5 h-5 text-amber-600" />
-                                <div>
-                                    <p className="text-sm text-slate-600">Civil Date</p>
-                                    <p className="font-semibold text-slate-800">
-                                        {format(currentDate, 'EEEE, MMMM d, yyyy')}
-                                    </p>
+                        <div className="mt-4 pt-4 border-t border-slate-200">
+                            <div className="flex items-center justify-between mb-3">
+                                <div className="flex items-center gap-3">
+                                    <CalendarIcon className="w-5 h-5 text-amber-600" />
+                                    <p className="text-sm font-medium text-slate-600">Select Date</p>
                                 </div>
+                                <Button 
+                                    variant="outline" 
+                                    size="sm"
+                                    onClick={handleRefresh}
+                                    disabled={calculating}
+                                    className="border-slate-300 hover:bg-slate-50"
+                                >
+                                    <RefreshCw className={`w-4 h-4 ${calculating ? 'animate-spin' : ''}`} />
+                                </Button>
                             </div>
-                            <Button 
-                                variant="outline" 
-                                size="sm"
-                                onClick={handleRefresh}
-                                disabled={calculating}
-                                className="border-slate-300 hover:bg-slate-50"
-                            >
-                                <RefreshCw className={`w-4 h-4 ${calculating ? 'animate-spin' : ''}`} />
-                            </Button>
+                            <div className="flex items-center gap-2">
+                                <Button
+                                    variant="outline"
+                                    size="icon"
+                                    onClick={() => {
+                                        const newDate = new Date(currentDate);
+                                        newDate.setDate(newDate.getDate() - 1);
+                                        setCurrentDate(newDate);
+                                    }}
+                                    disabled={calculating}
+                                    className="h-10 w-10"
+                                >
+                                    <ChevronLeft className="h-4 w-4" />
+                                </Button>
+                                <Popover>
+                                    <PopoverTrigger asChild>
+                                        <Button
+                                            variant="outline"
+                                            className="flex-1 justify-start text-left font-semibold"
+                                            disabled={calculating}
+                                        >
+                                            <CalendarIcon className="mr-2 h-4 w-4" />
+                                            {format(currentDate, 'EEEE, MMMM d, yyyy')}
+                                        </Button>
+                                    </PopoverTrigger>
+                                    <PopoverContent className="w-auto p-0" align="start">
+                                        <Calendar
+                                            mode="single"
+                                            selected={currentDate}
+                                            onSelect={(date) => date && setCurrentDate(date)}
+                                            initialFocus
+                                        />
+                                    </PopoverContent>
+                                </Popover>
+                                <Button
+                                    variant="outline"
+                                    size="icon"
+                                    onClick={() => {
+                                        const newDate = new Date(currentDate);
+                                        newDate.setDate(newDate.getDate() + 1);
+                                        setCurrentDate(newDate);
+                                    }}
+                                    disabled={calculating}
+                                    className="h-10 w-10"
+                                >
+                                    <ChevronRight className="h-4 w-4" />
+                                </Button>
+                            </div>
                         </div>
 
                         {zmanim && (
