@@ -449,6 +449,9 @@ Use actual astronomical calculations. Verify data is correct.`,
                     {zmanim?.timezone && (
                         <p className="mt-1">Timezone: {zmanim.timezone}</p>
                     )}
+                    <p className="mt-2">
+                        Based on <a href="https://outorah.org/p/41921/" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">https://outorah.org/p/41921/</a>
+                    </p>
                 </div>
             </div>
         </div>
