@@ -56,39 +56,47 @@ export default function Zmanim() {
         setError(null);
 
         try {
+            const dateStr = format(currentDate, 'yyyy-MM-dd');
             const result = await base44.integrations.Core.InvokeLLM({
-                prompt: `Find the accurate Jewish zmanim (prayer times) for today's date: ${format(currentDate, 'yyyy-MM-dd')}
+                prompt: `Calculate accurate Jewish zmanim for ${dateStr} at coordinates: ${location.latitude}, ${location.longitude}
 
-Location coordinates:
-- Latitude: ${location.latitude}
-- Longitude: ${location.longitude}
+CRITICAL INSTRUCTIONS:
+1. Search hebcal.com API or website specifically for these exact coordinates and date
+2. Use this URL pattern: https://www.hebcal.com/zmanim?cfg=json&latitude=${location.latitude}&longitude=${location.longitude}&date=${dateStr}
+3. Verify times match astronomical reality for this location
 
-Search for accurate zmanim data from reliable Jewish calendar websites (like chabad.org, myzmanim.com, ou.org, hebcal.com, or similar).
+Required zmanim (return in 12-hour format with AM/PM):
 
-Please provide the following zmanim in local time (use 12-hour format with AM/PM):
+DAWN & MORNING:
+- alot_hashachar: Dawn (72 minutes before sunrise OR when sun is 16.1° below horizon)
+- misheyakir: When one can recognize someone from 6 feet (sun 11° below horizon)
+- sunrise: Top of sun visible at horizon
+- sof_zman_shma_gra: Latest Shema (3 halachic hours after sunrise using GRA method: divide sunrise to sunset into 12 parts)
+- sof_zman_shma_mga: Latest Shema (3 halachic hours after dawn using MGA method: divide dawn to nightfall into 12 parts)
+- sof_zman_tefillah_gra: Latest Shemoneh Esrei (4 halachic hours after sunrise, GRA)
+- sof_zman_tefillah_mga: Latest Shemoneh Esrei (4 halachic hours after dawn, MGA)
 
-1. Alot Hashachar (Dawn)
-2. Misheyakir (Earliest Tallit/Tefillin)
-3. Sunrise (Netz Hachamah)
-4. Sof Zman Shma MGA (Latest Shma - Magen Avraham)
-5. Sof Zman Shma GRA (Latest Shma - Gra)
-6. Sof Zman Tefillah MGA (Latest Shacharit - Magen Avraham)
-7. Sof Zman Tefillah GRA (Latest Shacharit - Gra)
-8. Chatzot (Midday)
-9. Mincha Gedola (Earliest Mincha)
-10. Mincha Ketana (Preferred Mincha)
-11. Plag Hamincha
-12. Sunset (Shkiah)
-13. Tzait Hakochavim (Nightfall - 3 stars)
-14. Chatzot Laila (Halachic midnight)
+MIDDAY & AFTERNOON:
+- chatzot: Halachic noon (exact midpoint between sunrise and sunset)
+- mincha_gedola: 30 minutes after chatzot
+- mincha_ketana: 2.5 halachic hours before sunset
+- plag_hamincha: 1.25 halachic hours before sunset (midpoint between mincha ketana and sunset)
 
-Also provide:
-- Hebrew date (e.g., "15 Tevet 5785")
-- Day of week in Hebrew
-- Parsha of the week (Torah portion)
-- Location timezone
+EVENING & NIGHT:
+- candle_lighting: 18 minutes before sunset (for Shabbat/Yom Tov)
+- sunset: When sun disappears below horizon
+- tzait_hakochavim: Nightfall - 3 medium stars visible (sun 8.5° below horizon OR 42-50 minutes after sunset)
+- tzait_72: Nightfall per Rabbeinu Tam (72 minutes after sunset)
+- chatzot_laila: Halachic midnight (midpoint between sunset and next sunrise)
 
-IMPORTANT: Use actual astronomical calculations from reliable sources. Search the web for accurate data.`,
+HEBREW DATE INFO:
+- hebrew_date: Full Hebrew date (e.g., "כ״א כסלו תשפ״ה" or "21 Kislev 5785")
+- day_of_week_hebrew: Hebrew day name
+- parsha: Torah portion for the week (if applicable)
+- location_name: City name for these coordinates
+- timezone: Local timezone
+
+Use actual astronomical calculations. Verify data is correct.`,
                 add_context_from_internet: true,
                 response_json_schema: {
                     type: "object",
@@ -96,6 +104,7 @@ IMPORTANT: Use actual astronomical calculations from reliable sources. Search th
                         hebrew_date: { type: "string" },
                         day_of_week_hebrew: { type: "string" },
                         parsha: { type: "string" },
+                        location_name: { type: "string" },
                         timezone: { type: "string" },
                         zmanim: {
                             type: "object",
@@ -103,16 +112,18 @@ IMPORTANT: Use actual astronomical calculations from reliable sources. Search th
                                 alot_hashachar: { type: "string" },
                                 misheyakir: { type: "string" },
                                 sunrise: { type: "string" },
-                                sof_zman_shma_mga: { type: "string" },
                                 sof_zman_shma_gra: { type: "string" },
-                                sof_zman_tefillah_mga: { type: "string" },
+                                sof_zman_shma_mga: { type: "string" },
                                 sof_zman_tefillah_gra: { type: "string" },
+                                sof_zman_tefillah_mga: { type: "string" },
                                 chatzot: { type: "string" },
                                 mincha_gedola: { type: "string" },
                                 mincha_ketana: { type: "string" },
                                 plag_hamincha: { type: "string" },
+                                candle_lighting: { type: "string" },
                                 sunset: { type: "string" },
                                 tzait_hakochavim: { type: "string" },
+                                tzait_72: { type: "string" },
                                 chatzot_laila: { type: "string" }
                             }
                         }
@@ -348,13 +359,13 @@ IMPORTANT: Use actual astronomical calculations from reliable sources. Search th
                             icon="☀️"
                             color="from-amber-500 to-orange-500"
                             times={[
-                                { label: 'Alot Hashachar', value: zmanim.zmanim.alot_hashachar, description: 'Dawn' },
-                                { label: 'Misheyakir', value: zmanim.zmanim.misheyakir, description: 'Tallit & Tefillin' },
-                                { label: 'Sunrise', value: zmanim.zmanim.sunrise, description: 'Netz HaChamah', highlight: true },
-                                { label: 'Sof Zman Shma (GRA)', value: zmanim.zmanim.sof_zman_shma_gra, description: 'Latest Shma', highlight: true },
-                                { label: 'Sof Zman Shma (MGA)', value: zmanim.zmanim.sof_zman_shma_mga, description: 'Latest Shma (Stringent)' },
-                                { label: 'Sof Zman Tefillah (GRA)', value: zmanim.zmanim.sof_zman_tefillah_gra, description: 'Latest Shacharit', highlight: true },
-                                { label: 'Sof Zman Tefillah (MGA)', value: zmanim.zmanim.sof_zman_tefillah_mga, description: 'Latest Shacharit (Stringent)' }
+                                { label: 'Alot Hashachar', value: zmanim.zmanim.alot_hashachar, description: 'Dawn - 72 min before sunrise' },
+                                { label: 'Misheyakir', value: zmanim.zmanim.misheyakir, description: 'Earliest Tallit & Tefillin' },
+                                { label: 'Sunrise', value: zmanim.zmanim.sunrise, description: 'HaNetz HaChamah', highlight: true },
+                                { label: 'Sof Zman Shema (GRA)', value: zmanim.zmanim.sof_zman_shma_gra, description: 'Latest Shema - 3 hrs after sunrise', highlight: true },
+                                { label: 'Sof Zman Shema (MGA)', value: zmanim.zmanim.sof_zman_shma_mga, description: '3 hrs after dawn (stringent)' },
+                                { label: 'Sof Zman Tefillah (GRA)', value: zmanim.zmanim.sof_zman_tefillah_gra, description: 'Latest Shemoneh Esrei - 4 hrs', highlight: true },
+                                { label: 'Sof Zman Tefillah (MGA)', value: zmanim.zmanim.sof_zman_tefillah_mga, description: '4 hrs after dawn (stringent)' }
                             ]}
                         />
 
@@ -363,10 +374,10 @@ IMPORTANT: Use actual astronomical calculations from reliable sources. Search th
                             icon="🌤️"
                             color="from-blue-500 to-cyan-500"
                             times={[
-                                { label: 'Chatzot', value: zmanim.zmanim.chatzot, description: 'Halachic Noon', highlight: true },
-                                { label: 'Mincha Gedola', value: zmanim.zmanim.mincha_gedola, description: 'Earliest Mincha' },
-                                { label: 'Mincha Ketana', value: zmanim.zmanim.mincha_ketana, description: 'Preferred Mincha' },
-                                { label: 'Plag HaMincha', value: zmanim.zmanim.plag_hamincha, description: 'Early Maariv Time' }
+                                { label: 'Chatzot', value: zmanim.zmanim.chatzot, description: 'Halachic Noon - midpoint of day', highlight: true },
+                                { label: 'Mincha Gedola', value: zmanim.zmanim.mincha_gedola, description: 'Earliest Mincha - 30 min after noon' },
+                                { label: 'Mincha Ketana', value: zmanim.zmanim.mincha_ketana, description: 'Preferred Mincha - 2.5 hrs before sunset' },
+                                { label: 'Plag HaMincha', value: zmanim.zmanim.plag_hamincha, description: 'Earliest candle lighting - 1.25 hrs before sunset' }
                             ]}
                         />
 
@@ -375,10 +386,12 @@ IMPORTANT: Use actual astronomical calculations from reliable sources. Search th
                             icon="🌙"
                             color="from-indigo-600 to-purple-600"
                             times={[
-                                { label: 'Sunset', value: zmanim.zmanim.sunset, description: 'Shkiah', highlight: true },
-                                { label: 'Tzait HaKochavim', value: zmanim.zmanim.tzait_hakochavim, description: 'Nightfall (3 Stars)', highlight: true },
+                                zmanim.zmanim.candle_lighting && { label: 'Candle Lighting', value: zmanim.zmanim.candle_lighting, description: '18 min before sunset', highlight: true },
+                                { label: 'Sunset', value: zmanim.zmanim.sunset, description: 'Shkiyas HaChamah', highlight: true },
+                                { label: 'Tzait HaKochavim', value: zmanim.zmanim.tzait_hakochavim, description: 'Nightfall - 3 medium stars', highlight: true },
+                                { label: 'Tzait (72 min)', value: zmanim.zmanim.tzait_72, description: 'Nightfall - Rabbeinu Tam' },
                                 { label: 'Chatzot Laila', value: zmanim.zmanim.chatzot_laila, description: 'Halachic Midnight' }
-                            ]}
+                            ].filter(Boolean)}
                         />
                     </div>
                 )}
