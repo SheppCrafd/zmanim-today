@@ -291,15 +291,26 @@ Use actual astronomical calculations. Verify data is correct.`,
                                     <CalendarIcon className="w-5 h-5 text-amber-600" />
                                     <p className="text-sm font-medium text-slate-600">Select Date</p>
                                 </div>
-                                <Button 
-                                    variant="outline" 
-                                    size="sm"
-                                    onClick={handleRefresh}
-                                    disabled={calculating}
-                                    className="border-slate-300 hover:bg-slate-50"
-                                >
-                                    <RefreshCw className={`w-4 h-4 ${calculating ? 'animate-spin' : ''}`} />
-                                </Button>
+                                <div className="flex gap-2">
+                                    <Button 
+                                        variant="outline" 
+                                        size="sm"
+                                        onClick={() => setCurrentDate(new Date())}
+                                        disabled={calculating}
+                                        className="border-slate-300 hover:bg-slate-50"
+                                    >
+                                        Today
+                                    </Button>
+                                    <Button 
+                                        variant="outline" 
+                                        size="sm"
+                                        onClick={handleRefresh}
+                                        disabled={calculating}
+                                        className="border-slate-300 hover:bg-slate-50"
+                                    >
+                                        <RefreshCw className={`w-4 h-4 ${calculating ? 'animate-spin' : ''}`} />
+                                    </Button>
+                                </div>
                             </div>
                             <div className="flex items-center gap-2">
                                 <Button
