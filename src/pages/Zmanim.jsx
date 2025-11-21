@@ -59,79 +59,47 @@ export default function Zmanim() {
 
         try {
             const dateStr = format(currentDate, 'yyyy-MM-dd');
-            const result = await base44.integrations.Core.InvokeLLM({
-                prompt: `Calculate accurate Jewish zmanim for ${dateStr} at coordinates: ${location.latitude}, ${location.longitude}
+            const url = `https://www.hebcal.com/zmanim?cfg=json&latitude=${location.latitude}&longitude=${location.longitude}&date=${dateStr}`;
+            
+            const response = await fetch(url);
+            const data = await response.json();
 
-CRITICAL INSTRUCTIONS:
-1. Search hebcal.com API or website specifically for these exact coordinates and date
-2. Use this URL pattern: https://www.hebcal.com/zmanim?cfg=json&latitude=${location.latitude}&longitude=${location.longitude}&date=${dateStr}
-3. Verify times match astronomical reality for this location
+            // Format time to 12-hour format
+            const formatTime = (timeStr) => {
+                if (!timeStr) return '';
+                const date = new Date(timeStr);
+                return date.toLocaleTimeString('en-US', { 
+                    hour: 'numeric', 
+                    minute: '2-digit',
+                    hour12: true 
+                });
+            };
 
-Required zmanim (return in 12-hour format with AM/PM):
-
-DAWN & MORNING:
-- alot_hashachar: Dawn (72 minutes before sunrise OR when sun is 16.1° below horizon)
-- misheyakir: When one can recognize someone from 6 feet (sun 11° below horizon)
-- sunrise: Top of sun visible at horizon
-- sof_zman_shma_gra: Latest Shema (3 halachic hours after sunrise using GRA method: divide sunrise to sunset into 12 parts)
-- sof_zman_shma_mga: Latest Shema (3 halachic hours after dawn using MGA method: divide dawn to nightfall into 12 parts)
-- sof_zman_tefillah_gra: Latest Shemoneh Esrei (4 halachic hours after sunrise, GRA)
-- sof_zman_tefillah_mga: Latest Shemoneh Esrei (4 halachic hours after dawn, MGA)
-
-MIDDAY & AFTERNOON:
-- chatzot: Halachic noon (exact midpoint between sunrise and sunset)
-- mincha_gedola: 30 minutes after chatzot
-- mincha_ketana: 2.5 halachic hours before sunset
-- plag_hamincha: 1.25 halachic hours before sunset (midpoint between mincha ketana and sunset)
-
-EVENING & NIGHT:
-- candle_lighting: 18 minutes before sunset (for Shabbat/Yom Tov)
-- sunset: When sun disappears below horizon
-- tzait_hakochavim: Nightfall - 3 medium stars visible (sun 8.5° below horizon OR 42-50 minutes after sunset)
-- tzait_72: Nightfall per Rabbeinu Tam (72 minutes after sunset)
-- chatzot_laila: Halachic midnight (midpoint between sunset and next sunrise)
-
-HEBREW DATE INFO:
-- hebrew_date: Full Hebrew date (e.g., "כ״א כסלו תשפ״ה" or "21 Kislev 5785")
-- day_of_week_hebrew: Hebrew day name
-- parsha: Torah portion for the week (if applicable)
-- location_name: City name for these coordinates
-- timezone: Local timezone
-
-Use actual astronomical calculations. Verify data is correct.`,
-                add_context_from_internet: true,
-                response_json_schema: {
-                    type: "object",
-                    properties: {
-                        hebrew_date: { type: "string" },
-                        day_of_week_hebrew: { type: "string" },
-                        parsha: { type: "string" },
-                        location_name: { type: "string" },
-                        timezone: { type: "string" },
-                        zmanim: {
-                            type: "object",
-                            properties: {
-                                alot_hashachar: { type: "string" },
-                                misheyakir: { type: "string" },
-                                sunrise: { type: "string" },
-                                sof_zman_shma_gra: { type: "string" },
-                                sof_zman_shma_mga: { type: "string" },
-                                sof_zman_tefillah_gra: { type: "string" },
-                                sof_zman_tefillah_mga: { type: "string" },
-                                chatzot: { type: "string" },
-                                mincha_gedola: { type: "string" },
-                                mincha_ketana: { type: "string" },
-                                plag_hamincha: { type: "string" },
-                                candle_lighting: { type: "string" },
-                                sunset: { type: "string" },
-                                tzait_hakochavim: { type: "string" },
-                                tzait_72: { type: "string" },
-                                chatzot_laila: { type: "string" }
-                            }
-                        }
-                    }
+            const result = {
+                hebrew_date: data.date?.hebrew || '',
+                day_of_week_hebrew: data.date?.hebrew?.split(',')[0] || '',
+                parsha: data.events?.find(e => e.category === 'parashat')?.hebrew || '',
+                location_name: data.location?.title || '',
+                timezone: data.location?.tzid || '',
+                zmanim: {
+                    alot_hashachar: formatTime(data.times?.alotHaShachar),
+                    misheyakir: formatTime(data.times?.misheyakir),
+                    sunrise: formatTime(data.times?.sunrise),
+                    sof_zman_shma_gra: formatTime(data.times?.sofZmanShma),
+                    sof_zman_shma_mga: formatTime(data.times?.sofZmanShmaMGA),
+                    sof_zman_tefillah_gra: formatTime(data.times?.sofZmanTfilla),
+                    sof_zman_tefillah_mga: formatTime(data.times?.sofZmanTfillaMGA),
+                    chatzot: formatTime(data.times?.chatzot),
+                    mincha_gedola: formatTime(data.times?.minchaGedola),
+                    mincha_ketana: formatTime(data.times?.minchaKetana),
+                    plag_hamincha: formatTime(data.times?.plagHaMincha),
+                    candle_lighting: formatTime(data.times?.candleLighting),
+                    sunset: formatTime(data.times?.sunset),
+                    tzait_hakochavim: formatTime(data.times?.tzeit),
+                    tzait_72: formatTime(data.times?.tzeit72min),
+                    chatzot_laila: formatTime(data.times?.chatzotNight)
                 }
-            });
+            };
 
             setZmanim(result);
         } catch (err) {
