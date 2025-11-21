@@ -59,47 +59,72 @@ export default function Zmanim() {
 
         try {
             const dateStr = format(currentDate, 'yyyy-MM-dd');
-            const url = `https://www.hebcal.com/zmanim?cfg=json&latitude=${location.latitude}&longitude=${location.longitude}&date=${dateStr}`;
-            
-            const response = await fetch(url);
-            const data = await response.json();
+            const result = await base44.integrations.Core.InvokeLLM({
+                prompt: `Get Jewish zmanim for ${dateStr} at coordinates: ${location.latitude}, ${location.longitude}
 
-            // Format time to 12-hour format
-            const formatTime = (timeStr) => {
-                if (!timeStr) return '';
-                const date = new Date(timeStr);
-                return date.toLocaleTimeString('en-US', { 
-                    hour: 'numeric', 
-                    minute: '2-digit',
-                    hour12: true 
-                });
-            };
+CRITICAL: Use this exact URL and fetch the data from it:
+https://www.hebcal.com/zmanim?cfg=json&latitude=${location.latitude}&longitude=${location.longitude}&date=${dateStr}
 
-            const result = {
-                hebrew_date: data.date?.hebrew || '',
-                day_of_week_hebrew: data.date?.hebrew?.split(',')[0] || '',
-                parsha: data.events?.find(e => e.category === 'parashat')?.hebrew || '',
-                location_name: data.location?.title || '',
-                timezone: data.location?.tzid || '',
-                zmanim: {
-                    alot_hashachar: formatTime(data.times?.alotHaShachar),
-                    misheyakir: formatTime(data.times?.misheyakir),
-                    sunrise: formatTime(data.times?.sunrise),
-                    sof_zman_shma_gra: formatTime(data.times?.sofZmanShma),
-                    sof_zman_shma_mga: formatTime(data.times?.sofZmanShmaMGA),
-                    sof_zman_tefillah_gra: formatTime(data.times?.sofZmanTfilla),
-                    sof_zman_tefillah_mga: formatTime(data.times?.sofZmanTfillaMGA),
-                    chatzot: formatTime(data.times?.chatzot),
-                    mincha_gedola: formatTime(data.times?.minchaGedola),
-                    mincha_ketana: formatTime(data.times?.minchaKetana),
-                    plag_hamincha: formatTime(data.times?.plagHaMincha),
-                    candle_lighting: formatTime(data.times?.candleLighting),
-                    sunset: formatTime(data.times?.sunset),
-                    tzait_hakochavim: formatTime(data.times?.tzeit),
-                    tzait_72: formatTime(data.times?.tzeit72min),
-                    chatzot_laila: formatTime(data.times?.chatzotNight)
+Parse the JSON response and extract:
+1. Hebrew date from the "date.hebrew" field
+2. Hebrew day of week from the "date.hebrew" field (first part before comma)
+3. Parsha from events array where category="parashat", get the "hebrew" field
+4. All zmanim times from the "times" object
+
+Return all times in 12-hour format with AM/PM.
+
+Required zmanim field mappings from API:
+- alotHaShachar → alot_hashachar
+- misheyakir → misheyakir  
+- sunrise → sunrise
+- sofZmanShma → sof_zman_shma_gra
+- sofZmanShmaMGA → sof_zman_shma_mga
+- sofZmanTfilla → sof_zman_tefillah_gra
+- sofZmanTfillaMGA → sof_zman_tefillah_mga
+- chatzot → chatzot
+- minchaGedola → mincha_gedola
+- minchaKetana → mincha_ketana
+- plagHaMincha → plag_hamincha
+- candleLighting → candle_lighting (if exists)
+- sunset → sunset
+- tzeit → tzait_hakochavim
+- tzeit72min → tzait_72
+- chatzotNight → chatzot_laila
+
+Also include location timezone from "location.tzid"`,
+                add_context_from_internet: true,
+                response_json_schema: {
+                    type: "object",
+                    properties: {
+                        hebrew_date: { type: "string" },
+                        day_of_week_hebrew: { type: "string" },
+                        parsha: { type: "string" },
+                        location_name: { type: "string" },
+                        timezone: { type: "string" },
+                        zmanim: {
+                            type: "object",
+                            properties: {
+                                alot_hashachar: { type: "string" },
+                                misheyakir: { type: "string" },
+                                sunrise: { type: "string" },
+                                sof_zman_shma_gra: { type: "string" },
+                                sof_zman_shma_mga: { type: "string" },
+                                sof_zman_tefillah_gra: { type: "string" },
+                                sof_zman_tefillah_mga: { type: "string" },
+                                chatzot: { type: "string" },
+                                mincha_gedola: { type: "string" },
+                                mincha_ketana: { type: "string" },
+                                plag_hamincha: { type: "string" },
+                                candle_lighting: { type: "string" },
+                                sunset: { type: "string" },
+                                tzait_hakochavim: { type: "string" },
+                                tzait_72: { type: "string" },
+                                chatzot_laila: { type: "string" }
+                            }
+                        }
+                    }
                 }
-            };
+            });
 
             setZmanim(result);
         } catch (err) {
