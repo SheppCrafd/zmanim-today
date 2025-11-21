@@ -47,8 +47,30 @@ export default function Zmanim() {
                 setLoading(false);
             },
             (error) => {
-                setError('Unable to retrieve your location. Please enable location services.');
+                console.error('Geolocation error:', error);
+                let errorMessage = 'Unable to retrieve your location. ';
+                
+                switch(error.code) {
+                    case error.PERMISSION_DENIED:
+                        errorMessage += 'Please allow location access in your browser settings.';
+                        break;
+                    case error.POSITION_UNAVAILABLE:
+                        errorMessage += 'Location information is unavailable.';
+                        break;
+                    case error.TIMEOUT:
+                        errorMessage += 'Location request timed out.';
+                        break;
+                    default:
+                        errorMessage += 'An unknown error occurred.';
+                }
+                
+                setError(errorMessage);
                 setLoading(false);
+            },
+            {
+                enableHighAccuracy: true,
+                timeout: 10000,
+                maximumAge: 0
             }
         );
     };
@@ -165,14 +187,20 @@ Use actual astronomical calculations. Verify data is correct.`,
                 }
             });
 
+            if (!result.latitude || !result.longitude) {
+                throw new Error('Invalid coordinates received');
+            }
+
             setLocation({
                 latitude: result.latitude,
                 longitude: result.longitude,
                 city: result.city,
                 country: result.country
             });
+            setManualLocation('');
         } catch (err) {
-            setError('Could not find location. Please try a different search.');
+            console.error('Location search error:', err);
+            setError(`Could not find location "${manualLocation}". Please try a different search or be more specific (e.g., "Jerusalem, Israel").`);
         } finally {
             setSearchingLocation(false);
         }
