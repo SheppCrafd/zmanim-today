@@ -270,7 +270,7 @@ export default function Compass() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-amber-50 pb-24">
-      <div className="max-w-sm mx-auto px-4 pt-12 pb-4">
+      <div className="max-w-sm mx-auto px-4 pt-4 pb-4">
 
         {/* Header */}
         <div className="relative flex items-center mb-8">

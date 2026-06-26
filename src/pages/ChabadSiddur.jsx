@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { ExternalLink, AlertCircle, ArrowLeft, ArrowRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
+import NavMenu from '@/components/NavMenu';
 const SOURCE_URL = 'https://www.sefaria.org/Weekday_Siddur_Chabad';
 
 export default function ChabadSiddur() {
@@ -12,27 +13,32 @@ export default function ChabadSiddur() {
         <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-amber-50 flex flex-col">
 
             {/* Header */}
-            <div className="text-center pt-8 pb-4 px-4">
-                <h1 className="text-3xl md:text-4xl font-bold text-slate-800 mb-1">Weekday Chabad Siddur</h1>
-                <p className="text-slate-500 text-sm mb-3">סידור חב״ד</p>
-                <a href={SOURCE_URL} target="_blank" rel="noopener noreferrer">
-                    <Button variant="outline" size="sm" className="gap-2">
-                        <ExternalLink className="w-4 h-4" />
-                        Open in Sefaria
+            <div className="px-4 pt-4 pb-2">
+                <div className="relative flex items-center mb-3">
+                    <NavMenu />
+                    <div className="absolute left-0 right-0 text-center pointer-events-none">
+                        <h1 className="text-2xl font-bold text-slate-800 leading-tight">Weekday Chabad Siddur</h1>
+                        <p className="text-slate-500 text-sm">סידור חב״ד</p>
+                    </div>
+                    <div className="ml-auto">
+                        <a href={SOURCE_URL} target="_blank" rel="noopener noreferrer">
+                            <Button variant="outline" size="sm" className="gap-1.5">
+                                <ExternalLink className="w-3.5 h-3.5" />
+                                Sefaria
+                            </Button>
+                        </a>
+                    </div>
+                </div>
+                <div className="flex justify-between items-center">
+                    <Button variant="ghost" size="sm" onClick={() => navigate(-1)} className="gap-2 text-slate-600">
+                        <ArrowLeft className="w-4 h-4" />
+                        Back
                     </Button>
-                </a>
-            </div>
-
-            {/* Navigation buttons */}
-            <div className="flex justify-between items-center mx-4 mb-2">
-                <Button variant="ghost" size="sm" onClick={() => navigate(-1)} className="gap-2 text-slate-600">
-                    <ArrowLeft className="w-4 h-4" />
-                    Back
-                </Button>
-                <Button variant="ghost" size="sm" onClick={() => navigate(1)} className="gap-2 text-slate-600">
-                    Forward
-                    <ArrowRight className="w-4 h-4" />
-                </Button>
+                    <Button variant="ghost" size="sm" onClick={() => navigate(1)} className="gap-2 text-slate-600">
+                        Forward
+                        <ArrowRight className="w-4 h-4" />
+                    </Button>
+                </div>
             </div>
 
             {/* Iframe or fallback */}

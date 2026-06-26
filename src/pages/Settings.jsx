@@ -22,7 +22,7 @@ export default function Settings() {
 
     return (
         <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-amber-50 pb-24">
-            <div className="max-w-lg mx-auto px-4 pt-12">
+            <div className="max-w-lg mx-auto px-4 pt-4">
 
                 <div className="relative flex items-center mb-6">
                     <NavMenu />
