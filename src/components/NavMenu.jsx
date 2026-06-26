@@ -1,17 +1,22 @@
 import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Menu, X, Clock, BookOpen, Compass } from 'lucide-react';
+import { Menu, X, Clock, BookOpen, Compass, Home, ChevronDown, ChevronUp } from 'lucide-react';
 
 const navItems = [
-    { label: 'Zmanim', path: '/', icon: Clock, description: 'Daily prayer times' },
+    { label: 'Home', path: '/', icon: Home, description: 'Dashboard' },
+    { label: 'Zmanim', path: '/Zmanim', icon: Clock, description: 'Daily prayer times' },
     { label: 'Compass to Jerusalem', path: '/Compass', icon: Compass, description: 'מצפן לירושלים' },
-    { label: 'Sephardic Siddur', path: '/SephardicSiddur', icon: BookOpen, description: 'Edot HaMizrach' },
-    { label: 'Ashkenazi Siddur', path: '/AshkenaziSiddur', icon: BookOpen, description: 'Nusach Ashkenaz' },
-    { label: 'Weekday Chabad Siddur', path: '/ChabadSiddur', icon: BookOpen, description: 'Nusach Ari' },
+];
+
+const siddurimItems = [
+    { label: 'Sephardic Siddur', path: '/SephardicSiddur', description: 'Edot HaMizrach' },
+    { label: 'Ashkenazi Siddur', path: '/AshkenaziSiddur', description: 'Nusach Ashkenaz' },
+    { label: 'Weekday Chabad Siddur', path: '/ChabadSiddur', description: 'Nusach Ari' },
 ];
 
 export default function NavMenu() {
     const [open, setOpen] = useState(false);
+    const [siddurimOpen, setSiddurimOpen] = useState(false);
     const location = useLocation();
 
     return (
@@ -19,7 +24,7 @@ export default function NavMenu() {
             {/* Hamburger Button */}
             <button
                 onClick={() => setOpen(true)}
-                className="fixed top-4 left-4 z-50 p-2 rounded-lg bg-white/90 shadow-md border border-slate-200 hover:bg-slate-50 transition-colors"
+                className="p-2 rounded-lg bg-white/90 shadow-sm border border-slate-200 hover:bg-slate-50 transition-colors"
             >
                 <Menu className="w-5 h-5 text-slate-700" />
             </button>
@@ -43,7 +48,7 @@ export default function NavMenu() {
                         <X className="w-5 h-5 text-slate-600" />
                     </button>
                 </div>
-                <nav className="p-4 space-y-2">
+                <nav className="p-4 space-y-1">
                     {navItems.map(({ label, path, icon: Icon, description }) => {
                         const active = location.pathname === path;
                         return (
@@ -52,9 +57,7 @@ export default function NavMenu() {
                                 to={path}
                                 onClick={() => setOpen(false)}
                                 className={`flex items-center gap-3 p-3 rounded-xl transition-colors ${
-                                    active
-                                        ? 'bg-blue-50 text-blue-700'
-                                        : 'text-slate-700 hover:bg-slate-50'
+                                    active ? 'bg-blue-50 text-blue-700' : 'text-slate-700 hover:bg-slate-50'
                                 }`}
                             >
                                 <div className={`p-2 rounded-lg ${active ? 'bg-blue-100' : 'bg-slate-100'}`}>
@@ -67,6 +70,44 @@ export default function NavMenu() {
                             </Link>
                         );
                     })}
+
+                    {/* Siddurim section */}
+                    <button
+                        onClick={() => setSiddurimOpen(!siddurimOpen)}
+                        className="w-full flex items-center gap-3 p-3 rounded-xl text-slate-700 hover:bg-slate-50 transition-colors"
+                    >
+                        <div className="p-2 rounded-lg bg-slate-100">
+                            <BookOpen className="w-4 h-4" />
+                        </div>
+                        <div className="flex-1 text-left">
+                            <p className="font-semibold text-sm">Siddurim</p>
+                            <p className="text-xs text-slate-500">Prayer books</p>
+                        </div>
+                        {siddurimOpen ? <ChevronUp className="w-4 h-4 text-slate-400" /> : <ChevronDown className="w-4 h-4 text-slate-400" />}
+                    </button>
+
+                    {siddurimOpen && (
+                        <div className="pl-4 space-y-1">
+                            {siddurimItems.map(({ label, path, description }) => {
+                                const active = location.pathname === path;
+                                return (
+                                    <Link
+                                        key={path}
+                                        to={path}
+                                        onClick={() => setOpen(false)}
+                                        className={`flex items-center gap-3 p-2.5 rounded-xl transition-colors ${
+                                            active ? 'bg-blue-50 text-blue-700' : 'text-slate-700 hover:bg-slate-50'
+                                        }`}
+                                    >
+                                        <div>
+                                            <p className="font-medium text-sm">{label}</p>
+                                            <p className="text-xs text-slate-500">{description}</p>
+                                        </div>
+                                    </Link>
+                                );
+                            })}
+                        </div>
+                    )}
                 </nav>
             </div>
         </>
