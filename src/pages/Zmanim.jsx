@@ -398,18 +398,29 @@ Use actual astronomical calculations. Verify data is correct.`,
 
                         {hebrewInfo && (
                             <div className="mt-4 pt-4 border-t border-slate-200 space-y-2">
-                                <div className="flex justify-between items-center">
-                                    <span className="text-sm text-slate-600">Hebrew Date</span>
-                                    <span className="font-semibold text-slate-800">{hebrewInfo.hebrew_date}</span>
+                                <div className="flex justify-between items-start gap-4">
+                                    <span className="text-sm text-slate-600 shrink-0">Hebrew Date</span>
+                                    <div className="text-right">
+                                        <div className="font-semibold text-slate-800 text-lg leading-tight" dir="rtl">{hebrewInfo.hebrew_date}</div>
+                                        <div className="text-sm text-slate-500">{hebrewInfo.hebrew_date_transliterated}</div>
+                                    </div>
                                 </div>
-                                <div className="flex justify-between items-center">
-                                    <span className="text-sm text-slate-600">Day</span>
-                                    <span className="font-semibold text-slate-800">{hebrewInfo.day_of_week_hebrew}</span>
+                                <div className="flex justify-between items-start gap-4">
+                                    <span className="text-sm text-slate-600 shrink-0">Day</span>
+                                    <div className="text-right">
+                                        <div className="font-semibold text-slate-800" dir="rtl">{hebrewInfo.day_of_week_hebrew}</div>
+                                        <div className="text-sm text-slate-500">{hebrewInfo.day_of_week_transliterated}</div>
+                                    </div>
                                 </div>
                                 {hebrewInfo.parsha && (
-                                    <div className="flex justify-between items-center">
-                                        <span className="text-sm text-slate-600">Parsha</span>
-                                        <span className="font-semibold text-blue-700">{hebrewInfo.parsha}</span>
+                                    <div className="flex justify-between items-start gap-4">
+                                        <span className="text-sm text-slate-600 shrink-0">Parsha</span>
+                                        <div className="text-right">
+                                            {hebrewInfo.parsha_hebrew && (
+                                                <div className="font-semibold text-blue-700" dir="rtl">{hebrewInfo.parsha_hebrew}</div>
+                                            )}
+                                            <div className="text-sm text-blue-600">{hebrewInfo.parsha}</div>
+                                        </div>
                                     </div>
                                 )}
                             </div>
