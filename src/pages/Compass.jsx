@@ -19,191 +19,186 @@ function calcBearing(userLat, userLon) {
 }
 
 function calcDistance(userLat, userLon) {
-  const R = 6371; // km
+  const R = 6371;
   const φ1 = toRad(userLat);
   const φ2 = toRad(JERUSALEM.lat);
   const Δφ = toRad(JERUSALEM.lat - userLat);
   const Δλ = toRad(JERUSALEM.lon - userLon);
   const a = Math.sin(Δφ / 2) ** 2 + Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ / 2) ** 2;
-  const distKm = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  return distKm;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
-function useLocale() {
+function useUnits() {
   try {
-    const locale = navigator.language || 'en-US';
-    return locale.startsWith('en') ? 'imperial' : 'metric';
-  } catch {
-    return 'metric';
-  }
+    return (navigator.language || 'en-US').startsWith('en') ? 'imperial' : 'metric';
+  } catch { return 'metric'; }
 }
 
-function CompassCanvas({ heading, bearing }) {
-  const canvasRef = useRef(null);
+function lerp(a, b, t) {
+  let diff = b - a;
+  if (diff > 180) diff -= 360;
+  if (diff < -180) diff += 360;
+  return a + diff * t;
+}
+
+function CompassSVG({ heading, bearing }) {
   const animHeading = useRef(heading);
   const animFrame = useRef(null);
+  const [displayHeading, setDisplayHeading] = useState(heading);
 
   useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-
-    const ctx = canvas.getContext('2d');
-    const size = canvas.width;
-    const cx = size / 2;
-    const cy = size / 2;
-    const R = size / 2 - 10;
-
-    function lerp(a, b, t) {
-      let diff = b - a;
-      if (diff > 180) diff -= 360;
-      if (diff < -180) diff += 360;
-      return a + diff * t;
+    function tick() {
+      animHeading.current = lerp(animHeading.current, heading, 0.1);
+      setDisplayHeading(animHeading.current);
+      animFrame.current = requestAnimationFrame(tick);
     }
-
-    function draw() {
-      animHeading.current = lerp(animHeading.current, heading, 0.12);
-      const h = animHeading.current;
-      const arrowAngle = toRad(bearing - h);
-
-      ctx.clearRect(0, 0, size, size);
-
-      // Outer ring shadow
-      ctx.save();
-      ctx.shadowColor = 'rgba(0,0,0,0.18)';
-      ctx.shadowBlur = 18;
-      ctx.beginPath();
-      ctx.arc(cx, cy, R, 0, Math.PI * 2);
-      ctx.fillStyle = '#1e293b';
-      ctx.fill();
-      ctx.restore();
-
-      // Inner face gradient
-      const grad = ctx.createRadialGradient(cx, cy - R * 0.2, R * 0.1, cx, cy, R * 0.95);
-      grad.addColorStop(0, '#334155');
-      grad.addColorStop(1, '#0f172a');
-      ctx.beginPath();
-      ctx.arc(cx, cy, R - 4, 0, Math.PI * 2);
-      ctx.fillStyle = grad;
-      ctx.fill();
-
-      // Outer border
-      ctx.beginPath();
-      ctx.arc(cx, cy, R, 0, Math.PI * 2);
-      ctx.strokeStyle = '#475569';
-      ctx.lineWidth = 3;
-      ctx.stroke();
-
-      ctx.save();
-      ctx.translate(cx, cy);
-      ctx.rotate(toRad(-h));
-
-      // Tick marks
-      for (let deg = 0; deg < 360; deg += 5) {
-        const angle = toRad(deg);
-        const isMajor = deg % 90 === 0;
-        const isMinor = deg % 15 === 0 && !isMajor;
-        const tickLen = isMajor ? 18 : isMinor ? 12 : 7;
-        const lineW = isMajor ? 2.5 : isMinor ? 1.5 : 1;
-        const color = isMajor ? '#94a3b8' : isMinor ? '#64748b' : '#334155';
-
-        ctx.beginPath();
-        ctx.moveTo(Math.sin(angle) * (R - 8), -Math.cos(angle) * (R - 8));
-        ctx.lineTo(Math.sin(angle) * (R - 8 - tickLen), -Math.cos(angle) * (R - 8 - tickLen));
-        ctx.strokeStyle = color;
-        ctx.lineWidth = lineW;
-        ctx.stroke();
-      }
-
-      // Cardinal labels
-      const cardinals = [
-        { label: 'N', deg: 0, color: '#ef4444', size: 22 },
-        { label: 'E', deg: 90, color: '#94a3b8', size: 18 },
-        { label: 'S', deg: 180, color: '#94a3b8', size: 18 },
-        { label: 'W', deg: 270, color: '#94a3b8', size: 18 },
-      ];
-      cardinals.forEach(({ label, deg, color, size: fSize }) => {
-        const angle = toRad(deg);
-        const dist = R - 36;
-        ctx.font = `bold ${fSize}px system-ui, sans-serif`;
-        ctx.fillStyle = color;
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText(label, Math.sin(angle) * dist, -Math.cos(angle) * dist);
-      });
-
-      ctx.restore();
-
-      // Jerusalem arrow
-      ctx.save();
-      ctx.translate(cx, cy);
-      ctx.rotate(arrowAngle);
-
-      // Arrow shaft
-      const arrowLen = R * 0.6;
-      const arrowGrad = ctx.createLinearGradient(0, -arrowLen, 0, arrowLen * 0.2);
-      arrowGrad.addColorStop(0, '#fbbf24');
-      arrowGrad.addColorStop(0.6, '#d97706');
-      arrowGrad.addColorStop(1, '#92400e');
-
-      ctx.beginPath();
-      ctx.moveTo(0, -arrowLen);
-      ctx.lineTo(10, -arrowLen * 0.35);
-      ctx.lineTo(4, -arrowLen * 0.35);
-      ctx.lineTo(4, arrowLen * 0.2);
-      ctx.lineTo(-4, arrowLen * 0.2);
-      ctx.lineTo(-4, -arrowLen * 0.35);
-      ctx.lineTo(-10, -arrowLen * 0.35);
-      ctx.closePath();
-      ctx.fillStyle = arrowGrad;
-      ctx.fill();
-      ctx.strokeStyle = '#fbbf24';
-      ctx.lineWidth = 1;
-      ctx.stroke();
-
-      // Glow on arrow tip
-      ctx.save();
-      ctx.shadowColor = '#fbbf24';
-      ctx.shadowBlur = 14;
-      ctx.beginPath();
-      ctx.arc(0, -arrowLen + 6, 5, 0, Math.PI * 2);
-      ctx.fillStyle = '#fde68a';
-      ctx.fill();
-      ctx.restore();
-
-      // Jerusalem label on arrow
-      ctx.font = 'bold 11px system-ui, sans-serif';
-      ctx.fillStyle = '#fde68a';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText('Jerusalem', 0, -arrowLen * 0.65);
-
-      ctx.restore();
-
-      // Center dot
-      ctx.beginPath();
-      ctx.arc(cx, cy, 7, 0, Math.PI * 2);
-      ctx.fillStyle = '#f1f5f9';
-      ctx.fill();
-      ctx.beginPath();
-      ctx.arc(cx, cy, 4, 0, Math.PI * 2);
-      ctx.fillStyle = '#fbbf24';
-      ctx.fill();
-
-      animFrame.current = requestAnimationFrame(draw);
-    }
-
-    draw();
+    animFrame.current = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(animFrame.current);
-  }, [heading, bearing]);
+  }, [heading]);
+
+  const size = 280;
+  const cx = size / 2;
+  const cy = size / 2;
+  const R = 126;
+
+  const ticks = [];
+  for (let deg = 0; deg < 360; deg += 10) {
+    const isMajor = deg % 30 === 0;
+    const len = isMajor ? 14 : 7;
+    const rad = toRad(deg);
+    const x1 = cx + Math.sin(rad) * R;
+    const y1 = cy - Math.cos(rad) * R;
+    const x2 = cx + Math.sin(rad) * (R - len);
+    const y2 = cy - Math.cos(rad) * (R - len);
+    ticks.push(
+      <line
+        key={deg}
+        x1={x1} y1={y1} x2={x2} y2={y2}
+        stroke={isMajor ? '#475569' : '#cbd5e1'}
+        strokeWidth={isMajor ? 1.5 : 1}
+        strokeLinecap="round"
+      />
+    );
+  }
+
+  const cardinals = [
+    { label: 'N', deg: 0, color: '#2563eb', fontWeight: '700', fontSize: 18 },
+    { label: 'E', deg: 90, color: '#475569', fontWeight: '600', fontSize: 15 },
+    { label: 'S', deg: 180, color: '#475569', fontWeight: '600', fontSize: 15 },
+    { label: 'W', deg: 270, color: '#475569', fontWeight: '600', fontSize: 15 },
+  ];
+
+  const cardinalElements = cardinals.map(({ label, deg, color, fontWeight, fontSize }) => {
+    const rad = toRad(deg);
+    const dist = R - 28;
+    const x = cx + Math.sin(rad) * dist;
+    const y = cy - Math.cos(rad) * dist;
+    return (
+      <text
+        key={label}
+        x={x} y={y}
+        textAnchor="middle"
+        dominantBaseline="central"
+        fill={color}
+        fontSize={fontSize}
+        fontWeight={fontWeight}
+        fontFamily="system-ui, -apple-system, sans-serif"
+      >
+        {label}
+      </text>
+    );
+  });
+
+  // Arrow pointing to Jerusalem (relative to compass, accounts for heading)
+  const arrowAngle = bearing - displayHeading;
+  const arrowRad = toRad(arrowAngle);
+  const arrowLen = 80;
+  const arrowTip = {
+    x: cx + Math.sin(arrowRad) * arrowLen,
+    y: cy - Math.cos(arrowRad) * arrowLen,
+  };
+  const arrowBase = {
+    x: cx + Math.sin(arrowRad) * (-28),
+    y: cy - Math.cos(arrowRad) * (-28),
+  };
+  // Perpendicular for chevron wings
+  const perpRad = arrowRad + Math.PI / 2;
+  const wingW = 9;
+  const wingBackOffset = 18;
+  const midPoint = {
+    x: cx + Math.sin(arrowRad) * (arrowLen - wingBackOffset),
+    y: cy - Math.cos(arrowRad) * (arrowLen - wingBackOffset),
+  };
+  const leftWing = {
+    x: midPoint.x + Math.sin(perpRad) * wingW,
+    y: midPoint.y - Math.cos(perpRad) * wingW,
+  };
+  const rightWing = {
+    x: midPoint.x - Math.sin(perpRad) * wingW,
+    y: midPoint.y + Math.cos(perpRad) * wingW,
+  };
+
+  // Label position: slightly beyond arrowhead
+  const labelDist = arrowLen + 16;
+  const labelPos = {
+    x: cx + Math.sin(arrowRad) * labelDist,
+    y: cy - Math.cos(arrowRad) * labelDist,
+  };
 
   return (
-    <canvas
-      ref={canvasRef}
-      width={320}
-      height={320}
-      className="w-full max-w-xs mx-auto"
-      style={{ imageRendering: 'crisp-edges' }}
-    />
+    <svg
+      width={size}
+      height={size}
+      viewBox={`0 0 ${size} ${size}`}
+      className="w-full max-w-[280px] mx-auto"
+      style={{ overflow: 'visible' }}
+    >
+      {/* Compass ring */}
+      <circle cx={cx} cy={cy} r={R} fill="white" stroke="#e2e8f0" strokeWidth="1.5" />
+
+      {/* Rotating group: ticks + cardinals */}
+      <g transform={`rotate(${-displayHeading}, ${cx}, ${cy})`}>
+        {ticks}
+        {cardinalElements}
+      </g>
+
+      {/* Jerusalem arrow — fixed in screen space, rotates based on bearing - heading */}
+      <g>
+        {/* Shaft */}
+        <line
+          x1={arrowBase.x} y1={arrowBase.y}
+          x2={midPoint.x} y2={midPoint.y}
+          stroke="#d97706"
+          strokeWidth="2.5"
+          strokeLinecap="round"
+        />
+        {/* Chevron head */}
+        <polyline
+          points={`${leftWing.x},${leftWing.y} ${arrowTip.x},${arrowTip.y} ${rightWing.x},${rightWing.y}`}
+          fill="none"
+          stroke="#d97706"
+          strokeWidth="2.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+        {/* Label */}
+        <text
+          x={labelPos.x}
+          y={labelPos.y}
+          textAnchor="middle"
+          dominantBaseline="central"
+          fill="#d97706"
+          fontSize="10"
+          fontWeight="600"
+          fontFamily="system-ui, -apple-system, sans-serif"
+        >
+          Jerusalem
+        </text>
+      </g>
+
+      {/* Center dot */}
+      <circle cx={cx} cy={cy} r="4" fill="#d97706" />
+    </svg>
   );
 }
 
@@ -214,11 +209,10 @@ export default function Compass() {
   const [orientationSupported, setOrientationSupported] = useState(true);
   const [manualHeading, setManualHeading] = useState(0);
   const [permissionGranted, setPermissionGranted] = useState(false);
-  const units = useLocale();
+  const units = useUnits();
   const watchId = useRef(null);
   const lastUpdate = useRef(0);
 
-  // GPS
   useEffect(() => {
     if (!navigator.geolocation) {
       setLocationError('Geolocation is not supported by your browser.');
@@ -230,42 +224,29 @@ export default function Compass() {
         setLocationError(null);
       },
       (err) => {
-        if (err.code === err.PERMISSION_DENIED) {
-          setLocationError('Location access is required to determine the direction and distance to Jerusalem.');
-        } else if (err.code === err.POSITION_UNAVAILABLE) {
-          setLocationError('Location information is unavailable.');
-        } else {
-          setLocationError('Location request timed out. Please try again.');
-        }
+        const msgs = {
+          [err.PERMISSION_DENIED]: 'Location access is required to determine the direction and distance to Jerusalem.',
+          [err.POSITION_UNAVAILABLE]: 'Location information is unavailable.',
+          [err.TIMEOUT]: 'Location request timed out. Please try again.',
+        };
+        setLocationError(msgs[err.code] || 'Unable to retrieve your location.');
       },
       { enableHighAccuracy: true, timeout: 12000, maximumAge: 5000 }
     );
     return () => navigator.geolocation.clearWatch(watchId.current);
   }, []);
 
-  // Device orientation
   const handleOrientation = useCallback((e) => {
     const now = Date.now();
-    if (now - lastUpdate.current < 50) return; // throttle to ~20fps
+    if (now - lastUpdate.current < 50 || document.hidden) return;
     lastUpdate.current = now;
-
-    if (document.hidden) return;
-
-    let h = null;
-    if (e.webkitCompassHeading != null) {
-      h = e.webkitCompassHeading; // iOS true north
-    } else if (e.alpha != null) {
-      h = (360 - e.alpha) % 360; // Android
-    }
+    let h = e.webkitCompassHeading != null ? e.webkitCompassHeading : e.alpha != null ? (360 - e.alpha) % 360 : null;
     if (h != null) setHeading(h);
   }, []);
 
   useEffect(() => {
-    const request = async () => {
-      if (typeof DeviceOrientationEvent === 'undefined') {
-        setOrientationSupported(false);
-        return;
-      }
+    const setup = async () => {
+      if (typeof DeviceOrientationEvent === 'undefined') { setOrientationSupported(false); return; }
       if (typeof DeviceOrientationEvent.requestPermission === 'function') {
         try {
           const perm = await DeviceOrientationEvent.requestPermission();
@@ -273,27 +254,34 @@ export default function Compass() {
             setPermissionGranted(true);
             window.addEventListener('deviceorientationabsolute', handleOrientation, true);
             window.addEventListener('deviceorientation', handleOrientation, true);
-          } else {
-            setOrientationSupported(false);
-          }
-        } catch {
-          setOrientationSupported(false);
-        }
+          } else { setOrientationSupported(false); }
+        } catch { setOrientationSupported(false); }
       } else {
         setPermissionGranted(true);
         window.addEventListener('deviceorientationabsolute', handleOrientation, true);
         window.addEventListener('deviceorientation', handleOrientation, true);
       }
     };
-    request();
+    setup();
     return () => {
       window.removeEventListener('deviceorientationabsolute', handleOrientation, true);
       window.removeEventListener('deviceorientation', handleOrientation, true);
     };
   }, [handleOrientation]);
 
-  const effectiveHeading = orientationSupported ? heading : manualHeading;
+  const requestIOSPermission = async () => {
+    try {
+      const perm = await DeviceOrientationEvent.requestPermission();
+      if (perm === 'granted') {
+        setOrientationSupported(true);
+        setPermissionGranted(true);
+        window.addEventListener('deviceorientationabsolute', handleOrientation, true);
+        window.addEventListener('deviceorientation', handleOrientation, true);
+      }
+    } catch { /* ignore */ }
+  };
 
+  const effectiveHeading = orientationSupported ? heading : manualHeading;
   const bearing = location ? calcBearing(location.lat, location.lon) : 0;
   const distKm = location ? calcDistance(location.lat, location.lon) : null;
   const distDisplay = distKm != null
@@ -302,29 +290,15 @@ export default function Compass() {
       : `${Math.round(distKm).toLocaleString()} km`
     : null;
 
-  const requestIOSPermission = async () => {
-    if (typeof DeviceOrientationEvent.requestPermission === 'function') {
-      try {
-        const perm = await DeviceOrientationEvent.requestPermission();
-        if (perm === 'granted') {
-          setOrientationSupported(true);
-          setPermissionGranted(true);
-          window.addEventListener('deviceorientationabsolute', handleOrientation, true);
-          window.addEventListener('deviceorientation', handleOrientation, true);
-        }
-      } catch { /* ignore */ }
-    }
-  };
-
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-amber-50">
       <NavMenu />
-      <div className="max-w-lg mx-auto px-4 pt-20 pb-12">
+      <div className="max-w-sm mx-auto px-4 pt-20 pb-12">
 
         {/* Header */}
         <div className="text-center mb-8">
-          <h1 className="text-4xl font-bold text-slate-800 mb-1 tracking-tight">Compass to Jerusalem</h1>
-          <p className="text-slate-500 text-base">מצפן לירושלים</p>
+          <h1 className="text-3xl font-bold text-slate-800 mb-1 tracking-tight">Compass to Jerusalem</h1>
+          <p className="text-slate-500 text-sm">מצפן לירושלים</p>
         </div>
 
         {/* Location error */}
@@ -336,69 +310,68 @@ export default function Compass() {
         )}
 
         {/* Compass */}
-        <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl border border-slate-200 p-6 mb-6">
-          {!location && !locationError && (
-            <div className="flex flex-col items-center py-6 gap-3">
-              <Loader2 className="w-8 h-8 text-blue-500 animate-spin" />
-              <p className="text-slate-500 text-sm">Acquiring location…</p>
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 mb-5 flex flex-col items-center">
+          {!location && !locationError ? (
+            <div className="flex flex-col items-center py-10 gap-3">
+              <Loader2 className="w-7 h-7 text-blue-500 animate-spin" />
+              <p className="text-slate-400 text-sm">Acquiring location…</p>
             </div>
+          ) : (
+            <CompassSVG heading={effectiveHeading} bearing={bearing} />
           )}
 
-          {(location || locationError) && (
-            <CompassCanvas heading={effectiveHeading} bearing={location ? bearing : 0} />
-          )}
-
-          {/* iOS permission button */}
+          {/* iOS sensor permission */}
           {!orientationSupported && typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function' && !permissionGranted && (
-            <div className="mt-4 text-center">
-              <Button onClick={requestIOSPermission} className="bg-blue-600 hover:bg-blue-700 text-sm">
-                Enable Compass Sensor
-              </Button>
-            </div>
+            <Button onClick={requestIOSPermission} size="sm" className="mt-4 bg-blue-600 hover:bg-blue-700">
+              Enable Compass Sensor
+            </Button>
           )}
 
-          {/* Manual heading slider fallback */}
+          {/* Manual heading fallback */}
           {!orientationSupported && (
-            <div className="mt-5 px-2">
-              <p className="text-xs text-slate-500 mb-2 text-center">Orientation sensor unavailable — rotate manually</p>
+            <div className="mt-5 w-full px-2">
+              <p className="text-xs text-slate-400 mb-2 text-center">Rotate manually — sensor unavailable</p>
               <Slider
-                min={0}
-                max={359}
-                step={1}
+                min={0} max={359} step={1}
                 value={[manualHeading]}
                 onValueChange={([v]) => setManualHeading(v)}
-                className="w-full"
               />
               <p className="text-xs text-slate-400 text-center mt-1">{manualHeading}°</p>
             </div>
           )}
         </div>
 
-        {/* Info panel */}
+        {/* Info cards */}
         {location && (
-          <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg border border-slate-200 p-5 space-y-3">
-            <div className="flex justify-between items-center py-2 border-b border-slate-100">
-              <span className="text-sm text-slate-500 flex items-center gap-2"><Navigation className="w-4 h-4" /> Heading</span>
-              <span className="font-semibold text-slate-800">{Math.round(effectiveHeading)}°</span>
+          <>
+            <div className="grid grid-cols-3 gap-3 mb-4">
+              <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-3 text-center">
+                <p className="text-xs text-slate-400 mb-1">Heading</p>
+                <p className="text-xl font-bold text-slate-800">{Math.round(effectiveHeading)}°</p>
+              </div>
+              <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-3 text-center">
+                <p className="text-xs text-slate-400 mb-1">Bearing</p>
+                <p className="text-xl font-bold text-amber-600">{Math.round(bearing)}°</p>
+              </div>
+              <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-3 text-center">
+                <p className="text-xs text-slate-400 mb-1">Distance</p>
+                <p className="text-lg font-bold text-slate-800 leading-tight">{distDisplay}</p>
+              </div>
             </div>
-            <div className="flex justify-between items-center py-2 border-b border-slate-100">
-              <span className="text-sm text-slate-500 flex items-center gap-2">🕍 Jerusalem Bearing</span>
-              <span className="font-semibold text-amber-600">{Math.round(bearing)}°</span>
-            </div>
-            <div className="py-2 border-b border-slate-100">
-              <p className="text-sm text-slate-700 leading-relaxed">
-                Jerusalem is{' '}
-                <span className="font-semibold text-amber-600">{distDisplay}</span> away at a bearing of{' '}
-                <span className="font-semibold text-amber-600">{Math.round(bearing)}°</span>.
+
+            <div className="bg-white rounded-xl border border-slate-200 shadow-sm px-4 py-3 mb-4">
+              <p className="text-sm text-slate-500 text-center">
+                Jerusalem is <span className="text-amber-600 font-semibold">{distDisplay}</span> away at a bearing of <span className="text-amber-600 font-semibold">{Math.round(bearing)}°</span>.
               </p>
             </div>
-            <div className="flex justify-between items-center pt-1">
-              <span className="text-xs text-slate-400 flex items-center gap-1"><MapPin className="w-3 h-3" /> Your location</span>
-              <span className="text-xs text-slate-400 font-mono">
+
+            <div className="flex items-center justify-center gap-1.5">
+              <MapPin className="w-3 h-3 text-slate-400" />
+              <p className="text-xs text-slate-400 font-mono">
                 {location.lat.toFixed(4)}°, {location.lon.toFixed(4)}°
-              </span>
+              </p>
             </div>
-          </div>
+          </>
         )}
 
       </div>
