@@ -9,6 +9,9 @@ import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
 import PageNotFound from './lib/PageNotFound';
 import { AuthProvider, useAuth } from '@/lib/AuthContext';
 import UserNotRegisteredError from '@/components/UserNotRegisteredError';
+import SephardicSiddur from './pages/SephardicSiddur';
+import AshkenaziSiddur from './pages/AshkenaziSiddur';
+import ChabadSiddur from './pages/ChabadSiddur';
 
 const { Pages, Layout, mainPage } = pagesConfig;
 const mainPageKey = mainPage ?? Object.keys(Pages)[0];
@@ -60,6 +63,9 @@ const AuthenticatedApp = () => {
           }
         />
       ))}
+      <Route path="/SephardicSiddur" element={<SephardicSiddur />} />
+      <Route path="/AshkenaziSiddur" element={<AshkenaziSiddur />} />
+      <Route path="/ChabadSiddur" element={<ChabadSiddur />} />
       <Route path="*" element={<PageNotFound />} />
     </Routes>
   );

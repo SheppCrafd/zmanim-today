@@ -9,6 +9,7 @@ import { format } from 'date-fns';
 import { base44 } from '@/api/base44Client';
 import ZmanimCard from '../components/zmanim/ZmanimCard';
 import LocationDisplay from '../components/zmanim/LocationDisplay';
+import NavMenu from '../components/NavMenu';
 
 export default function Zmanim() {
     const [location, setLocation] = useState(null);
@@ -215,6 +216,7 @@ Use actual astronomical calculations. Verify data is correct.`,
 
     return (
         <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-amber-50">
+            <NavMenu />
             <div className="max-w-4xl mx-auto p-4 md:p-8">
                 {/* Header */}
                 <div className="text-center mb-8">
