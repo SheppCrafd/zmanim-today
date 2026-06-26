@@ -242,7 +242,7 @@ Use actual astronomical calculations. Verify data is correct.`,
                                     <div className="flex gap-2">
                                         <Input
                                             type="text"
-                                            placeholder="e.g., Jerusalem, New York, London..."
+                                            placeholder="e.g., 'Jerusalem', 'New York, NY', 'London'..."
                                             value={manualLocation}
                                             onChange={(e) => setManualLocation(e.target.value)}
                                             className="flex-1"
