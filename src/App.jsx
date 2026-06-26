@@ -16,7 +16,6 @@ import AshkenaziSiddur from './pages/AshkenaziSiddur';
 import ChabadSiddur from './pages/ChabadSiddur';
 import Compass from './pages/Compass';
 import Settings from './pages/Settings';
-import BottomNav from './components/BottomNav';
 
 const AuthenticatedApp = () => {
   const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
@@ -46,7 +45,6 @@ const AuthenticatedApp = () => {
         <Route path="/ChabadSiddur" element={<ChabadSiddur />} />
         <Route path="*" element={<PageNotFound />} />
       </Routes>
-      <BottomNav />
     </>
   );
 };
