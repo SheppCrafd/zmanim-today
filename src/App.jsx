@@ -12,6 +12,7 @@ import UserNotRegisteredError from '@/components/UserNotRegisteredError';
 import SephardicSiddur from './pages/SephardicSiddur';
 import AshkenaziSiddur from './pages/AshkenaziSiddur';
 import ChabadSiddur from './pages/ChabadSiddur';
+import Compass from './pages/Compass';
 
 const { Pages, Layout, mainPage } = pagesConfig;
 const mainPageKey = mainPage ?? Object.keys(Pages)[0];
@@ -66,6 +67,7 @@ const AuthenticatedApp = () => {
       <Route path="/SephardicSiddur" element={<SephardicSiddur />} />
       <Route path="/AshkenaziSiddur" element={<AshkenaziSiddur />} />
       <Route path="/ChabadSiddur" element={<ChabadSiddur />} />
+      <Route path="/Compass" element={<Compass />} />
       <Route path="*" element={<PageNotFound />} />
     </Routes>
   );
