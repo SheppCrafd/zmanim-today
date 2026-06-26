@@ -4,28 +4,23 @@ import { QueryClientProvider } from '@tanstack/react-query'
 import { queryClientInstance } from '@/lib/query-client'
 import VisualEditAgent from '@/lib/VisualEditAgent'
 import NavigationTracker from '@/lib/NavigationTracker'
-import { pagesConfig } from './pages.config'
 import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
 import PageNotFound from './lib/PageNotFound';
 import { AuthProvider, useAuth } from '@/lib/AuthContext';
 import UserNotRegisteredError from '@/components/UserNotRegisteredError';
+
+import Home from './pages/Home';
+import Zmanim from './pages/Zmanim';
 import SephardicSiddur from './pages/SephardicSiddur';
 import AshkenaziSiddur from './pages/AshkenaziSiddur';
 import ChabadSiddur from './pages/ChabadSiddur';
 import Compass from './pages/Compass';
-
-const { Pages, Layout, mainPage } = pagesConfig;
-const mainPageKey = mainPage ?? Object.keys(Pages)[0];
-const MainPage = mainPageKey ? Pages[mainPageKey] : <></>;
-
-const LayoutWrapper = ({ children, currentPageName }) => Layout ?
-  <Layout currentPageName={currentPageName}>{children}</Layout>
-  : <>{children}</>;
+import Settings from './pages/Settings';
+import BottomNav from './components/BottomNav';
 
 const AuthenticatedApp = () => {
-  const { isLoadingAuth, isLoadingPublicSettings, authError, isAuthenticated, navigateToLogin } = useAuth();
+  const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
 
-  // Show loading spinner while checking app public settings or auth
   if (isLoadingPublicSettings || isLoadingAuth) {
     return (
       <div className="fixed inset-0 flex items-center justify-center">
@@ -34,48 +29,29 @@ const AuthenticatedApp = () => {
     );
   }
 
-  // Handle authentication errors
   if (authError) {
-    if (authError.type === 'user_not_registered') {
-      return <UserNotRegisteredError />;
-    } else if (authError.type === 'auth_required') {
-      // Redirect to login automatically
-      navigateToLogin();
-      return null;
-    }
+    if (authError.type === 'user_not_registered') return <UserNotRegisteredError />;
+    if (authError.type === 'auth_required') { navigateToLogin(); return null; }
   }
 
-  // Render the main app
   return (
-    <Routes>
-      <Route path="/" element={
-        <LayoutWrapper currentPageName={mainPageKey}>
-          <MainPage />
-        </LayoutWrapper>
-      } />
-      {Object.entries(Pages).map(([path, Page]) => (
-        <Route
-          key={path}
-          path={`/${path}`}
-          element={
-            <LayoutWrapper currentPageName={path}>
-              <Page />
-            </LayoutWrapper>
-          }
-        />
-      ))}
-      <Route path="/SephardicSiddur" element={<SephardicSiddur />} />
-      <Route path="/AshkenaziSiddur" element={<AshkenaziSiddur />} />
-      <Route path="/ChabadSiddur" element={<ChabadSiddur />} />
-      <Route path="/Compass" element={<Compass />} />
-      <Route path="*" element={<PageNotFound />} />
-    </Routes>
+    <>
+      <Routes>
+        <Route path="/" element={<Home />} />
+        <Route path="/Zmanim" element={<Zmanim />} />
+        <Route path="/Compass" element={<Compass />} />
+        <Route path="/Settings" element={<Settings />} />
+        <Route path="/SephardicSiddur" element={<SephardicSiddur />} />
+        <Route path="/AshkenaziSiddur" element={<AshkenaziSiddur />} />
+        <Route path="/ChabadSiddur" element={<ChabadSiddur />} />
+        <Route path="*" element={<PageNotFound />} />
+      </Routes>
+      <BottomNav />
+    </>
   );
 };
 
-
 function App() {
-
   return (
     <AuthProvider>
       <QueryClientProvider client={queryClientInstance}>
@@ -87,7 +63,7 @@ function App() {
         <VisualEditAgent />
       </QueryClientProvider>
     </AuthProvider>
-  )
+  );
 }
 
-export default App
+export default App;

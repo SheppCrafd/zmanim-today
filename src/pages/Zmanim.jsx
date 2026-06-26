@@ -9,11 +9,11 @@ import { format } from 'date-fns';
 import { base44 } from '@/api/base44Client';
 import ZmanimCard from '../components/zmanim/ZmanimCard';
 import LocationDisplay from '../components/zmanim/LocationDisplay';
-import NavMenu from '../components/NavMenu';
 import { getHebrewDate } from '../lib/hebrewDate';
+import { useSavedLocation } from '@/hooks/useLocation';
 
 export default function Zmanim() {
-    const [location, setLocation] = useState(null);
+    const { location, loading: gpsLoading, error: gpsError, detectGPS, searchLocation: searchSavedLocation, clearLocation } = useSavedLocation();
     const [loading, setLoading] = useState(false);
     const [calculating, setCalculating] = useState(false);
     const [zmanim, setZmanim] = useState(null);
@@ -38,50 +38,7 @@ export default function Zmanim() {
     }, [currentDate]);
 
     const getLocation = () => {
-        setLoading(true);
-        setError(null);
-        
-        if (!navigator.geolocation) {
-            setError('Geolocation is not supported by your browser');
-            setLoading(false);
-            return;
-        }
-
-        navigator.geolocation.getCurrentPosition(
-            (position) => {
-                setLocation({
-                    latitude: position.coords.latitude,
-                    longitude: position.coords.longitude
-                });
-                setLoading(false);
-            },
-            (error) => {
-                console.error('Geolocation error:', error);
-                let errorMessage = 'Unable to retrieve your location. ';
-                
-                switch(error.code) {
-                    case error.PERMISSION_DENIED:
-                        errorMessage += 'Please allow location access in your browser settings.';
-                        break;
-                    case error.POSITION_UNAVAILABLE:
-                        errorMessage += 'Location information is unavailable.';
-                        break;
-                    case error.TIMEOUT:
-                        errorMessage += 'Location request timed out.';
-                        break;
-                    default:
-                        errorMessage += 'An unknown error occurred.';
-                }
-                
-                setError(errorMessage);
-                setLoading(false);
-            },
-            {
-                enableHighAccuracy: true,
-                timeout: 10000,
-                maximumAge: 0
-            }
-        );
+        detectGPS();
     };
 
     const calculateZmanim = async () => {
@@ -169,46 +126,10 @@ Use actual astronomical calculations. Verify data is correct.`,
     const handleManualLocation = async (e) => {
         e.preventDefault();
         if (!manualLocation.trim()) return;
-
         setSearchingLocation(true);
-        setError(null);
-
-        try {
-            const result = await base44.integrations.Core.InvokeLLM({
-                prompt: `Get the exact coordinates (latitude and longitude) for this location: "${manualLocation}"
-                
-                Return precise coordinates that can be used for zmanim calculations. Include state/province abbreviation for countries that have them (e.g. USA, Canada, Australia), otherwise leave state null.`,
-                add_context_from_internet: true,
-                response_json_schema: {
-                    type: "object",
-                    properties: {
-                        latitude: { type: "number" },
-                        longitude: { type: "number" },
-                        city: { type: "string" },
-                        state: { type: "string" },
-                        country: { type: "string" }
-                    }
-                }
-            });
-
-            if (!result.latitude || !result.longitude) {
-                throw new Error('Invalid coordinates received');
-            }
-
-            setLocation({
-                latitude: result.latitude,
-                longitude: result.longitude,
-                city: result.city,
-                state: result.state,
-                country: result.country
-            });
-            setManualLocation('');
-        } catch (err) {
-            console.error('Location search error:', err);
-            setError(`Could not find location "${manualLocation}". Please try a different search or be more specific (e.g., "Jerusalem, Israel").`);
-        } finally {
-            setSearchingLocation(false);
-        }
+        await searchSavedLocation(manualLocation);
+        setManualLocation('');
+        setSearchingLocation(false);
     };
 
     const handleRefresh = () => {
@@ -219,8 +140,7 @@ Use actual astronomical calculations. Verify data is correct.`,
     };
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-amber-50">
-            <NavMenu />
+        <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-amber-50 pb-24">
             <div className="max-w-4xl mx-auto p-4 md:p-8">
                 {/* Header */}
                 <div className="text-center mb-8">
@@ -270,10 +190,10 @@ Use actual astronomical calculations. Verify data is correct.`,
                                     type="button"
                                     variant="outline"
                                     onClick={getLocation}
-                                    disabled={loading}
+                                    disabled={gpsLoading}
                                     className="w-full"
                                 >
-                                    {loading ? (
+                                    {gpsLoading ? (
                                         <>
                                             <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                                             Detecting Location...
@@ -309,7 +229,7 @@ Use actual astronomical calculations. Verify data is correct.`,
                                     variant="ghost"
                                     size="sm"
                                     onClick={() => {
-                                        setLocation(null);
+                                        clearLocation();
                                         setZmanim(null);
                                         setManualLocation('');
                                     }}

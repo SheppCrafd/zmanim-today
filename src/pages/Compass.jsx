@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { MapPin, Navigation, Loader2, AlertCircle } from 'lucide-react';
+import { MapPin, Loader2, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
-import NavMenu from '../components/NavMenu';
+import { useSavedLocation } from '@/hooks/useLocation';
+
 
 const JERUSALEM = { lat: 31.778, lon: 35.235 };
 
@@ -203,38 +204,14 @@ function CompassSVG({ heading, bearing }) {
 }
 
 export default function Compass() {
-  const [location, setLocation] = useState(null);
-  const [locationError, setLocationError] = useState(null);
+  const { location: savedLocation, error: locationError } = useSavedLocation();
+  const location = savedLocation ? { lat: savedLocation.latitude, lon: savedLocation.longitude } : null;
   const [heading, setHeading] = useState(0);
   const [orientationSupported, setOrientationSupported] = useState(true);
   const [manualHeading, setManualHeading] = useState(0);
   const [permissionGranted, setPermissionGranted] = useState(false);
   const units = useUnits();
-  const watchId = useRef(null);
   const lastUpdate = useRef(0);
-
-  useEffect(() => {
-    if (!navigator.geolocation) {
-      setLocationError('Geolocation is not supported by your browser.');
-      return;
-    }
-    watchId.current = navigator.geolocation.watchPosition(
-      (pos) => {
-        setLocation({ lat: pos.coords.latitude, lon: pos.coords.longitude });
-        setLocationError(null);
-      },
-      (err) => {
-        const msgs = {
-          [err.PERMISSION_DENIED]: 'Location access is required to determine the direction and distance to Jerusalem.',
-          [err.POSITION_UNAVAILABLE]: 'Location information is unavailable.',
-          [err.TIMEOUT]: 'Location request timed out. Please try again.',
-        };
-        setLocationError(msgs[err.code] || 'Unable to retrieve your location.');
-      },
-      { enableHighAccuracy: true, timeout: 12000, maximumAge: 5000 }
-    );
-    return () => navigator.geolocation.clearWatch(watchId.current);
-  }, []);
 
   const handleOrientation = useCallback((e) => {
     const now = Date.now();
@@ -291,9 +268,8 @@ export default function Compass() {
     : null;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-amber-50">
-      <NavMenu />
-      <div className="max-w-sm mx-auto px-4 pt-20 pb-12">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-amber-50 pb-24">
+      <div className="max-w-sm mx-auto px-4 pt-12 pb-4">
 
         {/* Header */}
         <div className="text-center mb-8">

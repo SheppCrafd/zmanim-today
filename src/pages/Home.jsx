@@ -1,10 +1,149 @@
-// Placeholder file, this should be overridden by the generated code
+import React, { useState } from 'react';
+import { MapPin, Loader2, Search, ChevronRight, AlertCircle } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Link } from 'react-router-dom';
+import { useSavedLocation } from '@/hooks/useLocation';
+import { useZmanim } from '@/hooks/useZmanim';
+import { useDashboardPrefs } from '@/hooks/useDashboardPrefs';
+import MiniCompass from '@/components/home/MiniCompass';
+import NextZmanCard from '@/components/home/NextZmanCard';
+import ZmanimSummary from '@/components/home/ZmanimSummary';
 
+function LocationLabel({ location }) {
+    if (!location) return null;
+    const parts = [location.city, location.state, location.country].filter(Boolean);
+    if (parts.length > 0) return <span>{parts.join(', ')}</span>;
+    return <span>{location.latitude?.toFixed(3)}°, {location.longitude?.toFixed(3)}°</span>;
+}
 
 export default function Home() {
+    const { location, loading: locLoading, error: locError, detectGPS, searchLocation, clearLocation } = useSavedLocation();
+    const { zmanim, loading: zmanimLoading } = useZmanim(location);
+    const { prefs } = useDashboardPrefs();
+    const [searchQuery, setSearchQuery] = useState('');
+    const [showSearch, setShowSearch] = useState(false);
 
-  return (
-    <div>
-    </div>
-  );
+    const enabledZmanimIds = prefs.items.filter(i => i.enabled && !['compass', 'next_zman'].includes(i.id)).map(i => i.id);
+    const showCompass = prefs.items.find(i => i.id === 'compass')?.enabled;
+    const showNextZman = prefs.items.find(i => i.id === 'next_zman')?.enabled;
+
+    const handleSearch = async (e) => {
+        e.preventDefault();
+        if (!searchQuery.trim()) return;
+        await searchLocation(searchQuery);
+        setSearchQuery('');
+        setShowSearch(false);
+    };
+
+    return (
+        <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-amber-50 pb-24">
+            <div className="max-w-lg mx-auto px-4 pt-12 pb-4">
+
+                {/* Header */}
+                <div className="mb-6">
+                    <h1 className="text-2xl font-bold text-slate-800 tracking-tight">Zmanim Today</h1>
+                    <p className="text-slate-500 text-sm">זמני היום</p>
+                </div>
+
+                {/* Location */}
+                {location ? (
+                    <div className="flex items-center gap-2 mb-6">
+                        <MapPin className="w-4 h-4 text-blue-500 shrink-0" />
+                        <p className="text-sm font-medium text-slate-700 flex-1">
+                            <LocationLabel location={location} />
+                        </p>
+                        <button
+                            onClick={() => setShowSearch(!showSearch)}
+                            className="text-xs text-blue-500 hover:text-blue-700 font-medium"
+                        >
+                            Change
+                        </button>
+                    </div>
+                ) : (
+                    <div className="mb-6">
+                        {locError && (
+                            <div className="flex gap-2 items-start mb-3 p-3 bg-amber-50 border border-amber-200 rounded-xl">
+                                <AlertCircle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
+                                <p className="text-xs text-amber-800">{locError}</p>
+                            </div>
+                        )}
+                        <p className="text-sm text-slate-500 mb-3">Set your location to get prayer times.</p>
+                        <div className="flex gap-2">
+                            <Button
+                                size="sm"
+                                onClick={detectGPS}
+                                disabled={locLoading}
+                                className="bg-blue-600 hover:bg-blue-700 flex-1"
+                            >
+                                {locLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <MapPin className="w-4 h-4" />}
+                                <span className="ml-1">{locLoading ? 'Detecting…' : 'Use My Location'}</span>
+                            </Button>
+                            <Button size="sm" variant="outline" onClick={() => setShowSearch(true)}>
+                                <Search className="w-4 h-4" />
+                            </Button>
+                        </div>
+                    </div>
+                )}
+
+                {/* Search box */}
+                {showSearch && (
+                    <form onSubmit={handleSearch} className="flex gap-2 mb-6">
+                        <Input
+                            autoFocus
+                            placeholder="e.g. Jerusalem, New York, NY…"
+                            value={searchQuery}
+                            onChange={e => setSearchQuery(e.target.value)}
+                            className="flex-1 text-sm"
+                            disabled={locLoading}
+                        />
+                        <Button type="submit" size="sm" disabled={locLoading || !searchQuery.trim()} className="bg-blue-600 hover:bg-blue-700">
+                            {locLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
+                        </Button>
+                        <Button type="button" size="sm" variant="ghost" onClick={() => setShowSearch(false)}>✕</Button>
+                    </form>
+                )}
+
+                {location && (
+                    <div className="space-y-3">
+                        {/* Mini Compass */}
+                        {showCompass && <MiniCompass location={location} />}
+
+                        {/* Zmanim loading */}
+                        {zmanimLoading && (
+                            <div className="bg-white rounded-xl border border-slate-200 p-6 flex items-center gap-3">
+                                <Loader2 className="w-5 h-5 text-blue-500 animate-spin" />
+                                <p className="text-sm text-slate-500">Calculating prayer times…</p>
+                            </div>
+                        )}
+
+                        {/* Next Zman */}
+                        {showNextZman && zmanim && !zmanimLoading && (
+                            <NextZmanCard zmanim={zmanim} />
+                        )}
+
+                        {/* Zmanim Summary */}
+                        {zmanim && !zmanimLoading && enabledZmanimIds.length > 0 && (
+                            <ZmanimSummary
+                                zmanim={zmanim}
+                                enabledIds={enabledZmanimIds}
+                                use24Hour={prefs.use24Hour}
+                            />
+                        )}
+
+                        {/* Link to full zmanim */}
+                        {zmanim && !zmanimLoading && (
+                            <Link to="/Zmanim">
+                                <div className="flex items-center justify-center gap-1.5 py-3 text-sm text-blue-600 hover:text-blue-700 font-medium">
+                                    View full zmanim list
+                                    <ChevronRight className="w-4 h-4" />
+                                </div>
+                            </Link>
+                        )}
+                    </div>
+                )}
+
+            </div>
+        </div>
+    );
 }
