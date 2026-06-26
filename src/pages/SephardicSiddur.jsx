@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ExternalLink, AlertCircle, ArrowLeft } from 'lucide-react';
+import { ExternalLink, AlertCircle, ArrowLeft, ArrowRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
 import NavMenu from '../components/NavMenu';
@@ -14,16 +14,8 @@ export default function SephardicSiddur() {
         <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-amber-50 flex flex-col">
             <NavMenu />
 
-            {/* Back button */}
-            <div className="pt-16 px-4">
-                <Button variant="ghost" size="sm" onClick={() => navigate(-1)} className="gap-2 text-slate-600">
-                    <ArrowLeft className="w-4 h-4" />
-                    Back
-                </Button>
-            </div>
-
             {/* Header */}
-            <div className="text-center pb-4 px-4">
+            <div className="text-center pt-16 pb-4 px-4">
                 <h1 className="text-3xl md:text-4xl font-bold text-slate-800 mb-1">Sephardic Siddur</h1>
                 <p className="text-slate-500 text-sm mb-3">סידור עדות המזרח</p>
                 <a href={SOURCE_URL} target="_blank" rel="noopener noreferrer">
@@ -32,6 +24,18 @@ export default function SephardicSiddur() {
                         Open in Sefaria
                     </Button>
                 </a>
+            </div>
+
+            {/* Navigation buttons */}
+            <div className="flex justify-between items-center mx-4 mb-2">
+                <Button variant="ghost" size="sm" onClick={() => navigate(-1)} className="gap-2 text-slate-600">
+                    <ArrowLeft className="w-4 h-4" />
+                    Back
+                </Button>
+                <Button variant="ghost" size="sm" onClick={() => navigate(1)} className="gap-2 text-slate-600">
+                    Forward
+                    <ArrowRight className="w-4 h-4" />
+                </Button>
             </div>
 
             {/* Iframe or fallback */}
