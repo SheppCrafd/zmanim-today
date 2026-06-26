@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Menu, X, Clock, BookOpen } from 'lucide-react';
+import { Menu, X, Clock, BookOpen, MapPin } from 'lucide-react';
 
 const navItems = [
     { label: 'Zmanim', path: '/', icon: Clock, description: 'Daily prayer times' },
+    { label: 'Jerusalem Compass', path: '/JerusalemCompass', icon: MapPin, description: 'Always points to Yerushalayim' },
     { label: 'Sephardic Siddur', path: '/SephardicSiddur', icon: BookOpen, description: 'Edot HaMizrach' },
     { label: 'Ashkenazi Siddur', path: '/AshkenaziSiddur', icon: BookOpen, description: 'Nusach Ashkenaz' },
     { label: 'Weekday Chabad Siddur', path: '/ChabadSiddur', icon: BookOpen, description: 'Nusach Ari' },
