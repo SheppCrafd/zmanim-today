@@ -10,6 +10,7 @@ import { base44 } from '@/api/base44Client';
 import ZmanimCard from '../components/zmanim/ZmanimCard';
 import LocationDisplay from '../components/zmanim/LocationDisplay';
 import NavMenu from '../components/NavMenu';
+import { getHebrewDate } from '../lib/hebrewDate';
 
 export default function Zmanim() {
     const [location, setLocation] = useState(null);
@@ -20,6 +21,7 @@ export default function Zmanim() {
     const [currentDate, setCurrentDate] = useState(new Date());
     const [manualLocation, setManualLocation] = useState('');
     const [searchingLocation, setSearchingLocation] = useState(false);
+    const [hebrewInfo, setHebrewInfo] = useState(null);
 
 
 
@@ -28,6 +30,12 @@ export default function Zmanim() {
             calculateZmanim();
         }
     }, [location, currentDate]);
+
+    useEffect(() => {
+        getHebrewDate(currentDate)
+            .then(setHebrewInfo)
+            .catch(() => setHebrewInfo(null));
+    }, [currentDate]);
 
     const getLocation = () => {
         setLoading(true);
@@ -114,21 +122,15 @@ EVENING & NIGHT:
 - tzait_72: Nightfall per Rabbeinu Tam (72 minutes after sunset)
 - chatzot_laila: Halachic midnight (midpoint between sunset and next sunrise)
 
-HEBREW DATE INFO (ALL must correspond to the date ${dateStr}, NOT today's date):
-- hebrew_date: Full Hebrew date that corresponds EXACTLY to the Gregorian date ${dateStr} (e.g., "כ״א כסלו תשפ״ה" or "21 Kislev 5785"). Convert ${dateStr} to its Hebrew calendar equivalent.
-- day_of_week_hebrew: Hebrew day name for ${dateStr} (e.g., יום ראשון, יום שני)
-- parsha: Torah portion read on the Shabbat of the week containing ${dateStr}
+LOCATION INFO:
 - location_name: City name for these coordinates
 - timezone: Local timezone
 
-CRITICAL: The Hebrew date, day of week, and parsha MUST all be calculated for ${dateStr} specifically — do not use today's date. Use actual astronomical calculations. Verify data is correct.`,
+Use actual astronomical calculations. Verify data is correct.`,
                 add_context_from_internet: true,
                 response_json_schema: {
                     type: "object",
                     properties: {
-                        hebrew_date: { type: "string" },
-                        day_of_week_hebrew: { type: "string" },
-                        parsha: { type: "string" },
                         location_name: { type: "string" },
                         timezone: { type: "string" },
                         zmanim: {
@@ -392,20 +394,20 @@ CRITICAL: The Hebrew date, day of week, and parsha MUST all be calculated for ${
                             </div>
                         </div>
 
-                        {zmanim && (
+                        {hebrewInfo && (
                             <div className="mt-4 pt-4 border-t border-slate-200 space-y-2">
                                 <div className="flex justify-between items-center">
                                     <span className="text-sm text-slate-600">Hebrew Date</span>
-                                    <span className="font-semibold text-slate-800">{zmanim.hebrew_date}</span>
+                                    <span className="font-semibold text-slate-800">{hebrewInfo.hebrew_date}</span>
                                 </div>
                                 <div className="flex justify-between items-center">
                                     <span className="text-sm text-slate-600">Day</span>
-                                    <span className="font-semibold text-slate-800">{zmanim.day_of_week_hebrew}</span>
+                                    <span className="font-semibold text-slate-800">{hebrewInfo.day_of_week_hebrew}</span>
                                 </div>
-                                {zmanim.parsha && (
+                                {hebrewInfo.parsha && (
                                     <div className="flex justify-between items-center">
                                         <span className="text-sm text-slate-600">Parsha</span>
-                                        <span className="font-semibold text-blue-700">{zmanim.parsha}</span>
+                                        <span className="font-semibold text-blue-700">{hebrewInfo.parsha}</span>
                                     </div>
                                 )}
                             </div>
