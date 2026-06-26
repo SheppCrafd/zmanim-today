@@ -20,20 +20,19 @@ export default function AshkenaziSiddur() {
                         <h1 className="text-2xl font-bold text-slate-800 leading-tight">Ashkenazi Siddur</h1>
                         <p className="text-slate-500 text-sm">סידור אשכנז</p>
                     </div>
-                    <div className="shrink-0">
-                        <a href={SOURCE_URL} target="_blank" rel="noopener noreferrer">
-                            <Button variant="outline" size="sm" className="gap-1.5">
-                                <ExternalLink className="w-3.5 h-3.5" />
-                                Sefaria
-                            </Button>
-                        </a>
-                    </div>
+                    <div className="shrink-0 w-9"></div>
                 </div>
                 <div className="flex justify-between items-center">
                     <Button variant="ghost" size="sm" onClick={() => navigate(-1)} className="gap-2 text-slate-600">
                         <ArrowLeft className="w-4 h-4" />
                         Back
                     </Button>
+                    <a href={SOURCE_URL} target="_blank" rel="noopener noreferrer">
+                        <Button variant="outline" size="sm" className="gap-1.5">
+                            <ExternalLink className="w-3.5 h-3.5" />
+                            Sefaria
+                        </Button>
+                    </a>
                     <Button variant="ghost" size="sm" onClick={() => navigate(1)} className="gap-2 text-slate-600">
                         Forward
                         <ArrowRight className="w-4 h-4" />
