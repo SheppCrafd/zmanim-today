@@ -270,10 +270,10 @@ export default function Compass() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-amber-50 pb-24">
-      <div className="max-w-sm mx-auto px-4 pt-12 pb-4">
+      <div className="max-w-sm mx-auto px-4 pb-4">
 
         {/* Header */}
-        <div className="relative flex items-center mb-8">
+        <div className="relative flex items-center pt-4 mb-4">
           <NavMenu />
           <div className="absolute left-0 right-0 text-center pointer-events-none">
             <h1 className="text-3xl font-bold text-slate-800 mb-1 tracking-tight">Compass to<br />Jerusalem</h1>
