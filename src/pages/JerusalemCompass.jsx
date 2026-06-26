@@ -114,96 +114,122 @@ export default function JerusalemCompass() {
 
                 {!loading && !locationError && (
                     <>
-                        {/* Compass */}
-                        <div className="relative w-72 h-72 flex items-center justify-center mb-8">
-                            {/* Outer ring */}
-                            <div className="absolute inset-0 rounded-full border-4 border-blue-700/50 bg-gradient-to-br from-slate-800 to-slate-900 shadow-2xl" />
+                        {/* Compass SVG */}
+                        <div className="mb-8 drop-shadow-2xl" style={{ filter: 'drop-shadow(0 0 32px rgba(251,191,36,0.18))' }}>
+                            <svg width="300" height="300" viewBox="0 0 300 300">
+                                {/* Definitions */}
+                                <defs>
+                                    <radialGradient id="dialGrad" cx="50%" cy="50%" r="50%">
+                                        <stop offset="0%" stopColor="#1e293b" />
+                                        <stop offset="100%" stopColor="#0f172a" />
+                                    </radialGradient>
+                                    <radialGradient id="centerGrad" cx="50%" cy="50%" r="50%">
+                                        <stop offset="0%" stopColor="#f8fafc" />
+                                        <stop offset="100%" stopColor="#94a3b8" />
+                                    </radialGradient>
+                                    <filter id="glow">
+                                        <feGaussianBlur stdDeviation="2.5" result="blur" />
+                                        <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
+                                    </filter>
+                                </defs>
 
-                            {/* Cardinal directions */}
-                            {[['N', 0], ['E', 90], ['S', 180], ['W', 270]].map(([dir, deg]) => (
-                                <span
-                                    key={dir}
-                                    className="absolute text-blue-300 text-xs font-bold"
-                                    style={{
-                                        transform: `rotate(${deg}deg) translateY(-122px) rotate(-${deg}deg)`,
-                                    }}
-                                >
-                                    {dir}
-                                </span>
-                            ))}
+                                {/* Outer bezel */}
+                                <circle cx="150" cy="150" r="148" fill="#1e293b" stroke="#334155" strokeWidth="1" />
+                                <circle cx="150" cy="150" r="143" fill="none" stroke="#fbbf24" strokeWidth="2" opacity="0.5" />
 
-                            {/* Tick marks */}
-                            {Array.from({ length: 36 }).map((_, i) => (
-                                <div
-                                    key={i}
-                                    className="absolute w-0.5 bg-blue-800"
-                                    style={{
-                                        height: i % 9 === 0 ? '12px' : '6px',
-                                        top: i % 9 === 0 ? '14px' : '17px',
-                                        left: '50%',
-                                        transformOrigin: '0 122px',
-                                        transform: `translateX(-50%) rotate(${i * 10}deg)`,
-                                    }}
-                                />
-                            ))}
+                                {/* Dial face */}
+                                <circle cx="150" cy="150" r="138" fill="url(#dialGrad)" />
 
-                            {/* Needle */}
-                            <div
-                                className="absolute w-3 flex flex-col items-center"
-                                style={{
-                                    height: '200px',
-                                    top: '50%',
-                                    left: '50%',
-                                    transformOrigin: '50% 100px',
-                                    transform: `translate(-50%, -100px) rotate(${needleRotation}deg)`,
-                                    transition: 'transform 0.3s ease-out',
-                                }}
-                            >
-                                {/* Gold tip pointing to Jerusalem */}
-                                <div className="w-0 h-0"
-                                    style={{
-                                        borderLeft: '6px solid transparent',
-                                        borderRight: '6px solid transparent',
-                                        borderBottom: '90px solid #f59e0b',
-                                    }}
-                                />
-                                {/* Blue tail */}
-                                <div className="w-0 h-0"
-                                    style={{
-                                        borderLeft: '6px solid transparent',
-                                        borderRight: '6px solid transparent',
-                                        borderTop: '90px solid #3b82f6',
-                                    }}
-                                />
-                            </div>
+                                {/* Tick marks — drawn at top, rotated around center */}
+                                {Array.from({ length: 72 }).map((_, i) => {
+                                    const angle = i * 5;
+                                    const isMajor = i % 18 === 0;   // cardinal (N/E/S/W)
+                                    const isMed = i % 9 === 0;      // intercardinal
+                                    const r1 = isMajor ? 108 : isMed ? 112 : 118;
+                                    const r2 = 132;
+                                    const rad = (angle - 90) * Math.PI / 180;
+                                    const x1 = 150 + r1 * Math.cos(rad);
+                                    const y1 = 150 + r1 * Math.sin(rad);
+                                    const x2 = 150 + r2 * Math.cos(rad);
+                                    const y2 = 150 + r2 * Math.sin(rad);
+                                    return (
+                                        <line
+                                            key={i}
+                                            x1={x1} y1={y1} x2={x2} y2={y2}
+                                            stroke={isMajor ? '#fbbf24' : isMed ? '#94a3b8' : '#334155'}
+                                            strokeWidth={isMajor ? 2.5 : isMed ? 1.5 : 1}
+                                            strokeLinecap="round"
+                                        />
+                                    );
+                                })}
 
-                            {/* Center dot */}
-                            <div className="absolute w-4 h-4 rounded-full bg-white shadow-md border-2 border-slate-600" />
+                                {/* Cardinal labels */}
+                                {[['N', 0, '#ef4444'], ['E', 90, '#94a3b8'], ['S', 180, '#94a3b8'], ['W', 270, '#94a3b8']].map(([dir, deg, color]) => {
+                                    const rad = (deg - 90) * Math.PI / 180;
+                                    const x = 150 + 92 * Math.cos(rad);
+                                    const y = 150 + 92 * Math.sin(rad);
+                                    return (
+                                        <text key={dir} x={x} y={y} textAnchor="middle" dominantBaseline="central"
+                                            fill={color} fontSize="16" fontWeight="700" fontFamily="system-ui">
+                                            {dir}
+                                        </text>
+                                    );
+                                })}
 
-                            {/* Star of David in center glow */}
-                            <div className="absolute text-2xl opacity-10 select-none">✡</div>
+                                {/* Needle group — rotates around center */}
+                                <g transform={`rotate(${needleRotation}, 150, 150)`} style={{ transition: 'transform 0.35s ease-out' }}>
+                                    {/* Gold tip (points to Jerusalem) */}
+                                    <polygon
+                                        points="150,42 143,150 157,150"
+                                        fill="#fbbf24"
+                                        filter="url(#glow)"
+                                    />
+                                    <polygon
+                                        points="150,42 146,100 154,100"
+                                        fill="#fde68a"
+                                    />
+                                    {/* Blue tail */}
+                                    <polygon
+                                        points="150,258 143,150 157,150"
+                                        fill="#3b82f6"
+                                    />
+                                    <polygon
+                                        points="150,258 146,200 154,200"
+                                        fill="#93c5fd"
+                                    />
+                                </g>
+
+                                {/* Inner ring shadow */}
+                                <circle cx="150" cy="150" r="26" fill="#0f172a" stroke="#1e293b" strokeWidth="2" />
+
+                                {/* Star of David */}
+                                <text x="150" y="150" textAnchor="middle" dominantBaseline="central"
+                                    fontSize="22" fill="#fbbf24" opacity="0.9">✡</text>
+
+                                {/* Center dot */}
+                                <circle cx="150" cy="150" r="6" fill="url(#centerGrad)" />
+                            </svg>
                         </div>
 
-                        {/* Info */}
-                        <div className="text-center space-y-2">
-                            <div className="bg-white/10 rounded-2xl px-8 py-4 backdrop-blur-sm border border-white/10">
-                                <p className="text-blue-300 text-xs uppercase tracking-widest mb-1">Direction to Jerusalem</p>
-                                <p className="text-white text-4xl font-bold">{Math.round(bearing)}°</p>
-                            </div>
-                            {distanceKm && (
-                                <div className="bg-white/5 rounded-xl px-6 py-3 border border-white/10">
-                                    <p className="text-blue-300 text-xs uppercase tracking-widest mb-0.5">Distance</p>
-                                    <p className="text-white text-xl font-semibold">{distanceKm}</p>
+                        {/* Info cards */}
+                        <div className="text-center space-y-3 w-full">
+                            <div className="flex gap-3 justify-center">
+                                <div className="bg-white/10 rounded-2xl px-6 py-4 backdrop-blur-sm border border-amber-400/20 flex-1 max-w-[160px]">
+                                    <p className="text-amber-300 text-xs uppercase tracking-widest mb-1">Bearing</p>
+                                    <p className="text-white text-3xl font-bold">{Math.round(bearing)}°</p>
                                 </div>
-                            )}
+                                {distanceKm && (
+                                    <div className="bg-white/10 rounded-2xl px-6 py-4 backdrop-blur-sm border border-blue-400/20 flex-1 max-w-[160px]">
+                                        <p className="text-blue-300 text-xs uppercase tracking-widest mb-1">Distance</p>
+                                        <p className="text-white text-3xl font-bold">{distanceKm}</p>
+                                    </div>
+                                )}
+                            </div>
                         </div>
 
-                        {orientationNote && (
-                            <p className="text-slate-400 text-xs text-center mt-6 max-w-xs">{orientationNote}</p>
-                        )}
-                        {!orientationNote && heading == null && (
-                            <p className="text-slate-400 text-xs text-center mt-6 max-w-xs">
-                                Showing fixed bearing — point your device north to calibrate.
+                        {(orientationNote || heading == null) && (
+                            <p className="text-slate-500 text-xs text-center mt-6 max-w-xs">
+                                {orientationNote || 'Showing fixed bearing — point your device north to calibrate.'}
                             </p>
                         )}
                     </>
