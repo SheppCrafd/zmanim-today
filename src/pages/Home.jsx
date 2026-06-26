@@ -42,7 +42,7 @@ export default function Home() {
             <div className="max-w-lg mx-auto px-4 pt-12 pb-4">
 
                 {/* Header */}
-                <div className="relative flex items-center pt-4 mb-4">
+                <div className="relative flex items-center mb-6">
                     <NavMenu />
                     <div className="absolute left-0 right-0 text-center pointer-events-none">
                         <h1 className="text-2xl font-bold text-slate-800 tracking-tight">Zmanim Today</h1>

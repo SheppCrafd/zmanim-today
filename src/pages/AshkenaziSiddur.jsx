@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { ExternalLink, AlertCircle, ArrowLeft, ArrowRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
-import NavMenu from '@/components/NavMenu';
 const SOURCE_URL = 'https://www.sefaria.org/Siddur_Ashkenaz';
 
 export default function AshkenaziSiddur() {
@@ -13,20 +12,15 @@ export default function AshkenaziSiddur() {
         <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-amber-50 flex flex-col">
 
             {/* Header */}
-            <div className="relative flex items-center pt-4 pb-4 px-4">
-                <NavMenu />
-                <div className="absolute left-0 right-0 text-center pointer-events-none">
-                    <h1 className="text-3xl md:text-4xl font-bold text-slate-800 mb-1">Ashkenazi Siddur</h1>
-                    <p className="text-slate-500 text-sm">סידור אשכנז</p>
-                </div>
-                <div className="ml-auto pointer-events-auto">
-                    <a href={SOURCE_URL} target="_blank" rel="noopener noreferrer">
-                        <Button variant="outline" size="sm" className="gap-2">
-                            <ExternalLink className="w-4 h-4" />
-                            Sefaria
-                        </Button>
-                    </a>
-                </div>
+            <div className="text-center pt-8 pb-4 px-4">
+                <h1 className="text-3xl md:text-4xl font-bold text-slate-800 mb-1">Ashkenazi Siddur</h1>
+                <p className="text-slate-500 text-sm mb-3">סידור אשכנז</p>
+                <a href={SOURCE_URL} target="_blank" rel="noopener noreferrer">
+                    <Button variant="outline" size="sm" className="gap-2">
+                        <ExternalLink className="w-4 h-4" />
+                        Open in Sefaria
+                    </Button>
+                </a>
             </div>
 
             {/* Navigation buttons */}

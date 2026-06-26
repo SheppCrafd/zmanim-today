@@ -142,9 +142,9 @@ Use actual astronomical calculations. Verify data is correct.`,
 
     return (
         <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-amber-50 pb-24">
-            <div className="max-w-4xl mx-auto px-4 md:px-8">
+            <div className="max-w-4xl mx-auto p-4 md:p-8">
                 {/* Header */}
-                <div className="relative flex items-center pt-4 mb-4">
+                <div className="relative flex items-center mb-8">
                     <NavMenu />
                     <div className="absolute left-0 right-0 text-center pointer-events-none">
                         <h1 className="text-4xl md:text-5xl font-bold text-slate-800 mb-2 tracking-tight">Zmanim</h1>
