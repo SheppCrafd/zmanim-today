@@ -24,12 +24,13 @@ export default function Settings() {
         <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-amber-50 pb-24">
             <div className="max-w-lg mx-auto px-4 pt-4">
 
-                <div className="relative flex items-center mb-6">
-                    <NavMenu />
-                    <div className="absolute left-0 right-0 text-center pointer-events-none">
+                <div className="flex items-center mb-6 min-h-[56px]">
+                    <div className="shrink-0"><NavMenu /></div>
+                    <div className="flex-1 text-center px-2">
                         <h1 className="text-2xl font-bold text-slate-800 tracking-tight">Settings</h1>
                         <p className="text-slate-500 text-sm">Customize your dashboard</p>
                     </div>
+                    <div className="shrink-0 w-9"></div>
                 </div>
 
                 {/* Location */}

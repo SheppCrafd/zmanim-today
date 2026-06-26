@@ -144,12 +144,13 @@ Use actual astronomical calculations. Verify data is correct.`,
         <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-amber-50 pb-24">
             <div className="max-w-4xl mx-auto px-4 pt-4 pb-8 md:px-8">
                 {/* Header */}
-                <div className="relative flex items-center mb-8">
-                    <NavMenu />
-                    <div className="absolute left-0 right-0 text-center pointer-events-none">
+                <div className="flex items-center mb-8 min-h-[72px]">
+                    <div className="shrink-0"><NavMenu /></div>
+                    <div className="flex-1 text-center px-2">
                         <h1 className="text-4xl md:text-5xl font-bold text-slate-800 mb-2 tracking-tight">Zmanim</h1>
                         <p className="text-slate-600 text-lg">זמני היום</p>
                     </div>
+                    <div className="shrink-0 w-9"></div>
                 </div>
 
                 {/* Location Search */}

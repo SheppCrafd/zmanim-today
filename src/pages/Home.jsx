@@ -42,13 +42,13 @@ export default function Home() {
             <div className="max-w-lg mx-auto px-4 pt-4 pb-4">
 
                 {/* Header */}
-                <div className="relative flex items-center mb-6">
-                    <NavMenu />
-                    <div className="absolute left-0 right-0 text-center pointer-events-none">
+                <div className="flex items-center mb-6 min-h-[56px]">
+                    <div className="shrink-0"><NavMenu /></div>
+                    <div className="flex-1 text-center px-2">
                         <h1 className="text-2xl font-bold text-slate-800 tracking-tight">Zmanim Today</h1>
                         <p className="text-slate-500 text-sm">זמני היום</p>
                     </div>
-                    <div className="ml-auto">
+                    <div className="shrink-0">
                         <Link to="/Settings">
                             <button className="p-2 rounded-lg bg-white/90 shadow-sm border border-slate-200 hover:bg-slate-50 transition-colors">
                                 <Settings className="w-5 h-5 text-slate-700" />

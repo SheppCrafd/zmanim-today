@@ -14,13 +14,13 @@ export default function ChabadSiddur() {
 
             {/* Header */}
             <div className="px-4 pt-4 pb-2">
-                <div className="relative flex items-center mb-3">
-                    <NavMenu />
-                    <div className="absolute left-0 right-0 text-center pointer-events-none">
+                <div className="flex items-center mb-3 min-h-[56px]">
+                    <div className="shrink-0"><NavMenu /></div>
+                    <div className="flex-1 text-center px-2">
                         <h1 className="text-2xl font-bold text-slate-800 leading-tight">Weekday Chabad Siddur</h1>
                         <p className="text-slate-500 text-sm">סידור חב״ד</p>
                     </div>
-                    <div className="ml-auto">
+                    <div className="shrink-0">
                         <a href={SOURCE_URL} target="_blank" rel="noopener noreferrer">
                             <Button variant="outline" size="sm" className="gap-1.5">
                                 <ExternalLink className="w-3.5 h-3.5" />
