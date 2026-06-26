@@ -11,6 +11,7 @@ import ZmanimCard from '../components/zmanim/ZmanimCard';
 import LocationDisplay from '../components/zmanim/LocationDisplay';
 import { getHebrewDate } from '../lib/hebrewDate';
 import { useSavedLocation } from '@/hooks/useLocation';
+import NavMenu from '@/components/NavMenu';
 
 export default function Zmanim() {
     const { location, loading: gpsLoading, error: gpsError, detectGPS, searchLocation: searchSavedLocation, clearLocation } = useSavedLocation();
@@ -143,11 +144,12 @@ Use actual astronomical calculations. Verify data is correct.`,
         <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-amber-50 pb-24">
             <div className="max-w-4xl mx-auto p-4 md:p-8">
                 {/* Header */}
-                <div className="text-center mb-8">
-                    <h1 className="text-4xl md:text-5xl font-bold text-slate-800 mb-2 tracking-tight">
-                        Zmanim
-                    </h1>
-                    <p className="text-slate-600 text-lg">זמני היום</p>
+                <div className="flex items-center gap-3 mb-8">
+                    <NavMenu />
+                    <div className="flex-1 text-center">
+                        <h1 className="text-4xl md:text-5xl font-bold text-slate-800 mb-2 tracking-tight">Zmanim</h1>
+                        <p className="text-slate-600 text-lg">זמני היום</p>
+                    </div>
                 </div>
 
                 {/* Location Search */}

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { MapPin, Loader2, AlertCircle } from 'lucide-react';
+import NavMenu from '@/components/NavMenu';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
 import { useSavedLocation } from '@/hooks/useLocation';
@@ -272,9 +273,12 @@ export default function Compass() {
       <div className="max-w-sm mx-auto px-4 pt-12 pb-4">
 
         {/* Header */}
-        <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-slate-800 mb-1 tracking-tight">Compass to Jerusalem</h1>
-          <p className="text-slate-500 text-sm">מצפן לירושלים</p>
+        <div className="flex items-center gap-3 mb-8">
+          <NavMenu />
+          <div className="flex-1 text-center">
+            <h1 className="text-3xl font-bold text-slate-800 mb-1 tracking-tight">Compass to Jerusalem</h1>
+            <p className="text-slate-500 text-sm">מצפן לירושלים</p>
+          </div>
         </div>
 
         {/* Location error */}
