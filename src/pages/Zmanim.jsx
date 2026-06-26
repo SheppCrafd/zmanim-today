@@ -177,7 +177,7 @@ Use actual astronomical calculations. Verify data is correct.`,
             const result = await base44.integrations.Core.InvokeLLM({
                 prompt: `Get the exact coordinates (latitude and longitude) for this location: "${manualLocation}"
                 
-                Return precise coordinates that can be used for zmanim calculations.`,
+                Return precise coordinates that can be used for zmanim calculations. Include state/province abbreviation for countries that have them (e.g. USA, Canada, Australia), otherwise leave state null.`,
                 add_context_from_internet: true,
                 response_json_schema: {
                     type: "object",
@@ -185,6 +185,7 @@ Use actual astronomical calculations. Verify data is correct.`,
                         latitude: { type: "number" },
                         longitude: { type: "number" },
                         city: { type: "string" },
+                        state: { type: "string" },
                         country: { type: "string" }
                     }
                 }
@@ -198,6 +199,7 @@ Use actual astronomical calculations. Verify data is correct.`,
                 latitude: result.latitude,
                 longitude: result.longitude,
                 city: result.city,
+                state: result.state,
                 country: result.country
             });
             setManualLocation('');

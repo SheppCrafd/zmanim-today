@@ -10,7 +10,7 @@ export default function LocationDisplay({ location }) {
         if (location && !location.city) {
             getLocationName();
         } else if (location && location.city) {
-            setLocationName({ city: location.city, country: location.country });
+            setLocationName({ city: location.city, state: location.state, country: location.country });
             setLoading(false);
         }
     }, [location]);
@@ -19,12 +19,13 @@ export default function LocationDisplay({ location }) {
         setLoading(true);
         try {
             const result = await base44.integrations.Core.InvokeLLM({
-                prompt: `Get the city name and country for these coordinates: ${location.latitude}, ${location.longitude}. 
-                Return just the city name and country in a user-friendly format.`,
+                prompt: `Get the city name, state/province (if applicable), and country for these coordinates: ${location.latitude}, ${location.longitude}. 
+                For countries with states or provinces (e.g. USA, Canada, Australia), include the state/province abbreviation. Otherwise leave state null.`,
                 response_json_schema: {
                     type: "object",
                     properties: {
                         city: { type: "string" },
+                        state: { type: "string" },
                         country: { type: "string" }
                     }
                 }
@@ -51,7 +52,7 @@ export default function LocationDisplay({ location }) {
                     </div>
                 ) : locationName ? (
                     <p className="font-semibold text-slate-800">
-                        {locationName.city}, {locationName.country}
+                        {locationName.city}{locationName.state ? `, ${locationName.state}` : ''}, {locationName.country}
                     </p>
                 ) : (
                     <p className="font-mono text-sm text-slate-600">
