@@ -1,19 +1,29 @@
 import React, { useState } from 'react';
-import { ExternalLink, AlertCircle } from 'lucide-react';
+import { ExternalLink, AlertCircle, ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { useNavigate } from 'react-router-dom';
 import NavMenu from '../components/NavMenu';
 
 const SOURCE_URL = 'https://www.sefaria.org/Siddur_Ashkenaz';
 
 export default function AshkenaziSiddur() {
     const [iframeError, setIframeError] = useState(false);
+    const navigate = useNavigate();
 
     return (
         <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-amber-50 flex flex-col">
             <NavMenu />
 
+            {/* Back button */}
+            <div className="pt-16 px-4">
+                <Button variant="ghost" size="sm" onClick={() => navigate(-1)} className="gap-2 text-slate-600">
+                    <ArrowLeft className="w-4 h-4" />
+                    Back
+                </Button>
+            </div>
+
             {/* Header */}
-            <div className="text-center pt-16 pb-4 px-4">
+            <div className="text-center pb-4 px-4">
                 <h1 className="text-3xl md:text-4xl font-bold text-slate-800 mb-1">Ashkenazi Siddur</h1>
                 <p className="text-slate-500 text-sm mb-3">סידור אשכנז</p>
                 <a href={SOURCE_URL} target="_blank" rel="noopener noreferrer">
