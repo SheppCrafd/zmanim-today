@@ -10,7 +10,6 @@ import PageNotFound from './lib/PageNotFound';
 import { AuthProvider, useAuth } from '@/lib/AuthContext';
 import UserNotRegisteredError from '@/components/UserNotRegisteredError';
 import SephardicSiddur from './pages/SephardicSiddur';
-import JerusalemCompass from './pages/JerusalemCompass';
 import AshkenaziSiddur from './pages/AshkenaziSiddur';
 import ChabadSiddur from './pages/ChabadSiddur';
 
@@ -64,7 +63,6 @@ const AuthenticatedApp = () => {
           }
         />
       ))}
-      <Route path="/JerusalemCompass" element={<JerusalemCompass />} />
       <Route path="/SephardicSiddur" element={<SephardicSiddur />} />
       <Route path="/AshkenaziSiddur" element={<AshkenaziSiddur />} />
       <Route path="/ChabadSiddur" element={<ChabadSiddur />} />
