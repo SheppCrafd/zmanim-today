@@ -114,14 +114,14 @@ EVENING & NIGHT:
 - tzait_72: Nightfall per Rabbeinu Tam (72 minutes after sunset)
 - chatzot_laila: Halachic midnight (midpoint between sunset and next sunrise)
 
-HEBREW DATE INFO:
-- hebrew_date: Full Hebrew date (e.g., "כ״א כסלו תשפ״ה" or "21 Kislev 5785")
-- day_of_week_hebrew: Hebrew day name
-- parsha: Torah portion for the week (if applicable)
+HEBREW DATE INFO (ALL must correspond to the date ${dateStr}, NOT today's date):
+- hebrew_date: Full Hebrew date that corresponds EXACTLY to the Gregorian date ${dateStr} (e.g., "כ״א כסלו תשפ״ה" or "21 Kislev 5785"). Convert ${dateStr} to its Hebrew calendar equivalent.
+- day_of_week_hebrew: Hebrew day name for ${dateStr} (e.g., יום ראשון, יום שני)
+- parsha: Torah portion read on the Shabbat of the week containing ${dateStr}
 - location_name: City name for these coordinates
 - timezone: Local timezone
 
-Use actual astronomical calculations. Verify data is correct.`,
+CRITICAL: The Hebrew date, day of week, and parsha MUST all be calculated for ${dateStr} specifically — do not use today's date. Use actual astronomical calculations. Verify data is correct.`,
                 add_context_from_internet: true,
                 response_json_schema: {
                     type: "object",
