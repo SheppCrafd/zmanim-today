@@ -24,9 +24,9 @@ export default function Settings() {
         <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-amber-50 pb-24">
             <div className="max-w-lg mx-auto px-4 pt-12">
 
-                <div className="flex items-center gap-3 mb-6">
+                <div className="relative flex items-center mb-6">
                     <NavMenu />
-                    <div>
+                    <div className="absolute left-0 right-0 text-center pointer-events-none">
                         <h1 className="text-2xl font-bold text-slate-800 tracking-tight">Settings</h1>
                         <p className="text-slate-500 text-sm">Customize your dashboard</p>
                     </div>

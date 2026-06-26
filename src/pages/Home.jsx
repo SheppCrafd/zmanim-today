@@ -42,19 +42,19 @@ export default function Home() {
             <div className="max-w-lg mx-auto px-4 pt-12 pb-4">
 
                 {/* Header */}
-                <div className="flex items-center justify-between mb-6">
-                    <div className="flex items-center gap-3">
-                        <NavMenu />
-                        <div>
-                            <h1 className="text-2xl font-bold text-slate-800 tracking-tight">Zmanim Today</h1>
-                            <p className="text-slate-500 text-sm">זמני היום</p>
-                        </div>
+                <div className="relative flex items-center mb-6">
+                    <NavMenu />
+                    <div className="absolute left-0 right-0 text-center pointer-events-none">
+                        <h1 className="text-2xl font-bold text-slate-800 tracking-tight">Zmanim Today</h1>
+                        <p className="text-slate-500 text-sm">זמני היום</p>
                     </div>
-                    <Link to="/Settings">
-                        <button className="p-2 rounded-lg bg-white/90 shadow-sm border border-slate-200 hover:bg-slate-50 transition-colors">
-                            <Settings className="w-5 h-5 text-slate-700" />
-                        </button>
-                    </Link>
+                    <div className="ml-auto">
+                        <Link to="/Settings">
+                            <button className="p-2 rounded-lg bg-white/90 shadow-sm border border-slate-200 hover:bg-slate-50 transition-colors">
+                                <Settings className="w-5 h-5 text-slate-700" />
+                            </button>
+                        </Link>
+                    </div>
                 </div>
 
                 {/* Location */}
