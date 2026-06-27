@@ -10,6 +10,7 @@ const HEBREW_DAYS = [
     { hebrew: 'שַׁבָּת', transliterated: 'Shabbat' },             // Saturday
 ];
 
+// Keys match Hebcal's exact spelling (including curly apostrophes)
 const PARSHA_HEBREW = {
     'Bereshit': 'בְּרֵאשִׁית', 'Noach': 'נֹחַ', 'Lech-Lecha': 'לֶךְ-לְךָ',
     'Vayera': 'וַיֵּרָא', 'Chayei Sara': 'חַיֵּי שָׂרָה', 'Toldot': 'תּוֹלְדוֹת',
@@ -23,14 +24,20 @@ const PARSHA_HEBREW = {
     'Tazria': 'תַּזְרִיעַ', 'Metzora': 'מְצֹרָע', 'Tazria-Metzora': 'תַּזְרִיעַ-מְצֹרָע',
     'Achrei Mot': 'אַחֲרֵי מוֹת', 'Kedoshim': 'קְדֹשִׁים', 'Achrei Mot-Kedoshim': 'אַחֲרֵי מוֹת-קְדֹשִׁים',
     'Emor': 'אֱמֹר', 'Behar': 'בְּהַר', 'Bechukotai': 'בְּחֻקֹּתַי', 'Behar-Bechukotai': 'בְּהַר-בְּחֻקֹּתַי',
-    'Bamidbar': 'בְּמִדְבַּר', 'Nasso': 'נָשֹׂא', "Beha'alotcha": 'בְּהַעֲלֹתְךָ',
-    'Shelach': 'שְׁלַח', 'Korach': 'קֹרַח', 'Chukat': 'חֻקַּת',
+    'Bamidbar': 'בְּמִדְבַּר', 'Nasso': 'נָשֹׂא',
+    'Beha\u2019alotcha': 'בְּהַעֲלֹתְךָ',   // Hebcal uses curly apostrophe
+    'Sh\u2019lach': 'שְׁלַח',               // Hebcal spells it "Sh'lach"
+    'Shelach': 'שְׁלַח',                    // fallback straight spelling
+    'Korach': 'קֹרַח', 'Chukat': 'חֻקַּת',
     'Balak': 'בָּלָק', 'Chukat-Balak': 'חֻקַּת-בָּלָק', 'Pinchas': 'פִּינְחָס',
     'Matot': 'מַטּוֹת', 'Masei': 'מַסְעֵי', 'Matot-Masei': 'מַטּוֹת-מַסְעֵי',
     'Devarim': 'דְּבָרִים', 'Vaetchanan': 'וָאֶתְחַנַּן', 'Eikev': 'עֵקֶב',
-    'Reeh': 'רְאֵה', 'Shoftim': 'שֹׁפְטִים', 'Ki Teitzei': 'כִּי תֵצֵא',
+    'Re\u2019eh': 'רְאֵה',                  // Hebcal uses curly apostrophe
+    'Reeh': 'רְאֵה',                        // fallback
+    'Shoftim': 'שֹׁפְטִים', 'Ki Teitzei': 'כִּי תֵצֵא',
     'Ki Tavo': 'כִּי תָבוֹא', 'Nitzavim': 'נִצָּבִים', 'Vayeilech': 'וַיֵּלֶךְ',
-    'Nitzavim-Vayeilech': 'נִצָּבִים-וַיֵּלֶךְ', "Ha'Azinu": 'הַאֲזִינוּ',
+    'Nitzavim-Vayeilech': 'נִצָּבִים-וַיֵּלֶךְ',
+    'Ha\u2019azinu': 'הַאֲזִינוּ',          // Hebcal uses curly apostrophe + lowercase
     'Vezot Haberakhah': 'וְזֹאת הַבְּרָכָה',
 };
 
