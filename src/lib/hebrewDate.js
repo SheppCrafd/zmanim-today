@@ -49,13 +49,14 @@ export async function getHebrewDate(date) {
     const data = await convert(date);
 
     // Parsha: from the Shabbat of the week containing this date
+    const daysUntilSaturday = (6 - date.getDay() + 7) % 7;
     const saturday = new Date(date);
-    saturday.setDate(saturday.getDate() + (6 - saturday.getDay()));
+    saturday.setDate(saturday.getDate() + daysUntilSaturday);
     const satData = await convert(saturday);
     const parshaEvent = (satData.events || []).find((e) =>
         e.startsWith('Parashat') || e.startsWith('Parshat')
     );
-    const parsha = parshaEvent ? parshaEvent.replace(/^Parashat |^Parshat /, '') : '';
+    const parsha = parshaEvent ? parshaEvent.replace(/^Parashat\s+|^Parshat\s+/, '').trim() : '';
 
     const day = HEBREW_DAYS[date.getDay()];
 
