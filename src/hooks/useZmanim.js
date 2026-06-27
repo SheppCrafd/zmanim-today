@@ -4,6 +4,21 @@ import { base44 } from '@/api/base44Client';
 
 const STORAGE_KEY = 'zmanim_cache_v2';
 
+function applyDayRules(result, date) {
+    if (!result?.zmanim) return result;
+    const dow = date.getDay(); // 0=Sun, 5=Fri, 6=Sat
+    const isFriday = dow === 5;
+    const isSaturday = dow === 6;
+    return {
+        ...result,
+        zmanim: {
+            ...result.zmanim,
+            candle_lighting: isFriday ? result.zmanim.candle_lighting : null,
+            havdalah: isSaturday ? result.zmanim.tzait_72 : null,
+        }
+    };
+}
+
 function fixCandleLighting(result) {
     if (!result?.zmanim?.sunset) return result;
     const sunsetStr = result.zmanim.sunset;
@@ -61,7 +76,7 @@ export function useZmanim(location, date = new Date()) {
         const key = cacheKey(location.latitude, location.longitude, dateStr);
         const cached = getCache(key);
         if (cached) {
-            setZmanim(fixCandleLighting(cached));
+            setZmanim(applyDayRules(fixCandleLighting(cached), date));
             return;
         }
 
@@ -116,7 +131,7 @@ LOCATION INFO:
             }
         }).then(result => {
             const fixed = fixCandleLighting(result);
-            setZmanim(fixed);
+            setZmanim(applyDayRules(fixed, date));
             setCache(key, fixed);
         }).catch(() => {
             setError('Failed to load zmanim.');

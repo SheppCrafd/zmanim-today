@@ -11,6 +11,7 @@ const ZMAN_META = {
     sunset:              { label: 'Sunset', icon: '🌇', zmanimKey: 'sunset' },
     tzait_hakochavim:    { label: 'Tzeit', icon: '✨', zmanimKey: 'tzait_hakochavim' },
     tzait_72:            { label: 'Havdalah (72 min)', icon: '🌟', zmanimKey: 'tzait_72' },
+    havdalah:            { label: 'Havdalah', icon: '🕍', zmanimKey: 'havdalah' },
 };
 
 function convertTo24(timeStr) {

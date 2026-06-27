@@ -412,10 +412,11 @@ Use actual astronomical calculations. Verify data is correct.`,
                             icon="🌙"
                             color="from-indigo-600 to-purple-600"
                             times={[
-                                zmanim.zmanim.candle_lighting && { label: 'Candle Lighting', value: zmanim.zmanim.candle_lighting, description: '18 min before sunset', highlight: true },
+                                currentDate.getDay() === 5 && zmanim.zmanim.candle_lighting && { label: 'Candle Lighting', value: zmanim.zmanim.candle_lighting, description: '18 min before sunset', highlight: true },
                                 { label: 'Sunset', value: zmanim.zmanim.sunset, description: 'Shkiyas HaChamah', highlight: true },
                                 { label: 'Tzait HaKochavim', value: zmanim.zmanim.tzait_hakochavim, description: 'Nightfall - 3 medium stars', highlight: true },
-                                { label: 'Tzait (72 min)', value: zmanim.zmanim.tzait_72, description: 'Nightfall - Rabbeinu Tam' },
+                                currentDate.getDay() === 6 && { label: 'Havdalah', value: zmanim.zmanim.tzait_72, description: 'Nightfall - Rabbeinu Tam', highlight: true },
+                                currentDate.getDay() !== 6 && { label: 'Tzait (72 min)', value: zmanim.zmanim.tzait_72, description: 'Nightfall - Rabbeinu Tam' },
                                 { label: 'Chatzot Laila', value: zmanim.zmanim.chatzot_laila, description: 'Halachic Midnight' }
                             ].filter(Boolean)}
                         />
