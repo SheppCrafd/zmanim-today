@@ -11,6 +11,17 @@ import NextZmanCard from '@/components/home/NextZmanCard';
 import ZmanimSummary from '@/components/home/ZmanimSummary';
 import NavMenu from '@/components/NavMenu';
 
+function convertTo24(timeStr) {
+    if (!timeStr) return timeStr;
+    const m = timeStr.match(/(\d+):(\d+)\s*(AM|PM)/i);
+    if (!m) return timeStr;
+    let [, h, min, ampm] = m;
+    h = parseInt(h);
+    if (ampm.toUpperCase() === 'PM' && h !== 12) h += 12;
+    if (ampm.toUpperCase() === 'AM' && h === 12) h = 0;
+    return `${String(h).padStart(2, '0')}:${min}`;
+}
+
 function LocationLabel({ location }) {
     if (!location) return null;
     const parts = [location.city, location.state, location.country].filter(Boolean);
@@ -18,9 +29,15 @@ function LocationLabel({ location }) {
     return <span>{location.latitude?.toFixed(3)}°, {location.longitude?.toFixed(3)}°</span>;
 }
 
+const today = new Date();
+const tomorrow = new Date(today);
+tomorrow.setDate(today.getDate() + 1);
+const isFriday = today.getDay() === 5;
+
 export default function Home() {
     const { location, loading: locLoading, error: locError, detectGPS, searchLocation, clearLocation } = useSavedLocation();
     const { zmanim, loading: zmanimLoading } = useZmanim(location);
+    const { zmanim: tomorrowZmanim } = useZmanim(isFriday ? location : null, tomorrow);
     const { prefs } = useDashboardPrefs();
     const [searchQuery, setSearchQuery] = useState('');
     const [showSearch, setShowSearch] = useState(false);
@@ -131,6 +148,22 @@ export default function Home() {
                         {/* Next Zman */}
                         {showNextZman && zmanim && !zmanimLoading && (
                             <NextZmanCard zmanim={zmanim} />
+                        )}
+
+                        {/* Tomorrow's Havdalah (Fridays only) */}
+                        {isFriday && tomorrowZmanim?.zmanim?.tzait_72 && (
+                            <div className="bg-white rounded-xl border border-slate-200 px-4 py-3 flex items-center justify-between">
+                                <div className="flex items-center gap-3">
+                                    <span className="text-base">🕍</span>
+                                    <div>
+                                        <p className="text-sm font-medium text-slate-700">Tomorrow's Havdalah</p>
+                                        <p className="text-xs text-slate-400">Motzei Shabbat</p>
+                                    </div>
+                                </div>
+                                <span className="text-sm font-semibold text-slate-800 tabular-nums">
+                                    {prefs.use24Hour ? convertTo24(tomorrowZmanim.zmanim.tzait_72) : tomorrowZmanim.zmanim.tzait_72}
+                                </span>
+                            </div>
                         )}
 
                         {/* Zmanim Summary */}
