@@ -92,6 +92,22 @@ LOCATION INFO:
                 }
             }
         }).then(result => {
+            // Always compute candle_lighting as exactly 18 minutes before sunset
+            if (result?.zmanim?.sunset) {
+                const sunsetStr = result.zmanim.sunset;
+                const [time, meridiem] = sunsetStr.split(' ');
+                const [hStr, mStr] = time.split(':');
+                let hours = parseInt(hStr, 10);
+                const minutes = parseInt(mStr, 10);
+                if (meridiem === 'PM' && hours !== 12) hours += 12;
+                if (meridiem === 'AM' && hours === 12) hours = 0;
+                const totalMins = hours * 60 + minutes - 18;
+                let clHours = Math.floor(totalMins / 60) % 24;
+                const clMins = totalMins % 60;
+                const clMeridiem = clHours >= 12 ? 'PM' : 'AM';
+                const clDisplay = clHours > 12 ? clHours - 12 : (clHours === 0 ? 12 : clHours);
+                result.zmanim.candle_lighting = `${clDisplay}:${String(clMins).padStart(2, '0')} ${clMeridiem}`;
+            }
             setZmanim(result);
             setCache(key, result);
         }).catch(() => {
