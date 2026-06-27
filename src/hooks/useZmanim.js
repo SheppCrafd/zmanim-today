@@ -9,12 +9,13 @@ function applyDayRules(result, date) {
     const dow = date.getDay(); // 0=Sun, 5=Fri, 6=Sat
     const isFriday = dow === 5;
     const isSaturday = dow === 6;
+    const isFridayOrSaturday = isFriday || isSaturday;
     return {
         ...result,
         zmanim: {
             ...result.zmanim,
             candle_lighting: isFriday ? result.zmanim.candle_lighting : null,
-            havdalah: isSaturday ? result.zmanim.tzait_72 : null,
+            havdalah: isFridayOrSaturday ? result.zmanim.tzait_72 : null,
         }
     };
 }
