@@ -65,9 +65,13 @@ export function printZmanim({ zmanimData, date, locationLabel, hebrewInfo }) {
     <p style="margin-top:20px;font-size:11px;color:#94a3b8;">Based on https://outorah.org/p/41921/ · Zmanim Today App</p>
     </body></html>`;
 
-    const win = window.open('', '_blank');
-    win.document.write(html);
-    win.document.close();
-    win.focus();
-    win.print();
+    const iframe = document.createElement('iframe');
+    iframe.style.cssText = 'position:fixed;width:0;height:0;border:none;left:-9999px;top:-9999px;';
+    document.body.appendChild(iframe);
+    iframe.contentDocument.open();
+    iframe.contentDocument.write(html);
+    iframe.contentDocument.close();
+    iframe.contentWindow.focus();
+    iframe.contentWindow.print();
+    setTimeout(() => document.body.removeChild(iframe), 1000);
 }
