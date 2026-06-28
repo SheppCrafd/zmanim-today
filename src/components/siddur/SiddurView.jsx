@@ -1,12 +1,29 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { ExternalLink, Loader2, AlertCircle, ArrowLeft, ChevronDown } from 'lucide-react';
+import {
+    ExternalLink,
+    Loader2,
+    AlertCircle,
+    ArrowLeft,
+    ChevronRight
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
 import NavMenu from '@/components/NavMenu';
 
-// Flatten TOC
+/* ---------------- LOCK SCROLL GLOBALLY ---------------- */
+// This is required so ONLY the card scrolls
+if (typeof document !== 'undefined') {
+    document.documentElement.style.height = '100%';
+    document.body.style.height = '100%';
+    document.body.style.overflow = 'hidden';
+    document.getElementById('root')?.style.setProperty('height', '100%');
+    document.getElementById('root')?.style.setProperty('overflow', 'hidden');
+}
+
+/* ---------------- TOC FLATTEN ---------------- */
 function flattenNodes(nodes, keyPath = '', labelPath = '') {
     const result = [];
+
     for (const node of nodes) {
         const key = node.key || node.title;
         const fullKeyPath = keyPath ? `${keyPath}, ${key}` : key;
@@ -23,17 +40,22 @@ function flattenNodes(nodes, keyPath = '', labelPath = '') {
             });
         }
     }
+
     return result;
 }
 
-// Section renderer
+/* ---------------- TEXT RENDER ---------------- */
 function SectionText({ he, text }) {
-    const heArr = Array.isArray(he) ? he : (he ? [he] : []);
-    const enArr = Array.isArray(text) ? text : (text ? [text] : []);
+    const heArr = Array.isArray(he) ? he : he ? [he] : [];
+    const enArr = Array.isArray(text) ? text : text ? [text] : [];
     const maxLen = Math.max(heArr.length, enArr.length);
 
-    if (maxLen === 0) {
-        return <p className="text-slate-400 dark:text-slate-500 text-sm italic">No text available.</p>;
+    if (!maxLen) {
+        return (
+            <p className="text-slate-400 dark:text-slate-500 text-sm italic">
+                No text available.
+            </p>
+        );
     }
 
     return (
@@ -42,8 +64,8 @@ function SectionText({ he, text }) {
                 <div key={i} className="space-y-2">
                     {heArr[i] && (
                         <p
-                            className="text-right text-lg leading-loose text-slate-800 dark:text-slate-100 font-serif"
                             dir="rtl"
+                            className="text-right text-lg leading-loose text-slate-800 dark:text-slate-100 font-serif"
                             dangerouslySetInnerHTML={{ __html: heArr[i] }}
                         />
                     )}
@@ -59,37 +81,13 @@ function SectionText({ he, text }) {
     );
 }
 
-// Each section row — must be its own component so useEffect is a valid top-level hook
-function SectionRow({ sec, index, loadedSections, loadSection }) {
-    useEffect(() => {
-        loadSection(index);
-    }, [index]);
-
-    const data = loadedSections[index];
-
-    if (!data) {
-        return (
-            <div className="py-10 flex justify-center">
-                <Loader2 className="animate-spin text-blue-500" />
-            </div>
-        );
-    }
-
-    if (data.error) {
-        return <div className="text-center text-sm text-red-500">Failed to load section</div>;
-    }
-
-    return (
-        <div className="space-y-4">
-            <div className="sticky top-0 bg-white dark:bg-slate-900 py-2">
-                <p className="font-semibold text-slate-700 dark:text-slate-100">{sec.label}</p>
-            </div>
-            <SectionText he={data.he} text={data.text} />
-        </div>
-    );
-}
-
-export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
+/* ---------------- MAIN ---------------- */
+export default function SiddurView({
+    title,
+    subtitle,
+    bookRef,
+    sefariaUrl
+}) {
     const navigate = useNavigate();
     const scrollRef = useRef(null);
 
@@ -98,11 +96,12 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
     const [error, setError] = useState(false);
 
     const [startIndex, setStartIndex] = useState(null);
-    const [loadedSections, setLoadedSections] = useState({}); // cache by index
+    const [loaded, setLoaded] = useState({});
 
-    // Load TOC once
+    /* ---------------- LOAD TOC ---------------- */
     useEffect(() => {
         setLoading(true);
+
         fetch(`https://www.sefaria.org/api/index/${bookRef}`)
             .then(r => {
                 if (!r.ok) throw new Error();
@@ -112,6 +111,7 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
                 const schema = data?.schema;
                 const rootKey = schema?.key || bookRef.replace(/_/g, ' ');
                 const nodes = schema?.nodes || [];
+
                 setSections(flattenNodes(nodes, rootKey));
                 setLoading(false);
             })
@@ -121,9 +121,9 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
             });
     }, [bookRef]);
 
-    // Load a section lazily
+    /* ---------------- LOAD SECTION ---------------- */
     const loadSection = async (index) => {
-        if (loadedSections[index]) return;
+        if (loaded[index]) return;
 
         const sec = sections[index];
         if (!sec) return;
@@ -132,42 +132,29 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
             const res = await fetch(
                 `https://www.sefaria.org/api/texts/${encodeURIComponent(sec.ref)}`
             );
+
             const data = await res.json();
 
-            setLoadedSections(prev => ({
+            setLoaded(prev => ({
                 ...prev,
                 [index]: data
             }));
-        } catch (e) {
-            setLoadedSections(prev => ({
+        } catch {
+            setLoaded(prev => ({
                 ...prev,
                 [index]: { error: true }
             }));
         }
     };
 
-    // Jump into reader mode
+    /* ---------------- ENTER READER ---------------- */
     const openAt = async (index) => {
         setStartIndex(index);
         await loadSection(index);
+
         setTimeout(() => {
-            scrollRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
+            scrollRef.current?.scrollTo({ top: 0 });
         }, 50);
-    };
-
-    // preload next sections as user scrolls
-    const handleScroll = () => {
-        if (!scrollRef.current || startIndex === null) return;
-
-        const scrollTop = scrollRef.current.scrollTop;
-        const height = scrollRef.current.clientHeight;
-
-        const nearBottom = scrollTop + height > scrollRef.current.scrollHeight - 800;
-
-        if (nearBottom) {
-            const next = startIndex + Object.keys(loadedSections).length;
-            loadSection(next);
-        }
     };
 
     const sectionUrl =
@@ -175,10 +162,11 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
             ? `https://www.sefaria.org/${encodeURIComponent(sections[startIndex]?.ref)}`
             : sefariaUrl;
 
+    /* ---------------- RENDER ---------------- */
     return (
-        <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-amber-50 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950 flex flex-col">
+        <div className="h-screen flex flex-col overflow-hidden bg-gradient-to-br from-slate-50 via-blue-50 to-amber-50 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950">
 
-            {/* HEADER */}
+            {/* HEADER (fixed) */}
             <div className="px-4 pt-4 pb-2 shrink-0 flex items-center justify-between">
                 <div className="flex items-center gap-2">
                     <NavMenu />
@@ -211,14 +199,13 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
                 </div>
             </div>
 
-            {/* MAIN CARD (ONLY SCROLL AREA) */}
+            {/* ONLY SCROLL AREA */}
             <div
                 ref={scrollRef}
-                onScroll={handleScroll}
-                className="flex-1 mx-4 mb-4 rounded-xl overflow-y-auto shadow-sm border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900"
+                className="flex-1 overflow-y-auto mx-4 mb-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900"
             >
 
-                {/* TOC */}
+                {/* ---------------- TOC ---------------- */}
                 {startIndex === null && (
                     <div>
                         {loading && (
@@ -253,25 +240,49 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
                                         </p>
                                     )}
                                 </div>
-                                <ChevronDown className="w-4 h-4 text-slate-400" />
+
+                                <ChevronRight className="w-4 h-4 text-slate-400" />
                             </button>
                         ))}
                     </div>
                 )}
 
-                {/* READER MODE (infinite scroll stack) */}
+                {/* ---------------- READER MODE ---------------- */}
                 {startIndex !== null && (
-                    <div className="p-4 space-y-10">
-                        {sections.slice(startIndex, startIndex + 20).map((sec, i) => {
-                            const idx = startIndex + i;
+                    <div className="p-4 space-y-12">
+                        {sections.map((sec, i) => {
+                            if (i < startIndex) return null;
+
+                            const data = loaded[i];
+
+                            // lazy load
+                            if (!data) {
+                                loadSection(i);
+                                return (
+                                    <div key={i} className="flex justify-center py-10">
+                                        <Loader2 className="animate-spin text-blue-500" />
+                                    </div>
+                                );
+                            }
+
+                            if (data.error) {
+                                return (
+                                    <div key={i} className="text-center text-red-500 text-sm">
+                                        Failed to load section
+                                    </div>
+                                );
+                            }
+
                             return (
-                                <SectionRow
-                                    key={idx}
-                                    sec={sec}
-                                    index={idx}
-                                    loadedSections={loadedSections}
-                                    loadSection={loadSection}
-                                />
+                                <div key={i} className="space-y-4">
+                                    <div className="sticky top-0 bg-white dark:bg-slate-900 py-2">
+                                        <p className="font-semibold text-slate-700 dark:text-slate-100">
+                                            {sec.label}
+                                        </p>
+                                    </div>
+
+                                    <SectionText he={data.he} text={data.text} />
+                                </div>
                             );
                         })}
                     </div>
