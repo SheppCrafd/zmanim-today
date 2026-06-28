@@ -59,6 +59,36 @@ function SectionText({ he, text }) {
     );
 }
 
+// Each section row — must be its own component so useEffect is a valid top-level hook
+function SectionRow({ sec, index, loadedSections, loadSection }) {
+    useEffect(() => {
+        loadSection(index);
+    }, [index]);
+
+    const data = loadedSections[index];
+
+    if (!data) {
+        return (
+            <div className="py-10 flex justify-center">
+                <Loader2 className="animate-spin text-blue-500" />
+            </div>
+        );
+    }
+
+    if (data.error) {
+        return <div className="text-center text-sm text-red-500">Failed to load section</div>;
+    }
+
+    return (
+        <div className="space-y-4">
+            <div className="sticky top-0 bg-white dark:bg-slate-900 py-2">
+                <p className="font-semibold text-slate-700 dark:text-slate-100">{sec.label}</p>
+            </div>
+            <SectionText he={data.he} text={data.text} />
+        </div>
+    );
+}
+
 export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
     const navigate = useNavigate();
     const scrollRef = useRef(null);
@@ -234,38 +264,14 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
                     <div className="p-4 space-y-10">
                         {sections.slice(startIndex, startIndex + 20).map((sec, i) => {
                             const idx = startIndex + i;
-                            const data = loadedSections[idx];
-
-                            useEffect(() => {
-                                loadSection(idx);
-                            }, [idx]);
-
-                            if (!data) {
-                                return (
-                                    <div key={i} className="py-10 flex justify-center">
-                                        <Loader2 className="animate-spin text-blue-500" />
-                                    </div>
-                                );
-                            }
-
-                            if (data.error) {
-                                return (
-                                    <div key={i} className="text-center text-sm text-red-500">
-                                        Failed to load section
-                                    </div>
-                                );
-                            }
-
                             return (
-                                <div key={i} className="space-y-4">
-                                    <div className="sticky top-0 bg-white dark:bg-slate-900 py-2">
-                                        <p className="font-semibold text-slate-700 dark:text-slate-100">
-                                            {sec.label}
-                                        </p>
-                                    </div>
-
-                                    <SectionText he={data.he} text={data.text} />
-                                </div>
+                                <SectionRow
+                                    key={idx}
+                                    sec={sec}
+                                    index={idx}
+                                    loadedSections={loadedSections}
+                                    loadSection={loadSection}
+                                />
                             );
                         })}
                     </div>
