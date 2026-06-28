@@ -1,6 +1,13 @@
 import React from 'react';
-import SiddurFrame from '@/components/siddur/SiddurFrame';
+import SiddurView from '@/components/siddur/SiddurView';
 
 export default function ChabadSiddur() {
-    return <SiddurFrame title="Weekday Chabad Siddur" subtitle='סידור חב"ד' sourceUrl="https://www.sefaria.org/Weekday_Siddur_Chabad" />;
+    return (
+        <SiddurView
+            title="Weekday Chabad Siddur"
+            subtitle='סידור חב"ד'
+            bookRef="Weekday_Siddur_Chabad"
+            sefariaUrl="https://www.sefaria.org/Weekday_Siddur_Chabad"
+        />
+    );
 }

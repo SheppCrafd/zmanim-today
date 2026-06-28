@@ -1,6 +1,13 @@
 import React from 'react';
-import SiddurFrame from '@/components/siddur/SiddurFrame';
+import SiddurView from '@/components/siddur/SiddurView';
 
 export default function AshkenaziSiddur() {
-    return <SiddurFrame title="Ashkenazi Siddur" subtitle="סידור אשכנז" sourceUrl="https://www.sefaria.org/Siddur_Ashkenaz" />;
+    return (
+        <SiddurView
+            title="Ashkenazi Siddur"
+            subtitle="סידור אשכנז"
+            bookRef="Siddur_Ashkenaz"
+            sefariaUrl="https://www.sefaria.org/Siddur_Ashkenaz"
+        />
+    );
 }
