@@ -44,9 +44,8 @@ function SectionText({ he, en, showEnglish }) {
                     )}
 
                     {showEnglish && enArr[i] && isProbablyEnglish(enArr[i]) && (
-                        <p
-                            className="text-sm text-slate-500 dark:text-slate-400"
-                            dangerouslySetInnerHTML={{ __html: enArr[i] }}
+                        <p className="text-sm text-slate-500 dark:text-slate-400"
+                           dangerouslySetInnerHTML={{ __html: enArr[i] }}
                         />
                     )}
                 </div>
@@ -56,7 +55,7 @@ function SectionText({ he, en, showEnglish }) {
 }
 
 /* ---------------- MAIN ---------------- */
-export default function SiddurView({ title = "Siddur", subtitle = "" }) {
+export default function SiddurView() {
     const navigate = useNavigate();
     const { type, index } = useParams();
 
@@ -77,12 +76,14 @@ export default function SiddurView({ title = "Siddur", subtitle = "" }) {
     /* ---------------- LOAD TOC ---------------- */
     useEffect(() => {
         setLoading(true);
+        setLoaded({});
+        sectionRefs.current = [];
 
         fetch(`https://www.sefaria.org/api/index/${resolvedBookRef}`)
             .then(r => r.json())
             .then(data => {
                 const schema = data?.schema;
-                const rootKey = schema?.key || resolvedBookRef.replace(/_/g, ' ');
+                const rootKey = schema?.key || resolvedBookRef;
                 const nodes = schema?.nodes || [];
 
                 const flatten = (nodes, keyPath = '') => {
@@ -115,14 +116,11 @@ export default function SiddurView({ title = "Siddur", subtitle = "" }) {
 
     /* ---------------- LOAD SECTION ---------------- */
     const loadSection = async (i) => {
-        if (loaded[i]) return;
-
-        const sec = sections[i];
-        if (!sec) return;
+        if (loaded[i] || !sections[i]) return;
 
         try {
             const res = await fetch(
-                `https://www.sefaria.org/api/texts/${encodeURIComponent(sec.ref)}`
+                `https://www.sefaria.org/api/texts/${encodeURIComponent(sections[i].ref)}`
             );
 
             const data = await res.json();
@@ -139,7 +137,25 @@ export default function SiddurView({ title = "Siddur", subtitle = "" }) {
         }
     };
 
-    /* ---------------- PRELOAD ---------------- */
+    /* ---------------- REAL WINDOW ENFORCER (IMPORTANT FIX) ---------------- */
+    useEffect(() => {
+        const start = Math.max(0, activeIndex - WINDOW);
+        const end = Math.min(sections.length - 1, activeIndex + WINDOW);
+
+        setLoaded(prev => {
+            const next = {};
+
+            for (let i = start; i <= end; i++) {
+                if (prev[i]) next[i] = prev[i];
+            }
+
+            return next;
+        });
+
+        sectionRefs.current = sectionRefs.current.slice(start, end + 1);
+    }, [activeIndex, sections]);
+
+    /* ---------------- PRELOAD WINDOW ---------------- */
     useEffect(() => {
         if (!isReader) return;
 
@@ -181,7 +197,7 @@ export default function SiddurView({ title = "Siddur", subtitle = "" }) {
 
         el.addEventListener('scroll', handler);
         return () => el.removeEventListener('scroll', handler);
-    }, [isReader, sections, type]);
+    }, [isReader, type, activeIndex]);
 
     const openAt = (i) => {
         navigate(`/siddur/${type}/${i}`);
@@ -202,8 +218,7 @@ export default function SiddurView({ title = "Siddur", subtitle = "" }) {
                 <div className="flex items-center gap-2">
                     <NavMenu />
                     <div>
-                        <h1 className="text-lg font-bold">{title}</h1>
-                        <p className="text-xs text-slate-500">{subtitle}</p>
+                        <h1 className="text-lg font-bold">{type}</h1>
                     </div>
                 </div>
 
@@ -215,11 +230,8 @@ export default function SiddurView({ title = "Siddur", subtitle = "" }) {
                     )}
 
                     {isReader && (
-                        <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => setShowEnglish(v => !v)}
-                        >
+                        <Button variant="ghost" size="sm"
+                                onClick={() => setShowEnglish(v => !v)}>
                             EN {showEnglish ? 'ON' : 'OFF'}
                         </Button>
                     )}
@@ -235,17 +247,8 @@ export default function SiddurView({ title = "Siddur", subtitle = "" }) {
                 {/* TOC */}
                 {!isReader && (
                     <div>
-                        {loading && (
-                            <div className="p-10 flex justify-center">
-                                <Loader2 className="animate-spin" />
-                            </div>
-                        )}
-
-                        {error && (
-                            <div className="p-6 text-red-500">
-                                Failed to load
-                            </div>
-                        )}
+                        {loading && <div className="p-10 flex justify-center"><Loader2 className="animate-spin"/></div>}
+                        {error && <div className="p-6 text-red-500">Failed to load</div>}
 
                         {sections.map((sec, i) => (
                             <button
@@ -273,22 +276,19 @@ export default function SiddurView({ title = "Siddur", subtitle = "" }) {
                                 loadSection(i);
 
                                 return (
-                                    <div
-                                        key={i}
-                                        ref={el => (sectionRefs.current[i] = el)}
-                                        className="flex justify-center py-10"
-                                    >
-                                        <Loader2 className="animate-spin" />
+                                    <div key={i}
+                                         ref={el => (sectionRefs.current[i] = el)}
+                                         className="flex justify-center py-10">
+                                        <Loader2 className="animate-spin"/>
                                     </div>
                                 );
                             }
 
                             return (
-                                <div
-                                    key={i}
-                                    ref={el => (sectionRefs.current[i] = el)}
-                                    className="space-y-4"
-                                >
+                                <div key={i}
+                                     ref={el => (sectionRefs.current[i] = el)}
+                                     className="space-y-4">
+
                                     <div className="sticky top-0 bg-white dark:bg-slate-900 py-2 font-semibold">
                                         {sec.label}
                                     </div>
@@ -301,7 +301,6 @@ export default function SiddurView({ title = "Siddur", subtitle = "" }) {
                                 </div>
                             );
                         })}
-
                     </div>
                 )}
             </div>
