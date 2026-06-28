@@ -28,7 +28,7 @@ export default function SiddurFrame({ title, subtitle, sourceUrl }) {
     const showFallback = failed || timedOut;
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-amber-50 flex flex-col">
+        <div className="h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-amber-50 flex flex-col">
             <div className="px-4 pt-4 pb-2">
                 <div className="flex items-center mb-3 min-h-[56px]">
                     <div className="shrink-0"><NavMenu /></div>
@@ -70,7 +70,8 @@ export default function SiddurFrame({ title, subtitle, sourceUrl }) {
                 ) : (
                     <iframe
                         src={sourceUrl}
-                        className="w-full h-full"
+                        className="w-full h-full block"
+                        style={{ minHeight: 0 }}
                         title={title}
                         onLoad={handleLoad}
                         onError={() => { clearTimeout(timerRef.current); setFailed(true); }}
