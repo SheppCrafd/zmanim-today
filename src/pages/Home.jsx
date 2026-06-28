@@ -13,6 +13,7 @@ import NavMenu from '@/components/NavMenu';
 import { printZmanim } from '@/lib/printZmanim';
 import ZmanimRemindersPanel from '@/components/zmanim/ZmanimRemindersPanel';
 import { formatTime } from '@/lib/timeUtils';
+import SefariaFooter from '@/components/SefariaFooter';
 
 function LocationLabel({ location }) {
     if (!location) return null;
@@ -209,6 +210,7 @@ export default function Home() {
                 )}
 
             </div>
+            <SefariaFooter />
         </div>
     );
 }
