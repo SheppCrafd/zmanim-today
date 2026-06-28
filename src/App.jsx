@@ -9,7 +9,6 @@ import PageNotFound from './lib/PageNotFound';
 import { AuthProvider, useAuth } from '@/lib/AuthContext';
 import UserNotRegisteredError from '@/components/UserNotRegisteredError';
 
-import { useDarkMode } from './hooks/useDarkMode';
 import Home from './pages/Home';
 import Zmanim from './pages/Zmanim';
 import SephardicSiddur from './pages/SephardicSiddur';
@@ -20,7 +19,6 @@ import Settings from './pages/Settings';
 
 const AuthenticatedApp = () => {
   const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
-  useDarkMode();
 
   if (isLoadingPublicSettings || isLoadingAuth) {
     return (

@@ -4,12 +4,11 @@ import { useNavigate } from 'react-router-dom';
 import NavMenu from '@/components/NavMenu';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import { useDashboardPrefs, ALL_DASHBOARD_ITEMS } from '@/hooks/useDashboardPrefs';
-import { Moon } from 'lucide-react';
 import { useSavedLocation } from '@/hooks/useLocation';
 
 export default function Settings() {
     const navigate = useNavigate();
-    const { prefs, toggleItem, reorderItems, toggle24Hour, toggleDarkMode } = useDashboardPrefs();
+    const { prefs, toggleItem, reorderItems, toggle24Hour } = useDashboardPrefs();
     const { location, clearLocation } = useSavedLocation();
 
     const onDragEnd = (result) => {
@@ -82,28 +81,6 @@ export default function Settings() {
                             </div>
                             <div className={`w-10 h-6 rounded-full transition-colors flex items-center px-0.5 ${prefs.use24Hour ? 'bg-blue-600' : 'bg-slate-200'}`}>
                                 <div className={`w-5 h-5 bg-white rounded-full shadow transition-transform ${prefs.use24Hour ? 'translate-x-4' : 'translate-x-0'}`} />
-                            </div>
-                        </button>
-                    </div>
-                </div>
-
-                {/* Appearance */}
-                <div className="mb-6">
-                    <p className="text-xs font-semibold uppercase tracking-widest text-slate-400 mb-2 px-1">Appearance</p>
-                    <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700">
-                        <button
-                            onClick={toggleDarkMode}
-                            className="w-full flex items-center justify-between px-4 py-3"
-                        >
-                            <div className="flex items-center gap-3">
-                                <Moon className="w-4 h-4 text-indigo-500" />
-                                <div className="text-left">
-                                    <p className="text-sm font-medium text-slate-800 dark:text-slate-100">Dark Mode</p>
-                                    <p className="text-xs text-slate-400 dark:text-slate-400">Easy on the eyes at night</p>
-                                </div>
-                            </div>
-                            <div className={`w-10 h-6 rounded-full transition-colors flex items-center px-0.5 ${prefs.darkMode ? 'bg-indigo-600' : 'bg-slate-200'}`}>
-                                <div className={`w-5 h-5 bg-white rounded-full shadow transition-transform ${prefs.darkMode ? 'translate-x-4' : 'translate-x-0'}`} />
                             </div>
                         </button>
                     </div>
