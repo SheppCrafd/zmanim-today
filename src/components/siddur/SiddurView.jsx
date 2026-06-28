@@ -1,12 +1,19 @@
-import React, { useState, useEffect } from 'react';
-import { ExternalLink, Loader2, AlertCircle, ArrowLeft, ChevronRight } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import {
+    ExternalLink,
+    Loader2,
+    AlertCircle,
+    ArrowLeft,
+    ChevronRight
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
 import NavMenu from '@/components/NavMenu';
 
-// Recursively flatten a Sefaria schema node tree into a list of sections
+// flatten Sefaria tree
 function flattenNodes(nodes, keyPath = '', labelPath = '') {
     const result = [];
+
     for (const node of nodes) {
         const key = node.key || node.title;
         const fullKeyPath = keyPath ? `${keyPath}, ${key}` : key;
@@ -23,23 +30,22 @@ function flattenNodes(nodes, keyPath = '', labelPath = '') {
             });
         }
     }
+
     return result;
 }
 
-// Strip HTML tags from Sefaria text
-function stripHtml(str) {
-    if (!str) return '';
-    return str.replace(/<[^>]+>/g, '');
-}
-
-// Render one text section
+// render section text
 function SectionText({ he, text }) {
     const heArr = Array.isArray(he) ? he : (he ? [he] : []);
     const enArr = Array.isArray(text) ? text : (text ? [text] : []);
     const maxLen = Math.max(heArr.length, enArr.length);
 
     if (maxLen === 0) {
-        return <p className="text-slate-400 dark:text-slate-500 text-sm italic">No text available.</p>;
+        return (
+            <p className="text-slate-400 dark:text-slate-500 text-sm italic">
+                No text available.
+            </p>
+        );
     }
 
     return (
@@ -65,7 +71,7 @@ function SectionText({ he, text }) {
     );
 }
 
-// Section list (TOC)
+// TOC list
 function SectionList({ sections, onSelect }) {
     return (
         <div className="divide-y divide-slate-100 dark:divide-slate-800">
@@ -100,10 +106,14 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
     const [tocError, setTocError] = useState(false);
 
     const [selected, setSelected] = useState(null);
-    const [sectionData, setSectionData] = useState(null);
-    const [sectionLoading, setSectionLoading] = useState(false);
-    const [sectionError, setSectionError] = useState(false);
 
+    const [sectionDataMap, setSectionDataMap] = useState({});
+    const [loadingMap, setLoadingMap] = useState({});
+
+    const sectionRefs = useRef({});
+    const [activeSection, setActiveSection] = useState(null);
+
+    // LOAD TOC
     useEffect(() => {
         setTocLoading(true);
         setTocError(false);
@@ -117,6 +127,7 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
                 const schema = data?.schema;
                 const rootKey = schema?.key || bookRef.replace(/_/g, ' ');
                 const nodes = schema?.nodes || [];
+
                 setSections(flattenNodes(nodes, rootKey));
                 setTocLoading(false);
             })
@@ -124,31 +135,60 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
                 setTocError(true);
                 setTocLoading(false);
             });
-    }, [bookRef, title]);
+    }, [bookRef]);
 
+    // LOAD ALL TEXT ONCE ENTERING READER MODE
+    useEffect(() => {
+        if (!selected || !sections) return;
+
+        const loadAll = async () => {
+            for (const sec of sections) {
+                if (sectionDataMap[sec.ref]) continue;
+
+                setLoadingMap(prev => ({ ...prev, [sec.ref]: true }));
+
+                try {
+                    const encoded = encodeURIComponent(sec.ref);
+                    const res = await fetch(`https://www.sefaria.org/api/texts/${encoded}`);
+                    const data = await res.json();
+
+                    setSectionDataMap(prev => ({
+                        ...prev,
+                        [sec.ref]: data
+                    }));
+                } catch {}
+
+                setLoadingMap(prev => ({ ...prev, [sec.ref]: false }));
+            }
+        };
+
+        loadAll();
+    }, [selected, sections]);
+
+    // TRACK CURRENT SECTION IN VIEW
     useEffect(() => {
         if (!selected) return;
 
-        setSectionLoading(true);
-        setSectionError(false);
-        setSectionData(null);
+        const observer = new IntersectionObserver(
+            entries => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) {
+                        setActiveSection(entry.target.dataset.ref);
+                    }
+                });
+            },
+            {
+                rootMargin: '-40% 0px -50% 0px',
+                threshold: 0.1
+            }
+        );
 
-        const encodedRef = encodeURIComponent(selected.ref);
+        Object.values(sectionRefs.current).forEach(el => {
+            if (el) observer.observe(el);
+        });
 
-        fetch(`https://www.sefaria.org/api/texts/${encodedRef}`)
-            .then(r => {
-                if (!r.ok) throw new Error();
-                return r.json();
-            })
-            .then(data => {
-                setSectionData(data);
-                setSectionLoading(false);
-            })
-            .catch(() => {
-                setSectionError(true);
-                setSectionLoading(false);
-            });
-    }, [selected]);
+        return () => observer.disconnect();
+    }, [selected, sectionDataMap]);
 
     const sectionUrl = selected
         ? `https://www.sefaria.org/${encodeURIComponent(selected.ref)}`
@@ -159,11 +199,12 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
 
             {/* HEADER */}
             <div className="px-4 pt-4 pb-2 shrink-0">
+
                 <div className="flex items-center mb-3 min-h-[56px]">
                     <div className="shrink-0"><NavMenu /></div>
 
                     <div className="flex-1 text-center px-2">
-                        <h1 className="text-2xl font-bold text-slate-800 dark:text-slate-100 leading-tight">
+                        <h1 className="text-2xl font-bold text-slate-800 dark:text-slate-100">
                             {title}
                         </h1>
                         {subtitle && (
@@ -177,10 +218,11 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
                 </div>
 
                 <div className="relative flex items-center justify-between">
+
                     <Button
                         variant="ghost"
                         size="sm"
-                        onClick={selected ? () => setSelected(null) : () => navigate(-1)}
+                        onClick={() => setSelected(null)}
                         className="gap-2 text-slate-600 dark:text-slate-300"
                     >
                         <ArrowLeft className="w-4 h-4" />
@@ -188,9 +230,9 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
                     </Button>
 
                     <div className="absolute left-1/2 -translate-x-1/2">
-                        {selected && (
-                            <p className="text-sm font-medium text-slate-700 dark:text-slate-200 max-w-[160px] truncate text-center">
-                                {selected.label}
+                        {activeSection && (
+                            <p className="text-sm font-medium text-slate-700 dark:text-slate-200 max-w-[180px] truncate">
+                                {sections?.find(s => s.ref === activeSection)?.label}
                             </p>
                         )}
                     </div>
@@ -219,77 +261,52 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
                         )}
 
                         {tocError && (
-                            <div className="flex flex-col items-center justify-center py-20 px-6 text-center gap-3">
+                            <div className="flex flex-col items-center justify-center py-20 gap-3">
                                 <AlertCircle className="w-10 h-10 text-amber-500" />
                                 <p className="text-slate-700 dark:text-slate-200 font-semibold">
-                                    Unable to load text from Sefaria
+                                    Failed to load
                                 </p>
-                                <a href={sefariaUrl} target="_blank" rel="noopener noreferrer">
-                                    <Button className="gap-2 bg-blue-600 hover:bg-blue-700">
-                                        <ExternalLink className="w-4 h-4" /> Open in Sefaria
-                                    </Button>
-                                </a>
                             </div>
                         )}
 
                         {sections && !tocLoading && (
-                            <div className="overflow-y-auto max-h-full">
-
-                                <div className="px-4 py-3 border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/40">
-                                    <p className="text-xs text-slate-500 dark:text-slate-400 font-medium uppercase tracking-wide">
-                                        Table of Contents
-                                    </p>
-                                </div>
-
-                                <SectionList sections={sections} onSelect={setSelected} />
-                            </div>
+                            <SectionList sections={sections} onSelect={setSelected} />
                         )}
                     </>
                 )}
 
-                {/* SECTION */}
+                {/* READER MODE (continuous scroll) */}
                 {selected && (
-                    <div className="overflow-y-auto h-full">
+                    <div className="overflow-y-auto h-full p-4 space-y-12">
 
-                        <div className="px-4 py-3 border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/40 sticky top-0 backdrop-blur">
-                            <p className="text-sm font-semibold text-slate-700 dark:text-slate-100">
-                                {selected.label}
-                            </p>
-                            {selected.heLabel && (
-                                <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5" dir="rtl">
-                                    {selected.heLabel}
-                                </p>
-                            )}
-                        </div>
+                        {sections.map(sec => {
+                            const data = sectionDataMap[sec.ref];
+                            const loading = loadingMap[sec.ref];
 
-                        <div className="p-4">
-                            {sectionLoading && (
-                                <div className="flex flex-col items-center justify-center py-20 gap-3">
-                                    <Loader2 className="w-8 h-8 text-blue-500 animate-spin" />
-                                    <p className="text-sm text-slate-500 dark:text-slate-400">
-                                        Loading…
-                                    </p>
+                            return (
+                                <div
+                                    key={sec.ref}
+                                    ref={el => sectionRefs.current[sec.ref] = el}
+                                    data-ref={sec.ref}
+                                    className="scroll-mt-24"
+                                >
+                                    <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-100 mb-3">
+                                        {sec.label}
+                                    </h2>
+
+                                    {loading && (
+                                        <div className="flex items-center gap-2 text-slate-400">
+                                            <Loader2 className="w-4 h-4 animate-spin" />
+                                            Loading…
+                                        </div>
+                                    )}
+
+                                    {data && (
+                                        <SectionText he={data.he} text={data.text} />
+                                    )}
                                 </div>
-                            )}
-
-                            {sectionError && (
-                                <div className="flex flex-col items-center justify-center py-20 px-6 text-center gap-3">
-                                    <AlertCircle className="w-10 h-10 text-amber-500" />
-                                    <p className="text-slate-700 dark:text-slate-200 font-semibold">
-                                        Unable to load text from Sefaria
-                                    </p>
-                                    <a href={sectionUrl} target="_blank" rel="noopener noreferrer">
-                                        <Button className="gap-2 bg-blue-600 hover:bg-blue-700">
-                                            <ExternalLink className="w-4 h-4" /> Open in Sefaria
-                                        </Button>
-                                    </a>
-                                </div>
-                            )}
-
-                            {sectionData && !sectionLoading && (
-                                <SectionText he={sectionData.he} text={sectionData.text} />
-                            )}
-                        </div>
+                            );
+                        })}
                     </div>
                 )}
             </div>
