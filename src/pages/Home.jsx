@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { MapPin, Loader2, Search, ChevronRight, AlertCircle, Settings } from 'lucide-react';
+import { MapPin, Loader2, Search, ChevronRight, AlertCircle, Settings, Printer } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Link } from 'react-router-dom';
@@ -10,6 +10,7 @@ import MiniCompass from '@/components/home/MiniCompass';
 import NextZmanCard from '@/components/home/NextZmanCard';
 import ZmanimSummary from '@/components/home/ZmanimSummary';
 import NavMenu from '@/components/NavMenu';
+import { printZmanim } from '@/lib/printZmanim';
 
 function convertTo24(timeStr) {
     if (!timeStr) return timeStr;
@@ -37,7 +38,7 @@ const isFriday = today.getDay() === 5;
 export default function Home() {
     const { location, loading: locLoading, error: locError, detectGPS, searchLocation, clearLocation } = useSavedLocation();
     const { zmanim, loading: zmanimLoading } = useZmanim(location);
-    const { zmanim: tomorrowZmanim } = useZmanim(isFriday ? location : null, tomorrow);
+    const { zmanim: tomorrowZmanim } = useZmanim(location, tomorrow);
     const { prefs } = useDashboardPrefs();
     const [searchQuery, setSearchQuery] = useState('');
     const [showSearch, setShowSearch] = useState(false);
@@ -45,6 +46,10 @@ export default function Home() {
     const enabledZmanimIds = prefs.items.filter(i => i.enabled && !['compass', 'next_zman'].includes(i.id)).map(i => i.id);
     const showCompass = prefs.items.find(i => i.id === 'compass')?.enabled;
     const showNextZman = prefs.items.find(i => i.id === 'next_zman')?.enabled;
+
+    const locationLabel = location
+        ? [location.city, location.state, location.country].filter(Boolean).join(', ') || `${location.latitude?.toFixed(3)}°, ${location.longitude?.toFixed(3)}°`
+        : '';
 
     const handleSearch = async (e) => {
         e.preventDefault();
@@ -173,6 +178,28 @@ export default function Home() {
                                 enabledIds={enabledZmanimIds}
                                 use24Hour={prefs.use24Hour}
                             />
+                        )}
+
+                        {/* Print buttons */}
+                        {zmanim && !zmanimLoading && (
+                            <div className="flex gap-2">
+                                <button
+                                    onClick={() => printZmanim({ zmanimData: zmanim, date: today, locationLabel })}
+                                    className="flex-1 flex items-center justify-center gap-2 py-2.5 px-3 bg-white border border-slate-200 rounded-xl text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors"
+                                >
+                                    <Printer className="w-4 h-4 text-slate-500" />
+                                    Print Today's Zmanim
+                                </button>
+                                {tomorrowZmanim && (
+                                    <button
+                                        onClick={() => printZmanim({ zmanimData: tomorrowZmanim, date: tomorrow, locationLabel })}
+                                        className="flex-1 flex items-center justify-center gap-2 py-2.5 px-3 bg-white border border-slate-200 rounded-xl text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors"
+                                    >
+                                        <Printer className="w-4 h-4 text-slate-500" />
+                                        Print Tomorrow's
+                                    </button>
+                                )}
+                            </div>
                         )}
 
                         {/* Link to full zmanim */}

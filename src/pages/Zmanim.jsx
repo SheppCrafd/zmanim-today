@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { MapPin, Calendar as CalendarIcon, Loader2, RefreshCw, Search, ChevronLeft, ChevronRight } from 'lucide-react';
+import { MapPin, Calendar as CalendarIcon, Loader2, RefreshCw, Search, ChevronLeft, ChevronRight, Printer } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { format } from 'date-fns';
@@ -12,6 +12,7 @@ import LocationDisplay from '../components/zmanim/LocationDisplay';
 import { getHebrewDate } from '../lib/hebrewDate';
 import { useSavedLocation } from '@/hooks/useLocation';
 import NavMenu from '@/components/NavMenu';
+import { printZmanim } from '@/lib/printZmanim';
 
 export default function Zmanim() {
     const { location, loading: gpsLoading, error: gpsError, detectGPS, searchLocation: searchSavedLocation, clearLocation } = useSavedLocation();
@@ -258,6 +259,20 @@ Use actual astronomical calculations. Verify data is correct.`,
                                     >
                                         Today
                                     </Button>
+                                    {zmanim && !calculating && (
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={() => {
+                                                const locLabel = location ? [location.city, location.state, location.country].filter(Boolean).join(', ') || `${location.latitude?.toFixed(3)}°, ${location.longitude?.toFixed(3)}°` : '';
+                                                printZmanim({ zmanimData: zmanim, date: currentDate, locationLabel: locLabel, hebrewInfo });
+                                            }}
+                                            className="border-slate-300 hover:bg-slate-50"
+                                            title="Print zmanim"
+                                        >
+                                            <Printer className="w-4 h-4" />
+                                        </Button>
+                                    )}
                                     <Button 
                                         variant="outline" 
                                         size="sm"
