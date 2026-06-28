@@ -13,9 +13,6 @@ import UserNotRegisteredError from '@/components/UserNotRegisteredError';
 
 import Home from './pages/Home';
 import Zmanim from './pages/Zmanim';
-import SephardicSiddur from './pages/SephardicSiddur';
-import AshkenaziSiddur from './pages/AshkenaziSiddur';
-import ChabadSiddur from './pages/ChabadSiddur';
 import Compass from './pages/Compass';
 import Settings from './pages/Settings';
 
@@ -45,9 +42,9 @@ const AuthenticatedApp = () => {
       <Route path="/Compass" element={<Compass />} />
       <Route path="/Settings" element={<Settings />} />
 
-      {/* legacy redirects */}
-      <Route path="/SephardicSiddur" element={<Navigate to="/siddur/sephardic" />} />
+      {/* redirects */}
       <Route path="/AshkenaziSiddur" element={<Navigate to="/siddur/ashkenazi" />} />
+      <Route path="/SephardicSiddur" element={<Navigate to="/siddur/sephardic" />} />
       <Route path="/ChabadSiddur" element={<Navigate to="/siddur/chabad" />} />
 
       {/* unified engine */}
@@ -58,7 +55,7 @@ const AuthenticatedApp = () => {
   );
 };
 
-function App() {
+export default function App() {
   return (
     <ThemeProvider>
       <AuthProvider>
@@ -74,5 +71,3 @@ function App() {
     </ThemeProvider>
   );
 }
-
-export default App;
