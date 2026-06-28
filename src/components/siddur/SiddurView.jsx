@@ -16,20 +16,20 @@ if (typeof document !== 'undefined') {
 }
 
 /* ---------------- FLATTEN ---------------- */
-function flattenNodes(nodes, keyPath = '', labelPath = '') {
+function flattenNodes(nodes, keyPath = '') {
     const result = [];
 
     for (const node of nodes) {
         const key = node.key || node.title;
-        const fullKeyPath = keyPath ? `${keyPath}, ${key}` : key;
+        const fullKey = keyPath ? `${keyPath}, ${key}` : key;
 
         if (node.nodes) {
-            result.push(...flattenNodes(node.nodes, fullKeyPath, labelPath));
+            result.push(...flattenNodes(node.nodes, fullKey));
         } else {
             result.push({
                 label: node.title,
                 heLabel: node.heTitle,
-                ref: fullKeyPath
+                ref: fullKey
             });
         }
     }
@@ -43,17 +43,30 @@ function SectionText({ he, text }) {
     const enArr = Array.isArray(text) ? text : text ? [text] : [];
     const maxLen = Math.max(heArr.length, enArr.length);
 
+    if (!maxLen) {
+        return (
+            <p className="text-slate-400 italic text-sm">
+                Loading text...
+            </p>
+        );
+    }
+
     return (
         <div className="space-y-6">
             {Array.from({ length: maxLen }).map((_, i) => (
                 <div key={i} className="space-y-2">
                     {heArr[i] && (
-                        <p dir="rtl" className="text-right text-lg font-serif"
-                            dangerouslySetInnerHTML={{ __html: heArr[i] }} />
+                        <p
+                            dir="rtl"
+                            className="text-right text-lg font-serif"
+                            dangerouslySetInnerHTML={{ __html: heArr[i] }}
+                        />
                     )}
                     {enArr[i] && (
-                        <p className="text-sm text-slate-500"
-                            dangerouslySetInnerHTML={{ __html: enArr[i] }} />
+                        <p
+                            className="text-sm text-slate-500"
+                            dangerouslySetInnerHTML={{ __html: enArr[i] }}
+                        />
                     )}
                 </div>
             ))}
@@ -69,7 +82,6 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
     const [sections, setSections] = useState([]);
     const [loaded, setLoaded] = useState({});
     const [startIndex, setStartIndex] = useState(null);
-    const [activeIndex, setActiveIndex] = useState(null);
 
     const WINDOW = 2;
 
@@ -85,71 +97,36 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
     }, [bookRef]);
 
     /* ---------------- LOAD TEXT ---------------- */
-    const loadSection = async (index) => {
-        if (loaded[index] || !sections[index]) return;
+    const loadSection = async (i) => {
+        if (loaded[i] || !sections[i]) return;
 
         const res = await fetch(
-            `https://www.sefaria.org/api/texts/${encodeURIComponent(sections[index].ref)}`
+            `https://www.sefaria.org/api/texts/${encodeURIComponent(sections[i].ref)}`
         );
 
         const data = await res.json();
 
         setLoaded(prev => ({
             ...prev,
-            [index]: data
+            [i]: data
         }));
     };
 
-    /* ---------------- ENTER ---------------- */
-    const openAt = async (index) => {
-        setStartIndex(index);
-        setActiveIndex(index);
+    /* ---------------- OPEN ---------------- */
+    const openAt = async (i) => {
+        setStartIndex(i);
 
-        for (let i = index - WINDOW; i <= index + WINDOW; i++) {
-            if (i >= 0 && i < sections.length) loadSection(i);
+        // preload safe window ONLY (not virtualizing DOM)
+        for (let x = i - WINDOW; x <= i + WINDOW; x++) {
+            if (x >= 0 && x < sections.length) loadSection(x);
         }
 
         setTimeout(() => {
-            startRef.current?.scrollIntoView({ behavior: 'smooth' });
+            startRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
         }, 50);
     };
 
-    /* ---------------- OBSERVER (NO SNAPPING) ---------------- */
-    useEffect(() => {
-        if (startIndex === null) return;
-
-        const observer = new IntersectionObserver(
-            (entries) => {
-                for (const entry of entries) {
-                    if (entry.isIntersecting) {
-                        const index = Number(entry.target.dataset.index);
-                        setActiveIndex(index);
-
-                        // preload neighbors
-                        for (let i = index - WINDOW; i <= index + WINDOW; i++) {
-                            if (i >= 0 && i < sections.length) loadSection(i);
-                        }
-                    }
-                }
-            },
-            {
-                root: scrollRef.current,
-                threshold: 0.4
-            }
-        );
-
-        const nodes = scrollRef.current?.querySelectorAll('[data-index]');
-        nodes?.forEach(n => observer.observe(n));
-
-        return () => observer.disconnect();
-    }, [startIndex, sections]);
-
-    const visibleStart = Math.max(0, (activeIndex ?? startIndex ?? 0) - WINDOW);
-    const visibleEnd = Math.min(
-        sections.length - 1,
-        (activeIndex ?? startIndex ?? 0) + WINDOW
-    );
-
+    /* ---------------- RENDER ---------------- */
     return (
         <div className="h-screen flex flex-col overflow-hidden bg-slate-50 dark:bg-slate-950">
 
@@ -168,7 +145,7 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
                 </Button>
             </div>
 
-            {/* SCROLL */}
+            {/* SCROLL AREA */}
             <div
                 ref={scrollRef}
                 className="flex-1 overflow-y-auto mx-4 mb-4 bg-white dark:bg-slate-900 rounded-xl"
@@ -190,28 +167,19 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
                     </div>
                 )}
 
-                {/* READER */}
+                {/* READER (NO UNMOUNTING SECTIONS) */}
                 {startIndex !== null && (
                     <div className="p-4 space-y-12">
 
                         {sections.map((sec, i) => {
-                            if (i < visibleStart || i > visibleEnd) return null;
-
                             const data = loaded[i];
 
-                            if (!data) {
-                                loadSection(i);
-                                return (
-                                    <div key={i} className="py-10 flex justify-center">
-                                        <Loader2 className="animate-spin" />
-                                    </div>
-                                );
-                            }
+                            // lazy load
+                            if (!data) loadSection(i);
 
                             return (
                                 <div
                                     key={i}
-                                    data-index={i}
                                     ref={i === startIndex ? startRef : null}
                                     className="space-y-3"
                                 >
@@ -219,7 +187,13 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
                                         {sec.label}
                                     </div>
 
-                                    <SectionText he={data.he} text={data.text} />
+                                    {data ? (
+                                        <SectionText he={data.he} text={data.text} />
+                                    ) : (
+                                        <div className="py-6 flex justify-center">
+                                            <Loader2 className="animate-spin" />
+                                        </div>
+                                    )}
                                 </div>
                             );
                         })}
