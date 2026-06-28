@@ -1,68 +1,38 @@
 import { useState, useEffect } from 'react';
 import { format } from 'date-fns';
 import { base44 } from '@/api/base44Client';
+import { subtractMinutes } from '@/lib/timeUtils';
 
 const STORAGE_KEY = 'zmanim_cache_v2';
 
+/** Apply day-of-week rules: candle lighting only on Friday, havdalah only on Saturday. */
 function applyDayRules(result, date) {
     if (!result?.zmanim) return result;
-    const dow = date.getDay(); // 0=Sun, 5=Fri, 6=Sat
-    const isFriday = dow === 5;
-    const isSaturday = dow === 6;
+    const dow = date.getDay();
     return {
         ...result,
         zmanim: {
             ...result.zmanim,
-            candle_lighting: isFriday ? result.zmanim.candle_lighting : null,
-            havdalah: isSaturday ? result.zmanim.tzait_72 : null,
+            candle_lighting: dow === 5 ? result.zmanim.candle_lighting : null,
+            havdalah:        dow === 6 ? result.zmanim.tzait_72 : null,
         }
     };
 }
 
+/** Derive alot_hashachar as exactly 72 minutes before sunrise. */
 function fixAlotHashachar(result) {
     if (!result?.zmanim?.sunrise) return result;
-    const m = result.zmanim.sunrise.match(/(\d+):(\d+)\s*(AM|PM)/i);
-    if (!m) return result;
-    let [, h, min, ampm] = m;
-    h = parseInt(h); min = parseInt(min);
-    if (ampm.toUpperCase() === 'PM' && h !== 12) h += 12;
-    if (ampm.toUpperCase() === 'AM' && h === 12) h = 0;
-    const totalMin = h * 60 + min - 72;
-    const norm = ((totalMin % 1440) + 1440) % 1440;
-    const alotH = Math.floor(norm / 60);
-    const alotMin = norm % 60;
-    const period = alotH < 12 ? 'AM' : 'PM';
-    const display12 = alotH % 12 === 0 ? 12 : alotH % 12;
-    return {
-        ...result,
-        zmanim: {
-            ...result.zmanim,
-            alot_hashachar: `${display12}:${String(alotMin).padStart(2, '0')} ${period}`
-        }
-    };
+    const alot = subtractMinutes(result.zmanim.sunrise, 72);
+    if (!alot) return result;
+    return { ...result, zmanim: { ...result.zmanim, alot_hashachar: alot } };
 }
 
+/** Derive candle_lighting as exactly 18 minutes before sunset. */
 function fixCandleLighting(result) {
     if (!result?.zmanim?.sunset) return result;
-    const sunsetStr = result.zmanim.sunset;
-    const [time, meridiem] = sunsetStr.split(' ');
-    const [hStr, mStr] = time.split(':');
-    let hours = parseInt(hStr, 10);
-    const minutes = parseInt(mStr, 10);
-    if (meridiem === 'PM' && hours !== 12) hours += 12;
-    if (meridiem === 'AM' && hours === 12) hours = 0;
-    const totalMins = hours * 60 + minutes - 18;
-    let clHours = Math.floor(totalMins / 60) % 24;
-    const clMins = totalMins % 60;
-    const clMeridiem = clHours >= 12 ? 'PM' : 'AM';
-    const clDisplay = clHours > 12 ? clHours - 12 : (clHours === 0 ? 12 : clHours);
-    return {
-        ...result,
-        zmanim: {
-            ...result.zmanim,
-            candle_lighting: `${clDisplay}:${String(clMins).padStart(2, '0')} ${clMeridiem}`
-        }
-    };
+    const cl = subtractMinutes(result.zmanim.sunset, 18);
+    if (!cl) return result;
+    return { ...result, zmanim: { ...result.zmanim, candle_lighting: cl } };
 }
 
 function cacheKey(lat, lon, date) {
@@ -73,8 +43,7 @@ function getCache(key) {
     try {
         const raw = sessionStorage.getItem(STORAGE_KEY);
         if (!raw) return null;
-        const store = JSON.parse(raw);
-        return store[key] || null;
+        return JSON.parse(raw)[key] || null;
     } catch { return null; }
 }
 
@@ -87,19 +56,25 @@ function setCache(key, data) {
     } catch { /* ignore */ }
 }
 
+/** Apply all deterministic post-processing to a raw LLM result. */
+function postProcess(result, date) {
+    return applyDayRules(fixAlotHashachar(fixCandleLighting(result)), date);
+}
+
 export function useZmanim(location, date = new Date()) {
     const [zmanim, setZmanim] = useState(null);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
 
+    const dateStr = format(date, 'yyyy-MM-dd');
+
     useEffect(() => {
         if (!location?.latitude || !location?.longitude) return;
 
-        const dateStr = format(date, 'yyyy-MM-dd');
         const key = cacheKey(location.latitude, location.longitude, dateStr);
         const cached = getCache(key);
         if (cached) {
-            setZmanim(applyDayRules(fixAlotHashachar(fixCandleLighting(cached)), date));
+            setZmanim(postProcess(cached, date));
             return;
         }
 
@@ -132,36 +107,37 @@ LOCATION INFO:
                     zmanim: {
                         type: "object",
                         properties: {
-                            alot_hashachar: { type: "string" },
-                            misheyakir: { type: "string" },
-                            sunrise: { type: "string" },
-                            sof_zman_shma_gra: { type: "string" },
-                            sof_zman_shma_mga: { type: "string" },
+                            alot_hashachar:        { type: "string" },
+                            misheyakir:            { type: "string" },
+                            sunrise:               { type: "string" },
+                            sof_zman_shma_gra:     { type: "string" },
+                            sof_zman_shma_mga:     { type: "string" },
                             sof_zman_tefillah_gra: { type: "string" },
                             sof_zman_tefillah_mga: { type: "string" },
-                            chatzot: { type: "string" },
-                            mincha_gedola: { type: "string" },
-                            mincha_ketana: { type: "string" },
-                            plag_hamincha: { type: "string" },
-                            candle_lighting: { type: "string" },
-                            sunset: { type: "string" },
-                            tzait_hakochavim: { type: "string" },
-                            tzait_72: { type: "string" },
-                            chatzot_laila: { type: "string" }
+                            chatzot:               { type: "string" },
+                            mincha_gedola:         { type: "string" },
+                            mincha_ketana:         { type: "string" },
+                            plag_hamincha:         { type: "string" },
+                            candle_lighting:       { type: "string" },
+                            sunset:                { type: "string" },
+                            tzait_hakochavim:      { type: "string" },
+                            tzait_72:              { type: "string" },
+                            chatzot_laila:         { type: "string" },
                         }
                     }
                 }
             }
         }).then(result => {
+            // Store the raw result (before day rules) so cache is date-agnostic
             const fixed = fixAlotHashachar(fixCandleLighting(result));
-            setZmanim(applyDayRules(fixed, date));
             setCache(key, fixed);
+            setZmanim(postProcess(fixed, date));
         }).catch(() => {
             setError('Failed to load zmanim.');
         }).finally(() => {
             setLoading(false);
         });
-    }, [location?.latitude, location?.longitude, format(date, 'yyyy-MM-dd')]);
+    }, [location?.latitude, location?.longitude, dateStr]);
 
     return { zmanim, loading, error };
 }

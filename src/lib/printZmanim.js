@@ -1,72 +1,29 @@
 import { format } from 'date-fns';
+import { ZMANIM_GROUPS, getGroupEntries } from '@/lib/zmanimSchema';
 
-// Groups mirror the Zmanim page exactly
-function buildGroups(z, dow) {
-    const isFriday = dow === 5;
-    const isSaturday = dow === 6;
-
-    return [
-        {
-            title: 'Dawn & Morning',
-            icon: '☀️',
-            from: '#f59e0b', to: '#f97316',
-            times: [
-                { label: 'Alot Hashachar', value: z.alot_hashachar, description: 'Dawn - 72 min before sunrise' },
-                { label: 'Misheyakir', value: z.misheyakir, description: 'Earliest Tallit & Tefillin' },
-                { label: 'Sunrise', value: z.sunrise, description: 'HaNetz HaChamah', highlight: true },
-                { label: 'Sof Zman Shema (GRA)', value: z.sof_zman_shma_gra, description: 'Latest Shema - 3 hrs after sunrise', highlight: true },
-                { label: 'Sof Zman Shema (MGA)', value: z.sof_zman_shma_mga, description: '3 hrs after dawn (stringent)' },
-                { label: 'Sof Zman Tefillah (GRA)', value: z.sof_zman_tefillah_gra, description: 'Latest Shemoneh Esrei - 4 hrs', highlight: true },
-                { label: 'Sof Zman Tefillah (MGA)', value: z.sof_zman_tefillah_mga, description: '4 hrs after dawn (stringent)' },
-            ],
-        },
-        {
-            title: 'Midday & Afternoon',
-            icon: '🌤️',
-            from: '#3b82f6', to: '#06b6d4',
-            times: [
-                { label: 'Chatzot', value: z.chatzot, description: 'Halachic Noon - midpoint of day', highlight: true },
-                { label: 'Mincha Gedola', value: z.mincha_gedola, description: 'Earliest Mincha - 30 min after noon' },
-                { label: 'Mincha Ketana', value: z.mincha_ketana, description: 'Preferred Mincha - 2.5 hrs before sunset' },
-                { label: 'Plag HaMincha', value: z.plag_hamincha, description: 'Earliest candle lighting - 1.25 hrs before sunset' },
-            ],
-        },
-        {
-            title: 'Evening & Night',
-            icon: '🌙',
-            from: '#4f46e5', to: '#9333ea',
-            times: [
-                isFriday && z.candle_lighting && { label: 'Candle Lighting', value: z.candle_lighting, description: '18 min before sunset', highlight: true },
-                { label: 'Sunset', value: z.sunset, description: 'Shkiyas HaChamah', highlight: true },
-                { label: 'Tzait HaKochavim', value: z.tzait_hakochavim, description: 'Nightfall - 3 medium stars', highlight: true },
-                isSaturday && { label: 'Havdalah', value: z.tzait_72, description: 'Nightfall - Rabbeinu Tam', highlight: true },
-                !isSaturday && { label: 'Tzait (72 min)', value: z.tzait_72, description: 'Nightfall - Rabbeinu Tam' },
-                { label: 'Chatzot Laila', value: z.chatzot_laila, description: 'Halachic Midnight' },
-            ].filter(Boolean),
-        },
-    ];
-}
-
-function renderRow(t) {
-    const valStyle = t.highlight
+function renderRow(entry) {
+    const val = entry.value || '';
+    const valStyle = entry.highlight
         ? 'color:#1d4ed8;background:#dbeafe;padding:4px 12px;border-radius:8px;'
         : 'color:#334155;';
-    return `<div style="display:flex;align-items:center;justify-content:space-between;padding:16px;border-bottom:1px solid #f1f5f9;${t.highlight ? 'background:#fffbeb80;' : ''}">
+    return `<div style="display:flex;align-items:center;justify-content:space-between;padding:16px;border-bottom:1px solid #f1f5f9;${entry.highlight ? 'background:#fffbeb80;' : ''}">
         <div style="flex:1;">
-            <p style="margin:0;font-weight:600;color:${t.highlight ? '#0f172a' : '#334155'};">${t.label}</p>
-            <p style="margin:2px 0 0;font-size:13px;color:#64748b;">${t.description}</p>
+            <p style="margin:0;font-weight:600;color:${entry.highlight ? '#0f172a' : '#334155'};">${entry.label}</p>
+            <p style="margin:2px 0 0;font-size:13px;color:#64748b;">${entry.description}</p>
         </div>
-        <div style="font-family:ui-monospace,monospace;font-size:18px;font-weight:700;${valStyle}">${t.value || ''}</div>
+        <div style="font-family:ui-monospace,monospace;font-size:18px;font-weight:700;${valStyle}">${val}</div>
     </div>`;
 }
 
-function renderGroup(g) {
+function renderGroup(group, zmanimData, dayOfWeek) {
+    const entries = getGroupEntries(group.id, zmanimData, dayOfWeek);
+    if (!entries.length) return '';
     return `<div style="margin-bottom:16px;border-radius:14px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.1);background:#fff;">
-        <div style="background:linear-gradient(to right,${g.from},${g.to});padding:16px;display:flex;align-items:center;gap:12px;">
-            <span style="font-size:24px;">${g.icon}</span>
-            <span style="color:#fff;font-size:18px;font-weight:600;">${g.title}</span>
+        <div style="background:linear-gradient(to right,${group.printFrom},${group.printTo});padding:16px;display:flex;align-items:center;gap:12px;">
+            <span style="font-size:24px;">${group.icon}</span>
+            <span style="color:#fff;font-size:18px;font-weight:600;">${group.title}</span>
         </div>
-        <div>${g.times.map(renderRow).join('')}</div>
+        <div>${entries.map(renderRow).join('')}</div>
     </div>`;
 }
 
@@ -74,7 +31,6 @@ export function printZmanim({ zmanimData, date, locationLabel, hebrewInfo, timez
     const z = zmanimData?.zmanim || {};
     const dow = date.getDay();
     const dateStr = format(date, 'EEEE, MMMM d, yyyy');
-    const groups = buildGroups(z, dow);
 
     const hebrewBlock = hebrewInfo ? `
         <div style="background:#fff;border-radius:14px;padding:16px 20px;margin-bottom:16px;box-shadow:0 1px 3px rgba(0,0,0,0.1);">
@@ -124,7 +80,7 @@ export function printZmanim({ zmanimData, date, locationLabel, hebrewInfo, timez
             <div class="date">${dateStr}</div>
         </div>
         ${hebrewBlock}
-        ${groups.map(renderGroup).join('')}
+        ${ZMANIM_GROUPS.map(g => renderGroup(g, z, dow)).join('')}
         <div class="footer">
             <p style="margin:0;">Times calculated based on your location</p>
             ${timezone ? `<p style="margin:4px 0 0;">Timezone: ${timezone}</p>` : ''}

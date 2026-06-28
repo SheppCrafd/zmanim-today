@@ -14,6 +14,7 @@ import { useSavedLocation } from '@/hooks/useLocation';
 import NavMenu from '@/components/NavMenu';
 import { printZmanim } from '@/lib/printZmanim';
 import { useDashboardPrefs } from '@/hooks/useDashboardPrefs';
+import { ZMANIM_GROUPS, getGroupEntries } from '@/lib/zmanimSchema';
 
 
 export default function Zmanim() {
@@ -120,22 +121,6 @@ Use actual astronomical calculations. Verify data is correct.`,
                 }
             });
 
-            // Always derive alot_hashachar as exactly 72 min before the returned sunrise
-            if (result?.zmanim?.sunrise) {
-                const sunriseMatch = result.zmanim.sunrise.match(/(\d+):(\d+)\s*(AM|PM)/i);
-                if (sunriseMatch) {
-                    let [, h, min, ampm] = sunriseMatch;
-                    h = parseInt(h); min = parseInt(min);
-                    if (ampm.toUpperCase() === 'PM' && h !== 12) h += 12;
-                    if (ampm.toUpperCase() === 'AM' && h === 12) h = 0;
-                    const totalMin = h * 60 + min - 72;
-                    const alotH = Math.floor(((totalMin % 1440) + 1440) % 1440 / 60);
-                    const alotMin = ((totalMin % 1440) + 1440) % 1440 % 60;
-                    const period = alotH < 12 ? 'AM' : 'PM';
-                    const display12 = alotH % 12 === 0 ? 12 : alotH % 12;
-                    result.zmanim.alot_hashachar = `${display12}:${String(alotMin).padStart(2, '0')} ${period}`;
-                }
-            }
             setZmanim(result);
         } catch (err) {
             setError('Failed to calculate zmanim. Please try again.');
@@ -414,49 +399,25 @@ Use actual astronomical calculations. Verify data is correct.`,
                 {/* Zmanim Display */}
                 {zmanim && !calculating && (
                     <div className="space-y-4">
-                        <ZmanimCard 
-                            title="Dawn & Morning"
-                            icon="☀️"
-                            color="from-amber-500 to-orange-500"
-                            use24Hour={prefs.use24Hour}
-                            times={[
-                                { label: 'Alot Hashachar', value: zmanim.zmanim.alot_hashachar, description: 'Dawn - 72 min before sunrise' },
-                                { label: 'Misheyakir', value: zmanim.zmanim.misheyakir, description: 'Earliest Tallit & Tefillin' },
-                                { label: 'Sunrise', value: zmanim.zmanim.sunrise, description: 'HaNetz HaChamah', highlight: true },
-                                { label: 'Sof Zman Shema (GRA)', value: zmanim.zmanim.sof_zman_shma_gra, description: 'Latest Shema - 3 hrs after sunrise', highlight: true },
-                                { label: 'Sof Zman Shema (MGA)', value: zmanim.zmanim.sof_zman_shma_mga, description: '3 hrs after dawn (stringent)' },
-                                { label: 'Sof Zman Tefillah (GRA)', value: zmanim.zmanim.sof_zman_tefillah_gra, description: 'Latest Shemoneh Esrei - 4 hrs', highlight: true },
-                                { label: 'Sof Zman Tefillah (MGA)', value: zmanim.zmanim.sof_zman_tefillah_mga, description: '4 hrs after dawn (stringent)' }
-                            ]}
-                        />
-
-                        <ZmanimCard 
-                            title="Midday & Afternoon"
-                            icon="🌤️"
-                            color="from-blue-500 to-cyan-500"
-                            use24Hour={prefs.use24Hour}
-                            times={[
-                                { label: 'Chatzot', value: zmanim.zmanim.chatzot, description: 'Halachic Noon - midpoint of day', highlight: true },
-                                { label: 'Mincha Gedola', value: zmanim.zmanim.mincha_gedola, description: 'Earliest Mincha - 30 min after noon' },
-                                { label: 'Mincha Ketana', value: zmanim.zmanim.mincha_ketana, description: 'Preferred Mincha - 2.5 hrs before sunset' },
-                                { label: 'Plag HaMincha', value: zmanim.zmanim.plag_hamincha, description: 'Earliest candle lighting - 1.25 hrs before sunset' }
-                            ]}
-                        />
-
-                        <ZmanimCard 
-                            title="Evening & Night"
-                            icon="🌙"
-                            color="from-indigo-600 to-purple-600"
-                            use24Hour={prefs.use24Hour}
-                            times={[
-                                currentDate.getDay() === 5 && zmanim.zmanim.candle_lighting && { label: 'Candle Lighting', value: zmanim.zmanim.candle_lighting, description: '18 min before sunset', highlight: true },
-                                { label: 'Sunset', value: zmanim.zmanim.sunset, description: 'Shkiyas HaChamah', highlight: true },
-                                { label: 'Tzait HaKochavim', value: zmanim.zmanim.tzait_hakochavim, description: 'Nightfall - 3 medium stars', highlight: true },
-                                currentDate.getDay() === 6 && { label: 'Havdalah', value: zmanim.zmanim.tzait_72, description: 'Nightfall - Rabbeinu Tam', highlight: true },
-                                currentDate.getDay() !== 6 && { label: 'Tzait (72 min)', value: zmanim.zmanim.tzait_72, description: 'Nightfall - Rabbeinu Tam' },
-                                { label: 'Chatzot Laila', value: zmanim.zmanim.chatzot_laila, description: 'Halachic Midnight' }
-                            ].filter(Boolean)}
-                        />
+                        {ZMANIM_GROUPS.map(group => {
+                            const entries = getGroupEntries(group.id, zmanim.zmanim, currentDate.getDay());
+                            if (!entries.length) return null;
+                            return (
+                                <ZmanimCard
+                                    key={group.id}
+                                    title={group.title}
+                                    icon={group.icon}
+                                    color={group.color}
+                                    use24Hour={prefs.use24Hour}
+                                    times={entries.map(e => ({
+                                        label: e.label,
+                                        value: e.value,
+                                        description: e.description,
+                                        highlight: e.highlight,
+                                    }))}
+                                />
+                            );
+                        })}
                     </div>
                 )}
 
