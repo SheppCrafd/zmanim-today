@@ -2,24 +2,21 @@ import React, { useState, useEffect, useRef } from 'react';
 import {
     ExternalLink,
     Loader2,
-    AlertCircle,
-    ArrowLeft,
     ChevronRight
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import NavMenu from '@/components/NavMenu';
+import { useNavigate, useParams } from 'react-router-dom';
 
-/* ---------------- LOCK SCROLL GLOBALLY ---------------- */
+/* ---------------- CONFIG ---------------- */
+const WINDOW = 2;
+
+/* ---------------- SCROLL LOCK ---------------- */
 if (typeof document !== 'undefined') {
     document.documentElement.style.height = '100%';
     document.body.style.height = '100%';
     document.body.style.overflow = 'hidden';
-    document.getElementById('root')?.style.setProperty('height', '100%');
-    document.getElementById('root')?.style.setProperty('overflow', 'hidden');
 }
-
-/* ---------------- CONFIG ---------------- */
-const WINDOW = 2;
 
 /* ---------------- HELPERS ---------------- */
 const isProbablyEnglish = (str = '') =>
@@ -39,7 +36,7 @@ function SectionText({ he, en, showEnglish }) {
                     {heArr[i] && (
                         <p
                             dir="rtl"
-                            className="text-right text-lg leading-loose font-serif text-slate-800 dark:text-slate-100"
+                            className="text-right text-lg font-serif text-slate-900 dark:text-slate-100"
                             dangerouslySetInnerHTML={{ __html: heArr[i] }}
                         />
                     )}
@@ -48,7 +45,7 @@ function SectionText({ he, en, showEnglish }) {
                         enArr[i] &&
                         isProbablyEnglish(enArr[i]) && (
                             <p
-                                className="text-left text-sm text-slate-500 dark:text-slate-400"
+                                className="text-sm text-slate-500 dark:text-slate-400"
                                 dangerouslySetInnerHTML={{ __html: enArr[i] }}
                             />
                         )}
@@ -59,22 +56,21 @@ function SectionText({ he, en, showEnglish }) {
 }
 
 /* ---------------- MAIN ---------------- */
-export default function SiddurView({
-    title,
-    subtitle,
-    bookRef,
-    sefariaUrl
-}) {
+export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
+    const navigate = useNavigate();
+    const { index } = useParams();
+
     const scrollRef = useRef(null);
     const sectionRefs = useRef([]);
 
     const [sections, setSections] = useState([]);
     const [loaded, setLoaded] = useState({});
+    const [showEnglish, setShowEnglish] = useState(true);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(false);
 
-    const [activeIndex, setActiveIndex] = useState(0);
-    const [showEnglish, setShowEnglish] = useState(true);
+    const isReader = index !== undefined;
+    const activeIndex = isReader ? parseInt(index, 10) : 0;
 
     /* ---------------- LOAD TOC ---------------- */
     useEffect(() => {
@@ -116,10 +112,10 @@ export default function SiddurView({
     }, [bookRef]);
 
     /* ---------------- LOAD SECTION ---------------- */
-    const loadSection = async (index) => {
-        if (loaded[index]) return;
+    const loadSection = async (i) => {
+        if (loaded[i]) return;
 
-        const sec = sections[index];
+        const sec = sections[i];
         if (!sec) return;
 
         try {
@@ -131,38 +127,59 @@ export default function SiddurView({
 
             setLoaded(prev => ({
                 ...prev,
-                [index]: data
+                [i]: data
             }));
         } catch {
             setLoaded(prev => ({
                 ...prev,
-                [index]: { error: true }
+                [i]: { error: true }
             }));
         }
     };
 
-    /* ---------------- SCROLL TELEPORT (TOC) ---------------- */
-    const openAt = (index) => {
-        const el = sectionRefs.current[index];
-        el?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    /* ---------------- OPEN SECTION ---------------- */
+    const openAt = (i) => {
+        navigate(`/read/${i}`);
     };
 
-    /* ---------------- SCROLL TRACKING (MC PLAYER) ---------------- */
+    const goBack = () => {
+        navigate('/toc');
+    };
+
+    /* ---------------- CHUNK WINDOW ---------------- */
+    const windowStart = Math.max(0, activeIndex - WINDOW);
+    const windowEnd = Math.min(sections.length - 1, activeIndex + WINDOW);
+
+    /* ---------------- PRELOAD ---------------- */
     useEffect(() => {
+        if (!isReader) return;
+
+        const start = Math.max(0, activeIndex - WINDOW);
+        const end = Math.min(sections.length - 1, activeIndex + WINDOW);
+
+        for (let i = start; i <= end; i++) {
+            if (!loaded[i]) loadSection(i);
+        }
+    }, [activeIndex, isReader, sections]);
+
+    /* ---------------- SCROLL TRACKING ---------------- */
+    useEffect(() => {
+        if (!isReader) return;
+
         const el = scrollRef.current;
         if (!el) return;
 
         const handler = () => {
             const nodes = sectionRefs.current;
-            let closest = 0;
+
             let best = Infinity;
+            let closest = activeIndex;
 
             for (let i = 0; i < nodes.length; i++) {
                 const n = nodes[i];
                 if (!n) continue;
 
-                const rect = n.getBoundingClientRect();
-                const dist = Math.abs(rect.top);
+                const dist = Math.abs(n.getBoundingClientRect().top);
 
                 if (dist < best) {
                     best = dist;
@@ -170,34 +187,20 @@ export default function SiddurView({
                 }
             }
 
-            setActiveIndex(closest);
+            navigate(`/read/${closest}`, { replace: true });
         };
 
         el.addEventListener('scroll', handler);
         return () => el.removeEventListener('scroll', handler);
-    }, []);
+    }, [isReader, sections]);
 
-    /* ---------------- PRELOAD WINDOW ---------------- */
-    useEffect(() => {
-        const start = Math.max(0, activeIndex - WINDOW);
-        const end = Math.min(sections.length - 1, activeIndex + WINDOW);
-
-        for (let i = start; i <= end; i++) {
-            if (!loaded[i]) loadSection(i);
-        }
-    }, [activeIndex, sections]);
-
-    const windowStart = Math.max(0, activeIndex - WINDOW);
-    const windowEnd = Math.min(sections.length - 1, activeIndex + WINDOW);
-
-    const sectionUrl =
-        `https://www.sefaria.org/${encodeURIComponent(sections[activeIndex]?.ref || '')}`;
+    /* ---------------- RENDER ---------------- */
 
     return (
         <div className="h-screen flex flex-col overflow-hidden bg-slate-50 dark:bg-slate-950">
 
             {/* HEADER */}
-            <div className="px-4 pt-4 pb-2 shrink-0 flex justify-between items-center">
+            <div className="px-4 pt-4 pb-2 flex justify-between items-center shrink-0">
                 <div className="flex items-center gap-2">
                     <NavMenu />
                     <div>
@@ -207,89 +210,102 @@ export default function SiddurView({
                 </div>
 
                 <div className="flex gap-2">
-                    <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setShowEnglish(v => !v)}
-                    >
-                        EN {showEnglish ? 'ON' : 'OFF'}
-                    </Button>
-
-                    <a href={sectionUrl} target="_blank" rel="noopener noreferrer">
-                        <Button variant="outline" size="sm">
-                            <ExternalLink className="w-4 h-4" />
+                    {isReader && (
+                        <Button variant="ghost" size="sm" onClick={goBack}>
+                            ← TOC
                         </Button>
-                    </a>
+                    )}
+
+                    {isReader && (
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setShowEnglish(v => !v)}
+                        >
+                            EN {showEnglish ? 'ON' : 'OFF'}
+                        </Button>
+                    )}
                 </div>
             </div>
 
-            {/* SCROLL WORLD */}
+            {/* BODY */}
             <div
                 ref={scrollRef}
                 className="flex-1 min-h-0 overflow-y-auto mx-4 mb-4 rounded-xl border bg-white dark:bg-slate-900"
             >
 
-                {/* TOC */}
-                {!loading && !error && sections.map((sec, i) => (
-                    <button
-                        key={i}
-                        onClick={() => openAt(i)}
-                        className="w-full flex justify-between px-4 py-3 border-b hover:bg-slate-100 dark:hover:bg-slate-800"
-                    >
-                        <span>{sec.label}</span>
-                        <ChevronRight />
-                    </button>
-                ))}
-
-                {loading && (
-                    <div className="p-10 flex justify-center">
-                        <Loader2 className="animate-spin" />
-                    </div>
-                )}
-
-                {error && (
-                    <div className="p-6 text-red-500">
-                        Failed to load
-                    </div>
-                )}
-
-                {/* CHUNK RENDER (MC STYLE) */}
-                {!loading && !error && sections.map((sec, i) => {
-                    if (i < windowStart || i > windowEnd) return null;
-
-                    const data = loaded[i];
-
-                    if (!data) {
-                        loadSection(i);
-                        return (
-                            <div
-                                key={i}
-                                ref={el => (sectionRefs.current[i] = el)}
-                                className="flex justify-center py-10"
-                            >
+                {/* ---------------- TOC ---------------- */}
+                {!isReader && (
+                    <div>
+                        {loading && (
+                            <div className="p-10 flex justify-center">
                                 <Loader2 className="animate-spin" />
                             </div>
-                        );
-                    }
+                        )}
 
-                    return (
-                        <div
-                            key={i}
-                            ref={el => (sectionRefs.current[i] = el)}
-                            className="space-y-4"
-                        >
-                            <div className="sticky top-0 bg-white dark:bg-slate-900 py-2 font-semibold">
-                                {sec.label}
+                        {error && (
+                            <div className="p-6 text-red-500">
+                                Failed to load
                             </div>
+                        )}
 
-                            <SectionText
-                                he={data.he}
-                                en={data.text}
-                                showEnglish={showEnglish}
-                            />
-                        </div>
-                    );
-                })}
+                        {sections.map((sec, i) => (
+                            <button
+                                key={i}
+                                onClick={() => openAt(i)}
+                                className="w-full flex justify-between px-4 py-3 border-b hover:bg-slate-100 dark:hover:bg-slate-800"
+                            >
+                                <span>{sec.label}</span>
+                                <ChevronRight />
+                            </button>
+                        ))}
+                    </div>
+                )}
+
+                {/* ---------------- READER (MC CHUNKS) ---------------- */}
+                {isReader && (
+                    <div className="p-4 space-y-12">
+
+                        {sections.map((sec, i) => {
+                            if (i < windowStart || i > windowEnd) return null;
+
+                            const data = loaded[i];
+
+                            if (!data) {
+                                loadSection(i);
+
+                                return (
+                                    <div
+                                        key={i}
+                                        ref={el => (sectionRefs.current[i] = el)}
+                                        className="flex justify-center py-10"
+                                    >
+                                        <Loader2 className="animate-spin" />
+                                    </div>
+                                );
+                            }
+
+                            return (
+                                <div
+                                    key={i}
+                                    ref={el => (sectionRefs.current[i] = el)}
+                                    className="space-y-4"
+                                >
+                                    <div className="sticky top-0 bg-white dark:bg-slate-900 py-2 font-semibold">
+                                        {sec.label}
+                                    </div>
+
+                                    <SectionText
+                                        he={data.he}
+                                        en={data.text}
+                                        showEnglish={showEnglish}
+                                    />
+                                </div>
+                            );
+                        })}
+
+                    </div>
+                )}
 
             </div>
         </div>
