@@ -1,51 +1,78 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Loader2, ChevronRight } from 'lucide-react';
+import {
+    ExternalLink,
+    Loader2,
+    AlertCircle,
+    ArrowLeft,
+    ChevronRight
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { useNavigate } from 'react-router-dom';
 import NavMenu from '@/components/NavMenu';
-import { useNavigate, useParams } from 'react-router-dom';
 
-/* ---------------- CONFIG ---------------- */
-const WINDOW = 2;
-
-const SIDDUR_MAP = {
-    ashkenazi: "Siddur_Ashkenaz",
-    sephardic: "Siddur_Sefarad",
-    chabad: "Siddur_Chabad"
-};
-
-/* ---------------- SCROLL LOCK ---------------- */
+/* ---------------- LOCK SCROLL GLOBALLY ---------------- */
+// This is required so ONLY the card scrolls
 if (typeof document !== 'undefined') {
     document.documentElement.style.height = '100%';
     document.body.style.height = '100%';
     document.body.style.overflow = 'hidden';
+    document.getElementById('root')?.style.setProperty('height', '100%');
+    document.getElementById('root')?.style.setProperty('overflow', 'hidden');
 }
 
-/* ---------------- HELPERS ---------------- */
-const isProbablyEnglish = (str = '') =>
-    /^[\x00-\x7F\s.,;:'"!?()\-–—]*$/.test(str);
+/* ---------------- TOC FLATTEN ---------------- */
+function flattenNodes(nodes, keyPath = '', labelPath = '') {
+    const result = [];
 
-/* ---------------- TEXT ---------------- */
-function SectionText({ he, en, showEnglish }) {
+    for (const node of nodes) {
+        const key = node.key || node.title;
+        const fullKeyPath = keyPath ? `${keyPath}, ${key}` : key;
+        const fullLabelPath = labelPath ? `${labelPath} > ${node.title}` : node.title;
+
+        if (node.nodes) {
+            result.push(...flattenNodes(node.nodes, fullKeyPath, fullLabelPath));
+        } else {
+            result.push({
+                label: node.title,
+                heLabel: node.heTitle,
+                breadcrumb: fullLabelPath,
+                ref: fullKeyPath
+            });
+        }
+    }
+
+    return result;
+}
+
+/* ---------------- TEXT RENDER ---------------- */
+function SectionText({ he, text }) {
     const heArr = Array.isArray(he) ? he : he ? [he] : [];
-    const enArr = Array.isArray(en) ? en : en ? [en] : [];
+    const enArr = Array.isArray(text) ? text : text ? [text] : [];
     const maxLen = Math.max(heArr.length, enArr.length);
+
+    if (!maxLen) {
+        return (
+            <p className="text-slate-400 dark:text-slate-500 text-sm italic">
+                No text available.
+            </p>
+        );
+    }
 
     return (
         <div className="space-y-6">
             {Array.from({ length: maxLen }).map((_, i) => (
                 <div key={i} className="space-y-2">
-
                     {heArr[i] && (
                         <p
                             dir="rtl"
-                            className="text-right text-lg font-serif text-slate-900 dark:text-slate-100"
+                            className="text-right text-lg leading-loose text-slate-800 dark:text-slate-100 font-serif"
                             dangerouslySetInnerHTML={{ __html: heArr[i] }}
                         />
                     )}
-
-                    {showEnglish && enArr[i] && isProbablyEnglish(enArr[i]) && (
-                        <p className="text-sm text-slate-500 dark:text-slate-400"
-                           dangerouslySetInnerHTML={{ __html: enArr[i] }}
+                    {enArr[i] && (
+                        <p
+                            className="text-left text-sm leading-relaxed text-slate-500 dark:text-slate-400"
+                            dangerouslySetInnerHTML={{ __html: enArr[i] }}
                         />
                     )}
                 </div>
@@ -55,254 +82,212 @@ function SectionText({ he, en, showEnglish }) {
 }
 
 /* ---------------- MAIN ---------------- */
-export default function SiddurView() {
+export default function SiddurView({
+    title,
+    subtitle,
+    bookRef,
+    sefariaUrl
+}) {
     const navigate = useNavigate();
-    const { type, index } = useParams();
-
     const scrollRef = useRef(null);
-    const sectionRefs = useRef([]);
 
     const [sections, setSections] = useState([]);
-    const [loaded, setLoaded] = useState({});
-    const [showEnglish, setShowEnglish] = useState(true);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(false);
 
-    const isReader = index !== undefined;
-    const activeIndex = isReader ? parseInt(index, 10) : 0;
-
-    const resolvedBookRef = SIDDUR_MAP[type] || SIDDUR_MAP.ashkenazi;
+    const [startIndex, setStartIndex] = useState(null);
+    const [loaded, setLoaded] = useState({});
 
     /* ---------------- LOAD TOC ---------------- */
     useEffect(() => {
         setLoading(true);
-        setLoaded({});
-        sectionRefs.current = [];
 
-        fetch(`https://www.sefaria.org/api/index/${resolvedBookRef}`)
-            .then(r => r.json())
+        fetch(`https://www.sefaria.org/api/index/${bookRef}`)
+            .then(r => {
+                if (!r.ok) throw new Error();
+                return r.json();
+            })
             .then(data => {
                 const schema = data?.schema;
-                const rootKey = schema?.key || resolvedBookRef;
+                const rootKey = schema?.key || bookRef.replace(/_/g, ' ');
                 const nodes = schema?.nodes || [];
 
-                const flatten = (nodes, keyPath = '') => {
-                    let res = [];
-
-                    for (const node of nodes) {
-                        const key = node.key || node.title;
-                        const full = keyPath ? `${keyPath}, ${key}` : key;
-
-                        if (node.nodes) {
-                            res.push(...flatten(node.nodes, full));
-                        } else {
-                            res.push({
-                                label: node.title,
-                                ref: full
-                            });
-                        }
-                    }
-                    return res;
-                };
-
-                setSections(flatten(nodes, rootKey));
+                setSections(flattenNodes(nodes, rootKey));
                 setLoading(false);
             })
             .catch(() => {
                 setError(true);
                 setLoading(false);
             });
-    }, [resolvedBookRef]);
+    }, [bookRef]);
 
     /* ---------------- LOAD SECTION ---------------- */
-    const loadSection = async (i) => {
-        if (loaded[i] || !sections[i]) return;
+    const loadSection = async (index) => {
+        if (loaded[index]) return;
+
+        const sec = sections[index];
+        if (!sec) return;
 
         try {
             const res = await fetch(
-                `https://www.sefaria.org/api/texts/${encodeURIComponent(sections[i].ref)}`
+                `https://www.sefaria.org/api/texts/${encodeURIComponent(sec.ref)}`
             );
 
             const data = await res.json();
 
             setLoaded(prev => ({
                 ...prev,
-                [i]: data
+                [index]: data
             }));
         } catch {
             setLoaded(prev => ({
                 ...prev,
-                [i]: { error: true }
+                [index]: { error: true }
             }));
         }
     };
 
-    /* ---------------- REAL WINDOW ENFORCER (IMPORTANT FIX) ---------------- */
-    useEffect(() => {
-        const start = Math.max(0, activeIndex - WINDOW);
-        const end = Math.min(sections.length - 1, activeIndex + WINDOW);
+    /* ---------------- ENTER READER ---------------- */
+    const openAt = async (index) => {
+        setStartIndex(index);
+        await loadSection(index);
 
-        setLoaded(prev => {
-            const next = {};
-
-            for (let i = start; i <= end; i++) {
-                if (prev[i]) next[i] = prev[i];
-            }
-
-            return next;
-        });
-
-        sectionRefs.current = sectionRefs.current.slice(start, end + 1);
-    }, [activeIndex, sections]);
-
-    /* ---------------- PRELOAD WINDOW ---------------- */
-    useEffect(() => {
-        if (!isReader) return;
-
-        const start = Math.max(0, activeIndex - WINDOW);
-        const end = Math.min(sections.length - 1, activeIndex + WINDOW);
-
-        for (let i = start; i <= end; i++) {
-            if (!loaded[i]) loadSection(i);
-        }
-    }, [activeIndex, isReader, sections]);
-
-    /* ---------------- SCROLL TRACKING ---------------- */
-    useEffect(() => {
-        if (!isReader) return;
-
-        const el = scrollRef.current;
-        if (!el) return;
-
-        const handler = () => {
-            const nodes = sectionRefs.current;
-
-            let best = Infinity;
-            let closest = activeIndex;
-
-            for (let i = 0; i < nodes.length; i++) {
-                const n = nodes[i];
-                if (!n) continue;
-
-                const dist = Math.abs(n.getBoundingClientRect().top);
-
-                if (dist < best) {
-                    best = dist;
-                    closest = i;
-                }
-            }
-
-            navigate(`/siddur/${type}/${closest}`, { replace: true });
-        };
-
-        el.addEventListener('scroll', handler);
-        return () => el.removeEventListener('scroll', handler);
-    }, [isReader, type, activeIndex]);
-
-    const openAt = (i) => {
-        navigate(`/siddur/${type}/${i}`);
+        setTimeout(() => {
+            scrollRef.current?.scrollTo({ top: 0 });
+        }, 50);
     };
 
-    const goBack = () => {
-        navigate('/toc');
-    };
+    const sectionUrl =
+        startIndex !== null
+            ? `https://www.sefaria.org/${encodeURIComponent(sections[startIndex]?.ref)}`
+            : sefariaUrl;
 
-    const windowStart = Math.max(0, activeIndex - WINDOW);
-    const windowEnd = Math.min(sections.length - 1, activeIndex + WINDOW);
-
+    /* ---------------- RENDER ---------------- */
     return (
-        <div className="h-screen flex flex-col overflow-hidden bg-slate-50 dark:bg-slate-950">
+        <div className="h-screen flex flex-col overflow-hidden bg-gradient-to-br from-slate-50 via-blue-50 to-amber-50 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950">
 
-            {/* HEADER */}
-            <div className="px-4 pt-4 pb-2 flex justify-between items-center shrink-0">
+            {/* HEADER (fixed) */}
+            <div className="px-4 pt-4 pb-2 shrink-0 flex items-center justify-between">
                 <div className="flex items-center gap-2">
                     <NavMenu />
                     <div>
-                        <h1 className="text-lg font-bold">{type}</h1>
+                        <h1 className="text-lg font-bold text-slate-800 dark:text-slate-100">
+                            {title}
+                        </h1>
+                        <p className="text-xs text-slate-500 dark:text-slate-400">
+                            {subtitle}
+                        </p>
                     </div>
                 </div>
 
                 <div className="flex gap-2">
-                    {isReader && (
-                        <Button variant="ghost" size="sm" onClick={goBack}>
-                            ← TOC
-                        </Button>
-                    )}
+                    <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setStartIndex(null)}
+                        className="text-slate-600 dark:text-slate-300"
+                    >
+                        <ArrowLeft className="w-4 h-4 mr-1" />
+                        {startIndex === null ? 'Back' : 'TOC'}
+                    </Button>
 
-                    {isReader && (
-                        <Button variant="ghost" size="sm"
-                                onClick={() => setShowEnglish(v => !v)}>
-                            EN {showEnglish ? 'ON' : 'OFF'}
+                    <a href={sectionUrl} target="_blank" rel="noopener noreferrer">
+                        <Button variant="outline" size="sm">
+                            <ExternalLink className="w-4 h-4" />
                         </Button>
-                    )}
+                    </a>
                 </div>
             </div>
 
-            {/* BODY */}
+            {/* ONLY SCROLL AREA */}
             <div
                 ref={scrollRef}
-                className="flex-1 min-h-0 overflow-y-auto mx-4 mb-4 rounded-xl border bg-white dark:bg-slate-900"
+                className="flex-1 overflow-y-auto mx-4 mb-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900"
             >
 
-                {/* TOC */}
-                {!isReader && (
+                {/* ---------------- TOC ---------------- */}
+                {startIndex === null && (
                     <div>
-                        {loading && <div className="p-10 flex justify-center"><Loader2 className="animate-spin"/></div>}
-                        {error && <div className="p-6 text-red-500">Failed to load</div>}
+                        {loading && (
+                            <div className="flex items-center justify-center py-20 gap-3">
+                                <Loader2 className="w-6 h-6 animate-spin text-blue-500" />
+                                Loading…
+                            </div>
+                        )}
+
+                        {error && (
+                            <div className="p-6 text-center">
+                                <AlertCircle className="mx-auto w-8 h-8 text-amber-500" />
+                                <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
+                                    Failed to load
+                                </p>
+                            </div>
+                        )}
 
                         {sections.map((sec, i) => (
                             <button
                                 key={i}
                                 onClick={() => openAt(i)}
-                                className="w-full flex justify-between px-4 py-3 border-b hover:bg-slate-100 dark:hover:bg-slate-800"
+                                className="w-full flex justify-between px-4 py-3 border-b border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800"
                             >
-                                <span>{sec.label}</span>
-                                <ChevronRight />
+                                <div className="text-left">
+                                    <p className="text-sm font-medium text-slate-700 dark:text-slate-200">
+                                        {sec.label}
+                                    </p>
+                                    {sec.heLabel && (
+                                        <p className="text-xs text-slate-400" dir="rtl">
+                                            {sec.heLabel}
+                                        </p>
+                                    )}
+                                </div>
+
+                                <ChevronRight className="w-4 h-4 text-slate-400" />
                             </button>
                         ))}
                     </div>
                 )}
 
-                {/* READER */}
-                {isReader && (
+                {/* ---------------- READER MODE ---------------- */}
+                {startIndex !== null && (
                     <div className="p-4 space-y-12">
-
                         {sections.map((sec, i) => {
-                            if (i < windowStart || i > windowEnd) return null;
+                            if (i < startIndex) return null;
 
                             const data = loaded[i];
 
+                            // lazy load
                             if (!data) {
                                 loadSection(i);
-
                                 return (
-                                    <div key={i}
-                                         ref={el => (sectionRefs.current[i] = el)}
-                                         className="flex justify-center py-10">
-                                        <Loader2 className="animate-spin"/>
+                                    <div key={i} className="flex justify-center py-10">
+                                        <Loader2 className="animate-spin text-blue-500" />
+                                    </div>
+                                );
+                            }
+
+                            if (data.error) {
+                                return (
+                                    <div key={i} className="text-center text-red-500 text-sm">
+                                        Failed to load section
                                     </div>
                                 );
                             }
 
                             return (
-                                <div key={i}
-                                     ref={el => (sectionRefs.current[i] = el)}
-                                     className="space-y-4">
-
-                                    <div className="sticky top-0 bg-white dark:bg-slate-900 py-2 font-semibold">
-                                        {sec.label}
+                                <div key={i} className="space-y-4">
+                                    <div className="sticky top-0 bg-white dark:bg-slate-900 py-2">
+                                        <p className="font-semibold text-slate-700 dark:text-slate-100">
+                                            {sec.label}
+                                        </p>
                                     </div>
 
-                                    <SectionText
-                                        he={data.he}
-                                        en={data.text}
-                                        showEnglish={showEnglish}
-                                    />
+                                    <SectionText he={data.he} text={data.text} />
                                 </div>
                             );
                         })}
                     </div>
                 )}
+
             </div>
         </div>
     );
