@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
-import { GripVertical, Check } from 'lucide-react';
+import { GripVertical, Check, ArrowLeft } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import NavMenu from '@/components/NavMenu';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import { useDashboardPrefs, ALL_DASHBOARD_ITEMS } from '@/hooks/useDashboardPrefs';
 import { useSavedLocation } from '@/hooks/useLocation';
 
 export default function Settings() {
+    const navigate = useNavigate();
     const { prefs, toggleItem, reorderItems, toggle24Hour } = useDashboardPrefs();
     const { location, clearLocation } = useSavedLocation();
 
@@ -30,7 +32,11 @@ export default function Settings() {
                         <h1 className="text-2xl font-bold text-slate-800 tracking-tight">Settings</h1>
                         <p className="text-slate-500 text-sm">Customize your dashboard</p>
                     </div>
-                    <div className="shrink-0 w-9"></div>
+                    <div className="shrink-0">
+                        <button onClick={() => navigate(-1)} className="p-2 rounded-lg bg-white/90 shadow-sm border border-slate-200 hover:bg-slate-50 transition-colors flex items-center gap-1 text-sm text-slate-700 pr-3">
+                            <ArrowLeft className="w-4 h-4" /> Back
+                        </button>
+                    </div>
                 </div>
 
                 {/* Location */}
