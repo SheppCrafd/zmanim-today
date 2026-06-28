@@ -19,8 +19,10 @@ export default function LocationDisplay({ location }) {
         setLoading(true);
         try {
             const result = await base44.integrations.Core.InvokeLLM({
-                prompt: `Get the city name, state/province (if applicable), and country for these coordinates: ${location.latitude}, ${location.longitude}. 
-                For countries with states or provinces (e.g. USA, Canada, Australia), include the state/province abbreviation. Otherwise leave state null.`,
+                prompt: `Reverse-geocode these exact GPS coordinates to a real-world address: latitude ${location.latitude}, longitude ${location.longitude}.
+Use mapping/geocoding data to find the SPECIFIC city, town, or village that physically contains this point (not the largest nearby metro). If the point is in a smaller town or suburb, return that town, not the closest big city.
+Return the local municipality name as "city", the state/province abbreviation (for USA, Canada, Australia; otherwise null) as "state", and the country as "country".`,
+                add_context_from_internet: true,
                 response_json_schema: {
                     type: "object",
                     properties: {
