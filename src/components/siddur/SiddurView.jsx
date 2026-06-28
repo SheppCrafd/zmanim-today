@@ -1,15 +1,17 @@
 import React, { useState, useEffect, useRef } from 'react';
-import {
-    ExternalLink,
-    Loader2,
-    ChevronRight
-} from 'lucide-react';
+import { Loader2, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import NavMenu from '@/components/NavMenu';
 import { useNavigate, useParams } from 'react-router-dom';
 
 /* ---------------- CONFIG ---------------- */
 const WINDOW = 2;
+
+const SIDDUR_MAP = {
+    ashkenazi: "Siddur_Ashkenaz",
+    sephardic: "Siddur_Sefarad",
+    chabad: "Siddur_Chabad"
+};
 
 /* ---------------- SCROLL LOCK ---------------- */
 if (typeof document !== 'undefined') {
@@ -41,14 +43,12 @@ function SectionText({ he, en, showEnglish }) {
                         />
                     )}
 
-                    {showEnglish &&
-                        enArr[i] &&
-                        isProbablyEnglish(enArr[i]) && (
-                            <p
-                                className="text-sm text-slate-500 dark:text-slate-400"
-                                dangerouslySetInnerHTML={{ __html: enArr[i] }}
-                            />
-                        )}
+                    {showEnglish && enArr[i] && isProbablyEnglish(enArr[i]) && (
+                        <p
+                            className="text-sm text-slate-500 dark:text-slate-400"
+                            dangerouslySetInnerHTML={{ __html: enArr[i] }}
+                        />
+                    )}
                 </div>
             ))}
         </div>
@@ -56,9 +56,9 @@ function SectionText({ he, en, showEnglish }) {
 }
 
 /* ---------------- MAIN ---------------- */
-export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
+export default function SiddurView({ title = "Siddur", subtitle = "" }) {
     const navigate = useNavigate();
-    const { index } = useParams();
+    const { type, index } = useParams();
 
     const scrollRef = useRef(null);
     const sectionRefs = useRef([]);
@@ -72,15 +72,17 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
     const isReader = index !== undefined;
     const activeIndex = isReader ? parseInt(index, 10) : 0;
 
+    const resolvedBookRef = SIDDUR_MAP[type] || SIDDUR_MAP.ashkenazi;
+
     /* ---------------- LOAD TOC ---------------- */
     useEffect(() => {
         setLoading(true);
 
-        fetch(`https://www.sefaria.org/api/index/${bookRef}`)
+        fetch(`https://www.sefaria.org/api/index/${resolvedBookRef}`)
             .then(r => r.json())
             .then(data => {
                 const schema = data?.schema;
-                const rootKey = schema?.key || bookRef.replace(/_/g, ' ');
+                const rootKey = schema?.key || resolvedBookRef.replace(/_/g, ' ');
                 const nodes = schema?.nodes || [];
 
                 const flatten = (nodes, keyPath = '') => {
@@ -109,7 +111,7 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
                 setError(true);
                 setLoading(false);
             });
-    }, [bookRef]);
+    }, [resolvedBookRef]);
 
     /* ---------------- LOAD SECTION ---------------- */
     const loadSection = async (i) => {
@@ -136,19 +138,6 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
             }));
         }
     };
-
-    /* ---------------- OPEN SECTION ---------------- */
-    const openAt = (i) => {
-        navigate(`/read/${i}`);
-    };
-
-    const goBack = () => {
-        navigate('/toc');
-    };
-
-    /* ---------------- CHUNK WINDOW ---------------- */
-    const windowStart = Math.max(0, activeIndex - WINDOW);
-    const windowEnd = Math.min(sections.length - 1, activeIndex + WINDOW);
 
     /* ---------------- PRELOAD ---------------- */
     useEffect(() => {
@@ -187,14 +176,23 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
                 }
             }
 
-            navigate(`/read/${closest}`, { replace: true });
+            navigate(`/siddur/${type}/${closest}`, { replace: true });
         };
 
         el.addEventListener('scroll', handler);
         return () => el.removeEventListener('scroll', handler);
-    }, [isReader, sections]);
+    }, [isReader, sections, type]);
 
-    /* ---------------- RENDER ---------------- */
+    const openAt = (i) => {
+        navigate(`/siddur/${type}/${i}`);
+    };
+
+    const goBack = () => {
+        navigate('/toc');
+    };
+
+    const windowStart = Math.max(0, activeIndex - WINDOW);
+    const windowEnd = Math.min(sections.length - 1, activeIndex + WINDOW);
 
     return (
         <div className="h-screen flex flex-col overflow-hidden bg-slate-50 dark:bg-slate-950">
@@ -234,7 +232,7 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
                 className="flex-1 min-h-0 overflow-y-auto mx-4 mb-4 rounded-xl border bg-white dark:bg-slate-900"
             >
 
-                {/* ---------------- TOC ---------------- */}
+                {/* TOC */}
                 {!isReader && (
                     <div>
                         {loading && (
@@ -262,7 +260,7 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
                     </div>
                 )}
 
-                {/* ---------------- READER (MC CHUNKS) ---------------- */}
+                {/* READER */}
                 {isReader && (
                     <div className="p-4 space-y-12">
 
@@ -306,7 +304,6 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
 
                     </div>
                 )}
-
             </div>
         </div>
     );
