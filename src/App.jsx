@@ -4,8 +4,7 @@ import { QueryClientProvider } from '@tanstack/react-query'
 import { queryClientInstance } from '@/lib/query-client'
 import VisualEditAgent from '@/lib/VisualEditAgent'
 import NavigationTracker from '@/lib/NavigationTracker'
-import { BrowserRouter as Router, Route, Routes, Navigate } from 'react-router-dom';
-
+import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
 import PageNotFound from './lib/PageNotFound';
 import { AuthProvider, useAuth } from '@/lib/AuthContext';
 import { ThemeProvider } from '@/lib/ThemeContext';
@@ -13,10 +12,11 @@ import UserNotRegisteredError from '@/components/UserNotRegisteredError';
 
 import Home from './pages/Home';
 import Zmanim from './pages/Zmanim';
+import SephardicSiddur from './pages/SephardicSiddur';
+import AshkenaziSiddur from './pages/AshkenaziSiddur';
+import ChabadSiddur from './pages/ChabadSiddur';
 import Compass from './pages/Compass';
 import Settings from './pages/Settings';
-
-import SiddurView from '@/components/siddur/SiddurView';
 
 const AuthenticatedApp = () => {
   const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
@@ -35,27 +35,22 @@ const AuthenticatedApp = () => {
   }
 
   return (
-    <Routes>
-
-      <Route path="/" element={<Home />} />
-      <Route path="/Zmanim" element={<Zmanim />} />
-      <Route path="/Compass" element={<Compass />} />
-      <Route path="/Settings" element={<Settings />} />
-
-      {/* redirects */}
-      <Route path="/AshkenaziSiddur" element={<Navigate to="/siddur/ashkenazi" />} />
-      <Route path="/SephardicSiddur" element={<Navigate to="/siddur/sephardic" />} />
-      <Route path="/ChabadSiddur" element={<Navigate to="/siddur/chabad" />} />
-
-      {/* unified engine */}
-      <Route path="/siddur/:type/:index?" element={<SiddurView />} />
-
-      <Route path="*" element={<PageNotFound />} />
-    </Routes>
+    <>
+      <Routes>
+        <Route path="/" element={<Home />} />
+        <Route path="/Zmanim" element={<Zmanim />} />
+        <Route path="/Compass" element={<Compass />} />
+        <Route path="/Settings" element={<Settings />} />
+        <Route path="/SephardicSiddur" element={<SephardicSiddur />} />
+        <Route path="/AshkenaziSiddur" element={<AshkenaziSiddur />} />
+        <Route path="/ChabadSiddur" element={<ChabadSiddur />} />
+        <Route path="*" element={<PageNotFound />} />
+      </Routes>
+    </>
   );
 };
 
-export default function App() {
+function App() {
   return (
     <ThemeProvider>
       <AuthProvider>
@@ -71,3 +66,5 @@ export default function App() {
     </ThemeProvider>
   );
 }
+
+export default App;
