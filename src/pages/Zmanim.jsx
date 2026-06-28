@@ -13,10 +13,12 @@ import { getHebrewDate } from '../lib/hebrewDate';
 import { useSavedLocation } from '@/hooks/useLocation';
 import NavMenu from '@/components/NavMenu';
 import { printZmanim } from '@/lib/printZmanim';
+import { useDashboardPrefs } from '@/hooks/useDashboardPrefs';
 
 
 export default function Zmanim() {
     const { location, loading: gpsLoading, error: gpsError, detectGPS, searchLocation: searchSavedLocation, clearLocation } = useSavedLocation();
+    const { prefs } = useDashboardPrefs();
     const [loading, setLoading] = useState(false);
     const [calculating, setCalculating] = useState(false);
     const [zmanim, setZmanim] = useState(null);
@@ -416,6 +418,7 @@ Use actual astronomical calculations. Verify data is correct.`,
                             title="Dawn & Morning"
                             icon="☀️"
                             color="from-amber-500 to-orange-500"
+                            use24Hour={prefs.use24Hour}
                             times={[
                                 { label: 'Alot Hashachar', value: zmanim.zmanim.alot_hashachar, description: 'Dawn - 72 min before sunrise' },
                                 { label: 'Misheyakir', value: zmanim.zmanim.misheyakir, description: 'Earliest Tallit & Tefillin' },
@@ -431,6 +434,7 @@ Use actual astronomical calculations. Verify data is correct.`,
                             title="Midday & Afternoon"
                             icon="🌤️"
                             color="from-blue-500 to-cyan-500"
+                            use24Hour={prefs.use24Hour}
                             times={[
                                 { label: 'Chatzot', value: zmanim.zmanim.chatzot, description: 'Halachic Noon - midpoint of day', highlight: true },
                                 { label: 'Mincha Gedola', value: zmanim.zmanim.mincha_gedola, description: 'Earliest Mincha - 30 min after noon' },
@@ -443,6 +447,7 @@ Use actual astronomical calculations. Verify data is correct.`,
                             title="Evening & Night"
                             icon="🌙"
                             color="from-indigo-600 to-purple-600"
+                            use24Hour={prefs.use24Hour}
                             times={[
                                 currentDate.getDay() === 5 && zmanim.zmanim.candle_lighting && { label: 'Candle Lighting', value: zmanim.zmanim.candle_lighting, description: '18 min before sunset', highlight: true },
                                 { label: 'Sunset', value: zmanim.zmanim.sunset, description: 'Shkiyas HaChamah', highlight: true },

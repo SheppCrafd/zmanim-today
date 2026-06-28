@@ -167,7 +167,7 @@ export default function Home() {
 
                         {/* Next Zman */}
                         {showNextZman && zmanim && !zmanimLoading && (
-                            <NextZmanCard zmanim={zmanim} />
+                            <NextZmanCard zmanim={zmanim} use24Hour={prefs.use24Hour} />
                         )}
 
                         {/* Tomorrow's Havdalah (Fridays only) */}

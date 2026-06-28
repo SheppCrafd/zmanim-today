@@ -2,7 +2,18 @@ import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { motion } from 'framer-motion';
 
-export default function ZmanimCard({ title, icon, color, times }) {
+function convertTo24(timeStr) {
+    if (!timeStr) return timeStr;
+    const m = timeStr.match(/(\d+):(\d+)\s*(AM|PM)/i);
+    if (!m) return timeStr;
+    let [, h, min, ampm] = m;
+    h = parseInt(h);
+    if (ampm.toUpperCase() === 'PM' && h !== 12) h += 12;
+    if (ampm.toUpperCase() === 'AM' && h === 12) h = 0;
+    return `${String(h).padStart(2, '0')}:${min}`;
+}
+
+export default function ZmanimCard({ title, icon, color, times, use24Hour }) {
     return (
         <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -42,7 +53,7 @@ export default function ZmanimCard({ title, icon, color, times }) {
                                             ? 'text-blue-700 dark:text-blue-300 bg-blue-100 dark:bg-blue-900/50 px-3 py-1 rounded-lg' 
                                             : 'text-slate-700 dark:text-slate-300'
                                     }`}>
-                                        {time.value}
+                                        {use24Hour ? convertTo24(time.value) : time.value}
                                     </div>
                                 </div>
                             </motion.div>
