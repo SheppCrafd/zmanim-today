@@ -55,9 +55,9 @@ export default function SiddurFrame({ title, subtitle, sourceUrl }) {
                 </div>
             </div>
 
-            <div className="flex-1 mx-4 mb-4 rounded-xl overflow-hidden shadow-lg border border-slate-200 bg-white min-h-[70vh]">
+            <div className="flex-1 mx-4 mb-4 rounded-xl overflow-hidden shadow-lg border border-slate-200 bg-white" style={{ height: 'calc(100vh - 140px)' }}>
                 {showFallback ? (
-                    <div className="flex flex-col items-center justify-center h-full py-20 text-center px-6 min-h-[70vh]">
+                    <div className="flex flex-col items-center justify-center h-full py-20 text-center px-6">
                         <AlertCircle className="w-10 h-10 text-amber-500 mb-3" />
                         <p className="text-slate-700 font-semibold mb-2">Unable to load inline</p>
                         <p className="text-slate-500 text-sm mb-4">Sefaria cannot be embedded in this browser. Please open it directly.</p>
@@ -70,7 +70,7 @@ export default function SiddurFrame({ title, subtitle, sourceUrl }) {
                 ) : (
                     <iframe
                         src={sourceUrl}
-                        className="w-full h-full min-h-[70vh]"
+                        className="w-full h-full"
                         title={title}
                         onLoad={handleLoad}
                         onError={() => { clearTimeout(timerRef.current); setFailed(true); }}
