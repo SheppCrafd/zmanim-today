@@ -123,20 +123,32 @@ export default function Home() {
 
                 {/* Search box */}
                 {showSearch && (
-                    <form onSubmit={handleSearch} className="flex gap-2 mb-6">
-                        <Input
-                            autoFocus
-                            placeholder="e.g. Jerusalem, New York, NY…"
-                            value={searchQuery}
-                            onChange={e => setSearchQuery(e.target.value)}
-                            className="flex-1 text-sm"
+                    <div className="mb-6 space-y-2">
+                        <form onSubmit={handleSearch} className="flex gap-2">
+                            <Input
+                                autoFocus
+                                placeholder="e.g. Jerusalem, New York, NY…"
+                                value={searchQuery}
+                                onChange={e => setSearchQuery(e.target.value)}
+                                className="flex-1 text-sm"
+                                disabled={locLoading}
+                            />
+                            <Button type="submit" size="sm" disabled={locLoading || !searchQuery.trim()} className="bg-blue-600 hover:bg-blue-700">
+                                {locLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
+                            </Button>
+                            <Button type="button" size="sm" variant="ghost" onClick={() => setShowSearch(false)}>✕</Button>
+                        </form>
+                        <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => { detectGPS(); setShowSearch(false); }}
                             disabled={locLoading}
-                        />
-                        <Button type="submit" size="sm" disabled={locLoading || !searchQuery.trim()} className="bg-blue-600 hover:bg-blue-700">
-                            {locLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
+                            className="w-full gap-2 text-blue-600 border-blue-200 hover:bg-blue-50"
+                        >
+                            {locLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <MapPin className="w-4 h-4" />}
+                            Use My GPS Location
                         </Button>
-                        <Button type="button" size="sm" variant="ghost" onClick={() => setShowSearch(false)}>✕</Button>
-                    </form>
+                    </div>
                 )}
 
                 {location && (
