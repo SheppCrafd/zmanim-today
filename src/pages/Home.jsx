@@ -12,7 +12,17 @@ import ZmanimSummary from '@/components/home/ZmanimSummary';
 import NavMenu from '@/components/NavMenu';
 import { printZmanim } from '@/lib/printZmanim';
 import ZmanimRemindersPanel from '@/components/zmanim/ZmanimRemindersPanel';
-import { formatTime } from '@/lib/timeUtils';
+
+function convertTo24(timeStr) {
+    if (!timeStr) return timeStr;
+    const m = timeStr.match(/(\d+):(\d+)\s*(AM|PM)/i);
+    if (!m) return timeStr;
+    let [, h, min, ampm] = m;
+    h = parseInt(h);
+    if (ampm.toUpperCase() === 'PM' && h !== 12) h += 12;
+    if (ampm.toUpperCase() === 'AM' && h === 12) h = 0;
+    return `${String(h).padStart(2, '0')}:${min}`;
+}
 
 function LocationLabel({ location }) {
     if (!location) return null;
@@ -171,7 +181,7 @@ export default function Home() {
                                     </div>
                                 </div>
                                 <span className="text-sm font-semibold text-slate-800 tabular-nums">
-                                    {formatTime(tomorrowZmanim.zmanim.tzait_72, prefs.use24Hour)}
+                                    {prefs.use24Hour ? convertTo24(tomorrowZmanim.zmanim.tzait_72) : tomorrowZmanim.zmanim.tzait_72}
                                 </span>
                             </div>
                         )}

@@ -1,5 +1,4 @@
 import React from 'react';
-import { formatTime } from '@/lib/timeUtils';
 
 const ZMAN_META = {
     candle_lighting:     { label: 'Candle Lighting', icon: '🕯', zmanimKey: 'candle_lighting' },
@@ -15,6 +14,17 @@ const ZMAN_META = {
     havdalah:            { label: 'Havdalah', icon: '🕍', zmanimKey: 'havdalah' },
 };
 
+function convertTo24(timeStr) {
+    if (!timeStr) return timeStr;
+    const m = timeStr.match(/(\d+):(\d+)\s*(AM|PM)/i);
+    if (!m) return timeStr;
+    let [, h, min, ampm] = m;
+    h = parseInt(h);
+    if (ampm.toUpperCase() === 'PM' && h !== 12) h += 12;
+    if (ampm.toUpperCase() === 'AM' && h === 12) h = 0;
+    return `${String(h).padStart(2, '0')}:${min}`;
+}
+
 export default function ZmanimSummary({ zmanim, enabledIds, use24Hour }) {
     if (!zmanim?.zmanim) return null;
 
@@ -24,7 +34,7 @@ export default function ZmanimSummary({ zmanim, enabledIds, use24Hour }) {
             const meta = ZMAN_META[id];
             const raw = zmanim.zmanim[meta.zmanimKey];
             if (!raw) return null;
-            return { ...meta, value: formatTime(raw, use24Hour) };
+            return { ...meta, value: use24Hour ? convertTo24(raw) : raw };
         })
         .filter(Boolean);
 

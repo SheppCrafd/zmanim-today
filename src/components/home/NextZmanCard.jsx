@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { Timer } from 'lucide-react';
-import { formatTime } from '@/lib/timeUtils';
 
 const ZMAN_META = {
     alot_hashachar:      { label: 'Alot HaShachar', icon: '🌑' },
@@ -42,6 +41,17 @@ function formatCountdown(ms) {
     if (h > 0) return `${h}h ${m}m`;
     if (m > 0) return `${m}m ${s}s`;
     return `${s}s`;
+}
+
+function convertTo24(timeStr) {
+    if (!timeStr) return timeStr;
+    const m = timeStr.match(/(\d+):(\d+)\s*(AM|PM)/i);
+    if (!m) return timeStr;
+    let [, h, min, ampm] = m;
+    h = parseInt(h);
+    if (ampm.toUpperCase() === 'PM' && h !== 12) h += 12;
+    if (ampm.toUpperCase() === 'AM' && h === 12) h = 0;
+    return `${String(h).padStart(2, '0')}:${min}`;
 }
 
 export default function NextZmanCard({ zmanim, use24Hour }) {
@@ -92,7 +102,7 @@ export default function NextZmanCard({ zmanim, use24Hour }) {
                     <p className="text-lg font-bold text-slate-800 dark:text-slate-100">
                         {meta.icon} {meta.label}
                     </p>
-                    <p className="text-sm text-slate-500 dark:text-slate-400">{formatTime(next.val, use24Hour)}</p>
+                    <p className="text-sm text-slate-500 dark:text-slate-400">{use24Hour ? convertTo24(next.val) : next.val}</p>
                 </div>
                 <div className="text-right">
                     <p className={`text-2xl font-bold tabular-nums ${urgent ? 'text-amber-600 dark:text-amber-400' : 'text-blue-700 dark:text-blue-400'}`}>
