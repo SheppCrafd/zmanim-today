@@ -5,22 +5,31 @@ import { ZMANIM_BY_ID } from '@/lib/zmanimSchema';
  * Schema version — bump this whenever the prefs structure changes shape.
  * On version mismatch, stored prefs are migrated rather than wiped.
  */
-const SCHEMA_VERSION = 2;
-const PREFS_KEY = 'dashboard_prefs_v2';
+const SCHEMA_VERSION = 3;
+const PREFS_KEY = 'dashboard_prefs_v3';
 
 export const ALL_DASHBOARD_ITEMS = [
-    { id: 'compass',           label: 'Jerusalem Compass',    icon: '🧭', defaultOn: true  },
-    { id: 'next_zman',         label: 'Next Zman Countdown',  icon: '⏱',  defaultOn: true  },
-    { id: 'candle_lighting',   label: 'Candle Lighting',      icon: '🕯', defaultOn: true  },
-    { id: 'alot_hashachar',    label: 'Alot HaShachar',       icon: '🌑', defaultOn: false },
-    { id: 'sunrise',           label: 'Sunrise',              icon: '🌅', defaultOn: true  },
-    { id: 'sof_zman_shma_gra', label: 'Sof Zman Kriat Shema', icon: '📜', defaultOn: false },
-    { id: 'chatzot',           label: 'Chatzot',              icon: '☀️', defaultOn: false },
-    { id: 'mincha_gedola',     label: 'Mincha Gedola',        icon: '🕌', defaultOn: false },
-    { id: 'plag_hamincha',     label: 'Plag HaMincha',        icon: '🕐', defaultOn: false },
-    { id: 'sunset',            label: 'Sunset',               icon: '🌇', defaultOn: true  },
-    { id: 'tzait_hakochavim',  label: 'Tzeit HaKochavim',     icon: '✨', defaultOn: true  },
-    { id: 'tzait_72',          label: 'Havdalah (72 min)',     icon: '🌟', defaultOn: false },
+    // Dashboard-only widgets
+    { id: 'compass',                  label: 'Jerusalem Compass',       icon: '🧭', defaultOn: true  },
+    { id: 'next_zman',                label: 'Next Zman Countdown',     icon: '⏱',  defaultOn: true  },
+    // All zmanim from ZMANIM_SCHEMA, in order
+    { id: 'alot_hashachar',           label: 'Alot HaShachar',          icon: '🌑', defaultOn: false },
+    { id: 'misheyakir',               label: 'Misheyakir',              icon: '🌒', defaultOn: false },
+    { id: 'sunrise',                  label: 'Sunrise',                 icon: '🌅', defaultOn: true  },
+    { id: 'sof_zman_shma_gra',        label: 'Sof Zman Shema (GRA)',    icon: '📜', defaultOn: false },
+    { id: 'sof_zman_shma_mga',        label: 'Sof Zman Shema (MGA)',    icon: '📜', defaultOn: false },
+    { id: 'sof_zman_tefillah_gra',    label: 'Sof Zman Tefillah (GRA)', icon: '🕍', defaultOn: false },
+    { id: 'sof_zman_tefillah_mga',    label: 'Sof Zman Tefillah (MGA)', icon: '🕍', defaultOn: false },
+    { id: 'chatzot',                  label: 'Chatzot',                 icon: '☀️', defaultOn: false },
+    { id: 'mincha_gedola',            label: 'Mincha Gedola',           icon: '🕌', defaultOn: false },
+    { id: 'mincha_ketana',            label: 'Mincha Ketana',           icon: '🕐', defaultOn: false },
+    { id: 'plag_hamincha',            label: 'Plag HaMincha',           icon: '⏳', defaultOn: false },
+    { id: 'candle_lighting',          label: 'Candle Lighting',         icon: '🕯', defaultOn: true  },
+    { id: 'sunset',                   label: 'Sunset',                  icon: '🌇', defaultOn: true  },
+    { id: 'tzait_hakochavim',         label: 'Tzeit HaKochavim',        icon: '✨', defaultOn: true  },
+    { id: 'tzait_72',                 label: 'Tzait (72 min)',           icon: '🌟', defaultOn: false },
+    { id: 'havdalah',                 label: 'Havdalah',                icon: '🕍', defaultOn: false },
+    { id: 'chatzot_laila',            label: 'Chatzot Laila',           icon: '🌙', defaultOn: false },
 ];
 
 const defaultPrefs = () => ({
@@ -66,14 +75,15 @@ function loadPrefs() {
             return migratePrefs(saved);
         }
 
-        // Attempt migration from old key (v1)
-        const oldRaw = localStorage.getItem('dashboard_prefs_v1');
-        if (oldRaw) {
-            const old = JSON.parse(oldRaw);
-            const migrated = migratePrefs(old);
-            // Persist under new key; leave old key for one version
-            localStorage.setItem(PREFS_KEY, JSON.stringify(migrated));
-            return migrated;
+        // Attempt migration from old keys (v1, v2)
+        for (const oldKey of ['dashboard_prefs_v2', 'dashboard_prefs_v1']) {
+            const oldRaw = localStorage.getItem(oldKey);
+            if (oldRaw) {
+                const old = JSON.parse(oldRaw);
+                const migrated = migratePrefs(old);
+                localStorage.setItem(PREFS_KEY, JSON.stringify(migrated));
+                return migrated;
+            }
         }
     } catch { /* ignore parse errors */ }
     return defaultPrefs();
