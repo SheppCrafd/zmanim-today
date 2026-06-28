@@ -2,20 +2,17 @@ import React, { useState, useEffect, useRef } from 'react';
 import {
     ExternalLink,
     Loader2,
-    AlertCircle,
     ArrowLeft,
     ChevronRight
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import NavMenu from '@/components/NavMenu';
 
-/* ---------------- LOCK SCROLL GLOBALLY ---------------- */
+/* ---------------- LOCK SCROLL ---------------- */
 if (typeof document !== 'undefined') {
     document.documentElement.style.height = '100%';
     document.body.style.height = '100%';
     document.body.style.overflow = 'hidden';
-    document.getElementById('root')?.style.setProperty('height', '100%');
-    document.getElementById('root')?.style.setProperty('overflow', 'hidden');
 }
 
 /* ---------------- FLATTEN ---------------- */
@@ -25,10 +22,9 @@ function flattenNodes(nodes, keyPath = '', labelPath = '') {
     for (const node of nodes) {
         const key = node.key || node.title;
         const fullKeyPath = keyPath ? `${keyPath}, ${key}` : key;
-        const fullLabelPath = labelPath ? `${labelPath} > ${node.title}` : node.title;
 
         if (node.nodes) {
-            result.push(...flattenNodes(node.nodes, fullKeyPath, fullLabelPath));
+            result.push(...flattenNodes(node.nodes, fullKeyPath, labelPath));
         } else {
             result.push({
                 label: node.title,
@@ -46,10 +42,6 @@ function SectionText({ he, text }) {
     const heArr = Array.isArray(he) ? he : he ? [he] : [];
     const enArr = Array.isArray(text) ? text : text ? [text] : [];
     const maxLen = Math.max(heArr.length, enArr.length);
-
-    if (!maxLen) {
-        return <p className="text-slate-400 italic">No text.</p>;
-    }
 
     return (
         <div className="space-y-6">
@@ -77,10 +69,9 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
     const [sections, setSections] = useState([]);
     const [loaded, setLoaded] = useState({});
     const [startIndex, setStartIndex] = useState(null);
+    const [activeIndex, setActiveIndex] = useState(null);
 
-    /* ---- virtualization window ---- */
-    const [windowIndex, setWindowIndex] = useState(null);
-    const WINDOW_SIZE = 2;
+    const WINDOW = 2;
 
     /* ---------------- LOAD TOC ---------------- */
     useEffect(() => {
@@ -93,15 +84,12 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
             });
     }, [bookRef]);
 
-    /* ---------------- LOAD SECTION ---------------- */
+    /* ---------------- LOAD TEXT ---------------- */
     const loadSection = async (index) => {
-        if (loaded[index]) return;
-
-        const sec = sections[index];
-        if (!sec) return;
+        if (loaded[index] || !sections[index]) return;
 
         const res = await fetch(
-            `https://www.sefaria.org/api/texts/${encodeURIComponent(sec.ref)}`
+            `https://www.sefaria.org/api/texts/${encodeURIComponent(sections[index].ref)}`
         );
 
         const data = await res.json();
@@ -112,48 +100,55 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
         }));
     };
 
-    /* ---------------- ENTER READER ---------------- */
+    /* ---------------- ENTER ---------------- */
     const openAt = async (index) => {
         setStartIndex(index);
-        setWindowIndex(index);
+        setActiveIndex(index);
 
-        // preload window
-        for (let i = index - WINDOW_SIZE; i <= index + WINDOW_SIZE; i++) {
+        for (let i = index - WINDOW; i <= index + WINDOW; i++) {
             if (i >= 0 && i < sections.length) loadSection(i);
         }
 
         setTimeout(() => {
-            startRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            startRef.current?.scrollIntoView({ behavior: 'smooth' });
         }, 50);
     };
 
-    /* ---------------- WINDOW SHIFT ON SCROLL ---------------- */
-    const onScroll = () => {
-        const el = scrollRef.current;
-        if (!el || startIndex === null) return;
+    /* ---------------- OBSERVER (NO SNAPPING) ---------------- */
+    useEffect(() => {
+        if (startIndex === null) return;
 
-        const scrollTop = el.scrollTop;
-        const height = el.clientHeight;
+        const observer = new IntersectionObserver(
+            (entries) => {
+                for (const entry of entries) {
+                    if (entry.isIntersecting) {
+                        const index = Number(entry.target.dataset.index);
+                        setActiveIndex(index);
 
-        const approxIndex = Math.floor(scrollTop / (height * 0.8));
-
-        const newWindow = startIndex + approxIndex;
-        if (Math.abs(newWindow - windowIndex) > 0) {
-            setWindowIndex(newWindow);
-
-            for (let i = newWindow - WINDOW_SIZE; i <= newWindow + WINDOW_SIZE; i++) {
-                if (i >= 0 && i < sections.length) loadSection(i);
+                        // preload neighbors
+                        for (let i = index - WINDOW; i <= index + WINDOW; i++) {
+                            if (i >= 0 && i < sections.length) loadSection(i);
+                        }
+                    }
+                }
+            },
+            {
+                root: scrollRef.current,
+                threshold: 0.4
             }
-        }
-    };
+        );
 
-    const visibleStart = Math.max(0, windowIndex - WINDOW_SIZE);
-    const visibleEnd = Math.min(sections.length - 1, windowIndex + WINDOW_SIZE);
+        const nodes = scrollRef.current?.querySelectorAll('[data-index]');
+        nodes?.forEach(n => observer.observe(n));
 
-    const sectionUrl =
-        startIndex !== null
-            ? `https://www.sefaria.org/${encodeURIComponent(sections[startIndex]?.ref)}`
-            : sefariaUrl;
+        return () => observer.disconnect();
+    }, [startIndex, sections]);
+
+    const visibleStart = Math.max(0, (activeIndex ?? startIndex ?? 0) - WINDOW);
+    const visibleEnd = Math.min(
+        sections.length - 1,
+        (activeIndex ?? startIndex ?? 0) + WINDOW
+    );
 
     return (
         <div className="h-screen flex flex-col overflow-hidden bg-slate-50 dark:bg-slate-950">
@@ -168,23 +163,14 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
                     </div>
                 </div>
 
-                <div className="flex gap-2">
-                    <Button variant="ghost" onClick={() => setStartIndex(null)}>
-                        <ArrowLeft className="w-4 h-4" />
-                    </Button>
-
-                    <a href={sectionUrl} target="_blank">
-                        <Button variant="outline">
-                            <ExternalLink className="w-4 h-4" />
-                        </Button>
-                    </a>
-                </div>
+                <Button variant="ghost" onClick={() => setStartIndex(null)}>
+                    <ArrowLeft className="w-4 h-4" />
+                </Button>
             </div>
 
-            {/* SCROLL AREA */}
+            {/* SCROLL */}
             <div
                 ref={scrollRef}
-                onScroll={onScroll}
                 className="flex-1 overflow-y-auto mx-4 mb-4 bg-white dark:bg-slate-900 rounded-xl"
             >
 
@@ -195,9 +181,9 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
                             <button
                                 key={i}
                                 onClick={() => openAt(i)}
-                                className="w-full flex justify-between p-3 border-b hover:bg-slate-100"
+                                className="w-full flex justify-between p-3 border-b"
                             >
-                                <span>{sec.label}</span>
+                                {sec.label}
                                 <ChevronRight />
                             </button>
                         ))}
@@ -222,12 +208,11 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
                                 );
                             }
 
-                            const isStart = i === startIndex;
-
                             return (
                                 <div
                                     key={i}
-                                    ref={isStart ? startRef : null}
+                                    data-index={i}
+                                    ref={i === startIndex ? startRef : null}
                                     className="space-y-3"
                                 >
                                     <div className="sticky top-0 bg-white dark:bg-slate-900 py-2 font-semibold">
