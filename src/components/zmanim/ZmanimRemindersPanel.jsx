@@ -68,9 +68,14 @@ export default function ZmanimRemindersPanel({ zmanimData, currentDate }) {
 
         if (!zmanimData?.zmanim || !isToday || notifPermission !== 'granted') return;
 
+        const todayDow = new Date().getDay(); // 0=Sun,5=Fri,6=Sat
+
         ALL_ZMANIM.forEach(({ key, label, emoji }) => {
             const pref = prefs[key];
             if (!pref?.enabled) return;
+            // Candle lighting only on Friday (5), Havdalah/Tzait only on Saturday (6)
+            if (key === 'candle_lighting' && todayDow !== 5) return;
+            if (key === 'tzait_72' && todayDow !== 6) return;
             const timeStr = zmanimData.zmanim[key];
             if (!timeStr) return;
             const zmanTime = parseZmanTime(timeStr, date);
@@ -169,6 +174,10 @@ export default function ZmanimRemindersPanel({ zmanimData, currentDate }) {
                         {ALL_ZMANIM.map(({ key, label, emoji, description }) => {
                             const pref = prefs[key] || { enabled: false, minutesBefore: 10 };
                             const zmanTime = zmanimData?.zmanim?.[key];
+                            const todayDow = new Date().getDay();
+                            const dayNote =
+                                key === 'candle_lighting' ? '(Fridays only)' :
+                                key === 'tzait_72' ? '(Saturdays only)' : null;
                             return (
                                 <div
                                     key={key}
@@ -184,7 +193,7 @@ export default function ZmanimRemindersPanel({ zmanimData, currentDate }) {
                                             <span className="text-lg leading-none">{emoji}</span>
                                             <div>
                                                 <p className={`text-sm font-medium leading-tight ${pref.enabled ? 'text-blue-800' : 'text-slate-700'}`}>
-                                                    {label}
+                                                    {label} {dayNote && <span className="text-xs font-normal text-slate-400">{dayNote}</span>}
                                                 </p>
                                                 <p className="text-xs text-slate-400">
                                                     {zmanTime ? zmanTime : description}
