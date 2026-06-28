@@ -128,17 +128,6 @@ export default function Home() {
                             </Button>
                             <Button type="button" size="sm" variant="ghost" onClick={() => setShowSearch(false)}>✕</Button>
                         </form>
-                        <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            onClick={() => { detectGPS(); setShowSearch(false); }}
-                            disabled={locLoading}
-                            className="w-full gap-2"
-                        >
-                            {locLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <MapPin className="w-4 h-4" />}
-                            Use My GPS Location
-                        </Button>
                     </div>
                 )}
 
