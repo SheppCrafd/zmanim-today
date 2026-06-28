@@ -13,7 +13,7 @@ import { getHebrewDate } from '../lib/hebrewDate';
 import { useSavedLocation } from '@/hooks/useLocation';
 import NavMenu from '@/components/NavMenu';
 import { printZmanim } from '@/lib/printZmanim';
-import ZmanimRemindersPanel from '@/components/zmanim/ZmanimRemindersPanel';
+
 
 export default function Zmanim() {
     const { location, loading: gpsLoading, error: gpsError, detectGPS, searchLocation: searchSavedLocation, clearLocation } = useSavedLocation();
@@ -152,9 +152,7 @@ Use actual astronomical calculations. Verify data is correct.`,
                         <h1 className="text-4xl md:text-5xl font-bold text-slate-800 mb-2 tracking-tight">Zmanim</h1>
                         <p className="text-slate-600 text-lg">זמני היום</p>
                     </div>
-                    <div className="shrink-0">
-                        <ZmanimRemindersPanel zmanimData={zmanim} currentDate={currentDate} />
-                    </div>
+                    <div className="shrink-0 w-9"></div>
                 </div>
 
                 {/* Location Search */}

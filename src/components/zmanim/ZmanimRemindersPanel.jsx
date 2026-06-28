@@ -1,17 +1,26 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Bell, BellRing, Check } from 'lucide-react';
-import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 
 const STORAGE_KEY = 'zmanim_reminders';
 
-const REMINDER_OPTIONS = [
-    { key: 'candle_lighting',       label: 'Candle Lighting',       emoji: '🕯️' },
-    { key: 'sof_zman_tefillah_gra', label: 'Shacharit (Latest)',     emoji: '🌅' },
-    { key: 'chatzot',               label: 'Mussaf (Latest)',        emoji: '☀️' },
-    { key: 'mincha_ketana',         label: 'Mincha',                 emoji: '🌤️' },
-    { key: 'tzait_hakochavim',      label: "Ma'ariv / Arvit",        emoji: '🌙' },
-    { key: 'sunset',                label: 'Sunset',                 emoji: '🌇' },
+const ALL_ZMANIM = [
+    { key: 'alot_hashachar',        label: 'Alot Hashachar',              emoji: '🌑', description: 'Dawn' },
+    { key: 'misheyakir',            label: 'Misheyakir',                  emoji: '🌒', description: 'Earliest Tallit & Tefillin' },
+    { key: 'sunrise',               label: 'Sunrise',                     emoji: '🌅', description: 'HaNetz HaChamah' },
+    { key: 'sof_zman_shma_gra',     label: 'Sof Zman Shema (GRA)',        emoji: '📖', description: 'Latest Shema' },
+    { key: 'sof_zman_shma_mga',     label: 'Sof Zman Shema (MGA)',        emoji: '📖', description: 'Latest Shema (stringent)' },
+    { key: 'sof_zman_tefillah_gra', label: 'Shacharit Latest (GRA)',      emoji: '🌄', description: 'Latest Shemoneh Esrei' },
+    { key: 'sof_zman_tefillah_mga', label: 'Shacharit Latest (MGA)',      emoji: '🌄', description: 'Latest Shemoneh Esrei (stringent)' },
+    { key: 'chatzot',               label: 'Chatzot / Mussaf Latest',     emoji: '☀️', description: 'Halachic Noon' },
+    { key: 'mincha_gedola',         label: 'Mincha Gedola',               emoji: '🌤️', description: 'Earliest Mincha' },
+    { key: 'mincha_ketana',         label: 'Mincha Ketana',               emoji: '🌤️', description: 'Preferred Mincha time' },
+    { key: 'plag_hamincha',         label: 'Plag HaMincha',               emoji: '🌥️', description: 'Earliest candle lighting' },
+    { key: 'candle_lighting',       label: 'Candle Lighting',             emoji: '🕯️', description: '18 min before sunset' },
+    { key: 'sunset',                label: 'Sunset',                      emoji: '🌇', description: 'Shkiyas HaChamah' },
+    { key: 'tzait_hakochavim',      label: "Ma'ariv / Tzait HaKochavim",  emoji: '🌙', description: 'Nightfall – 3 stars' },
+    { key: 'tzait_72',              label: 'Havdalah / Tzait (72 min)',    emoji: '🌟', description: 'Rabbeinu Tam nightfall' },
+    { key: 'chatzot_laila',         label: 'Chatzot Laila',               emoji: '🌃', description: 'Halachic Midnight' },
 ];
 
 const MINUTES_OPTIONS = [5, 10, 15, 30];
@@ -49,22 +58,22 @@ export default function ZmanimRemindersPanel({ zmanimData, currentDate }) {
     );
     const timeoutsRef = useRef([]);
 
-    const isToday = new Date().toDateString() === new Date(currentDate).toDateString();
+    const date = currentDate || new Date();
+    const isToday = new Date().toDateString() === new Date(date).toDateString();
     const hasEnabled = Object.values(prefs).some(p => p?.enabled);
 
-    // Schedule / re-schedule notifications whenever prefs or zmanim change
     useEffect(() => {
         timeoutsRef.current.forEach(clearTimeout);
         timeoutsRef.current = [];
 
         if (!zmanimData?.zmanim || !isToday || notifPermission !== 'granted') return;
 
-        REMINDER_OPTIONS.forEach(({ key, label, emoji }) => {
+        ALL_ZMANIM.forEach(({ key, label, emoji }) => {
             const pref = prefs[key];
             if (!pref?.enabled) return;
             const timeStr = zmanimData.zmanim[key];
             if (!timeStr) return;
-            const zmanTime = parseZmanTime(timeStr, currentDate);
+            const zmanTime = parseZmanTime(timeStr, date);
             if (!zmanTime) return;
             const notifyAt = new Date(zmanTime.getTime() - pref.minutesBefore * 60000);
             const delay = notifyAt.getTime() - Date.now();
@@ -108,15 +117,18 @@ export default function ZmanimRemindersPanel({ zmanimData, currentDate }) {
     return (
         <Sheet open={open} onOpenChange={setOpen}>
             <SheetTrigger asChild>
-                <Button variant="ghost" size="icon" className="relative" title="Set reminders">
+                <button
+                    className="p-2 rounded-lg bg-white/90 shadow-sm border border-slate-200 hover:bg-slate-50 transition-colors relative"
+                    title="Set reminders"
+                >
                     {hasEnabled
                         ? <BellRing className="w-5 h-5 text-blue-600" />
-                        : <Bell className="w-5 h-5 text-slate-600" />
+                        : <Bell className="w-5 h-5 text-slate-700" />
                     }
                     {hasEnabled && (
-                        <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-blue-500 rounded-full" />
+                        <span className="absolute top-1 right-1 w-2 h-2 bg-blue-500 rounded-full" />
                     )}
-                </Button>
+                </button>
             </SheetTrigger>
 
             <SheetContent side="right" className="w-80 overflow-y-auto">
@@ -127,19 +139,21 @@ export default function ZmanimRemindersPanel({ zmanimData, currentDate }) {
                 </SheetHeader>
 
                 <div className="mt-4 space-y-4">
-                    {/* Permission banner */}
-                    {notifPermission !== 'granted' && (
+                    {notifPermission !== 'granted' && notifPermission !== 'denied' && (
                         <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-sm">
-                            <p className="text-amber-800 mb-2">Enable browser notifications to receive reminders.</p>
-                            <Button size="sm" onClick={requestPermission} className="bg-amber-600 hover:bg-amber-700 w-full">
+                            <p className="text-amber-800 mb-2">Enable notifications to receive reminders.</p>
+                            <button
+                                onClick={requestPermission}
+                                className="w-full py-1.5 rounded-lg bg-amber-600 text-white text-sm font-medium hover:bg-amber-700 transition-colors"
+                            >
                                 Enable Notifications
-                            </Button>
+                            </button>
                         </div>
                     )}
 
                     {notifPermission === 'denied' && (
                         <p className="text-xs text-red-600 bg-red-50 rounded-lg p-2 text-center">
-                            Notifications are blocked. Please enable them in your browser settings.
+                            Notifications are blocked. Please allow them in your browser settings.
                         </p>
                     )}
 
@@ -149,12 +163,10 @@ export default function ZmanimRemindersPanel({ zmanimData, currentDate }) {
                         </p>
                     )}
 
-                    <p className="text-xs text-slate-500">
-                        Toggle a zman to get notified before it. Choose your lead time below each one.
-                    </p>
+                    <p className="text-xs text-slate-500">Toggle any zman to get notified before it starts, then choose your lead time.</p>
 
                     <div className="space-y-2">
-                        {REMINDER_OPTIONS.map(({ key, label, emoji }) => {
+                        {ALL_ZMANIM.map(({ key, label, emoji, description }) => {
                             const pref = prefs[key] || { enabled: false, minutesBefore: 10 };
                             const zmanTime = zmanimData?.zmanim?.[key];
                             return (
@@ -169,21 +181,20 @@ export default function ZmanimRemindersPanel({ zmanimData, currentDate }) {
                                             onClick={() => toggleReminder(key)}
                                             className="flex items-center gap-2 flex-1 text-left"
                                         >
-                                            <span className="text-lg">{emoji}</span>
+                                            <span className="text-lg leading-none">{emoji}</span>
                                             <div>
-                                                <p className={`text-sm font-medium ${pref.enabled ? 'text-blue-800' : 'text-slate-700'}`}>
+                                                <p className={`text-sm font-medium leading-tight ${pref.enabled ? 'text-blue-800' : 'text-slate-700'}`}>
                                                     {label}
                                                 </p>
-                                                {zmanTime && (
-                                                    <p className="text-xs text-slate-400">{zmanTime}</p>
-                                                )}
+                                                <p className="text-xs text-slate-400">
+                                                    {zmanTime ? zmanTime : description}
+                                                </p>
                                             </div>
                                         </button>
 
-                                        {/* Toggle switch */}
                                         <div
                                             onClick={() => toggleReminder(key)}
-                                            className={`w-10 h-5 rounded-full transition-colors cursor-pointer flex-shrink-0 ${
+                                            className={`w-10 h-5 rounded-full transition-colors cursor-pointer flex-shrink-0 ml-2 ${
                                                 pref.enabled ? 'bg-blue-500' : 'bg-slate-200'
                                             }`}
                                         >
@@ -193,7 +204,6 @@ export default function ZmanimRemindersPanel({ zmanimData, currentDate }) {
                                         </div>
                                     </div>
 
-                                    {/* Lead time selector */}
                                     {pref.enabled && (
                                         <div className="mt-2 flex gap-1">
                                             {MINUTES_OPTIONS.map(m => (

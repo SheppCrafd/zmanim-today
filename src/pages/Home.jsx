@@ -11,6 +11,7 @@ import NextZmanCard from '@/components/home/NextZmanCard';
 import ZmanimSummary from '@/components/home/ZmanimSummary';
 import NavMenu from '@/components/NavMenu';
 import { printZmanim } from '@/lib/printZmanim';
+import ZmanimRemindersPanel from '@/components/zmanim/ZmanimRemindersPanel';
 
 function convertTo24(timeStr) {
     if (!timeStr) return timeStr;
@@ -70,7 +71,8 @@ export default function Home() {
                         <h1 className="text-2xl font-bold text-slate-800 tracking-tight">Zmanim Today</h1>
                         <p className="text-slate-500 text-sm">זמני היום</p>
                     </div>
-                    <div className="shrink-0">
+                    <div className="shrink-0 flex items-center gap-2">
+                        <ZmanimRemindersPanel zmanimData={zmanim} currentDate={today} />
                         <Link to="/Settings">
                             <button className="p-2 rounded-lg bg-white/90 shadow-sm border border-slate-200 hover:bg-slate-50 transition-colors">
                                 <Settings className="w-5 h-5 text-slate-700" />
