@@ -161,7 +161,7 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
                                     variant={showEnglish ? "default" : "outline"}
                                     onClick={() => setShowEnglish(v => !v)}
                                 >
-                                    English
+                                    EN
                                 </Button>
 
                                 <Button
@@ -169,7 +169,7 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
                                     variant={showTranslit ? "default" : "outline"}
                                     onClick={() => setShowTranslit(v => !v)}
                                 >
-                                    Transliteration
+                                    Translit
                                 </Button>
                             </div>
                         )}
