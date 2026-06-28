@@ -19,7 +19,7 @@ import Compass from './pages/Compass';
 import Settings from './pages/Settings';
 
 // ✅ ADD THIS (your new reader engine)
-import SiddurView from '@/components/SiddurView';
+import SiddurView from '@/components/siddur/SiddurView';
 
 const AuthenticatedApp = () => {
   const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
