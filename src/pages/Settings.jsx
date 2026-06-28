@@ -1,15 +1,17 @@
 import React, { useState } from 'react';
-import { GripVertical, Check, ArrowLeft } from 'lucide-react';
+import { GripVertical, Check, ArrowLeft, Moon } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import NavMenu from '@/components/NavMenu';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import { useDashboardPrefs, ALL_DASHBOARD_ITEMS } from '@/hooks/useDashboardPrefs';
 import { useSavedLocation } from '@/hooks/useLocation';
+import { useTheme } from '@/lib/ThemeContext';
 
 export default function Settings() {
     const navigate = useNavigate();
     const { prefs, toggleItem, reorderItems, toggle24Hour } = useDashboardPrefs();
     const { location, clearLocation } = useSavedLocation();
+    const { dark, toggleDark } = useTheme();
 
     const onDragEnd = (result) => {
         if (!result.destination) return;
@@ -64,6 +66,28 @@ export default function Settings() {
                                 <p className="text-sm text-slate-500">No location set. Set one from the Home screen.</p>
                             </div>
                         )}
+                    </div>
+                </div>
+
+                {/* Appearance */}
+                <div className="mb-6">
+                    <p className="text-xs font-semibold uppercase tracking-widest text-slate-400 mb-2 px-1">Appearance</p>
+                    <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700">
+                        <button
+                            onClick={toggleDark}
+                            className="w-full flex items-center justify-between px-4 py-3"
+                        >
+                            <div className="flex items-center gap-3">
+                                <Moon className="w-4 h-4 text-indigo-400" />
+                                <div className="text-left">
+                                    <p className="text-sm font-medium text-slate-800 dark:text-slate-100">Dark Mode</p>
+                                    <p className="text-xs text-slate-400">Easy on the eyes for night prayer</p>
+                                </div>
+                            </div>
+                            <div className={`w-10 h-6 rounded-full transition-colors flex items-center px-0.5 ${dark ? 'bg-indigo-600' : 'bg-slate-200'}`}>
+                                <div className={`w-5 h-5 bg-white rounded-full shadow transition-transform ${dark ? 'translate-x-4' : 'translate-x-0'}`} />
+                            </div>
+                        </button>
                     </div>
                 </div>
 
