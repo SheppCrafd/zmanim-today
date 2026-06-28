@@ -5,14 +5,17 @@ import { useNavigate } from 'react-router-dom';
 import NavMenu from '@/components/NavMenu';
 
 // Recursively flatten a Sefaria schema node tree into a list of sections
-function flattenNodes(nodes, path = '') {
+// Uses node.key for the ref path (matches Sefaria's canonical refs) and node.title for display
+function flattenNodes(nodes, keyPath = '', labelPath = '') {
     const result = [];
     for (const node of nodes) {
-        const fullPath = path ? `${path}, ${node.title}` : node.title;
+        const key = node.key || node.title;
+        const fullKeyPath = keyPath ? `${keyPath}, ${key}` : key;
+        const fullLabelPath = labelPath ? `${labelPath} > ${node.title}` : node.title;
         if (node.nodes) {
-            result.push(...flattenNodes(node.nodes, fullPath));
+            result.push(...flattenNodes(node.nodes, fullKeyPath, fullLabelPath));
         } else {
-            result.push({ label: node.title, heLabel: node.heTitle, ref: fullPath });
+            result.push({ label: node.title, heLabel: node.heTitle, breadcrumb: fullLabelPath, ref: fullKeyPath });
         }
     }
     return result;
@@ -97,8 +100,10 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
         fetch(`https://www.sefaria.org/api/index/${bookRef}`)
             .then(r => { if (!r.ok) throw new Error(); return r.json(); })
             .then(data => {
-                const nodes = data?.schema?.nodes || [];
-                setSections(flattenNodes(nodes, title));
+                const schema = data?.schema;
+                const rootKey = schema?.key || bookRef.replace(/_/g, ' ');
+                const nodes = schema?.nodes || [];
+                setSections(flattenNodes(nodes, rootKey));
                 setTocLoading(false);
             })
             .catch(() => { setTocError(true); setTocLoading(false); });
