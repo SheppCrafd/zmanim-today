@@ -156,7 +156,7 @@ function CompassSVG({ heading, bearing }) {
       style={{ overflow: 'visible' }}
     >
       {/* Compass ring */}
-      <circle cx={cx} cy={cy} r={R} fill="white" stroke="#e2e8f0" strokeWidth="1.5" />
+      <circle cx={cx} cy={cy} r={R} fill="var(--compass-bg, white)" stroke="#e2e8f0" strokeWidth="1.5" />
 
       {/* Rotating group: ticks + cardinals */}
       <g transform={`rotate(${-displayHeading}, ${cx}, ${cy})`}>
@@ -269,29 +269,29 @@ export default function Compass() {
     : null;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-amber-50 pb-24">
+    <div className="min-h-screen bg-background pb-24">
       <div className="max-w-sm mx-auto px-4 pt-4 pb-4">
 
         {/* Header */}
         <div className="flex items-center mb-8 min-h-[72px]">
           <div className="shrink-0"><NavMenu /></div>
           <div className="flex-1 text-center px-2">
-            <h1 className="text-3xl font-bold text-slate-800 mb-1 tracking-tight">Compass to<br />Jerusalem</h1>
-            <p className="text-slate-500 text-sm">מצפן לירושלים</p>
+            <h1 className="text-3xl font-bold text-slate-800 dark:text-slate-100 mb-1 tracking-tight">Compass to<br />Jerusalem</h1>
+            <p className="text-slate-500 dark:text-slate-400 text-sm">מצפן לירושלים</p>
           </div>
           <div className="shrink-0 w-9"></div>
         </div>
 
         {/* Location error */}
         {locationError && (
-          <div className="mb-6 bg-amber-50 border border-amber-200 rounded-xl p-4 flex gap-3 items-start">
+          <div className="mb-6 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 rounded-xl p-4 flex gap-3 items-start">
             <AlertCircle className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
-            <p className="text-sm text-amber-800">{locationError}</p>
+            <p className="text-sm text-amber-800 dark:text-amber-300">{locationError}</p>
           </div>
         )}
 
         {/* Compass */}
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 mb-5 flex flex-col items-center">
+        <div className="bg-card rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm p-6 mb-5 flex flex-col items-center">
           {!location && !locationError ? (
             <div className="flex flex-col items-center py-10 gap-3">
               <Loader2 className="w-7 h-7 text-blue-500 animate-spin" />
@@ -311,13 +311,13 @@ export default function Compass() {
           {/* Manual heading fallback */}
           {!orientationSupported && (
             <div className="mt-5 w-full px-2">
-              <p className="text-xs text-slate-400 mb-2 text-center">Rotate manually — sensor unavailable</p>
+              <p className="text-xs text-slate-400 dark:text-slate-500 mb-2 text-center">Rotate manually — sensor unavailable</p>
               <Slider
                 min={0} max={359} step={1}
                 value={[manualHeading]}
                 onValueChange={([v]) => setManualHeading(v)}
               />
-              <p className="text-xs text-slate-400 text-center mt-1">{manualHeading}°</p>
+              <p className="text-xs text-slate-400 dark:text-slate-500 text-center mt-1">{manualHeading}°</p>
             </div>
           )}
         </div>
@@ -326,23 +326,23 @@ export default function Compass() {
         {location && (
           <>
             <div className="grid grid-cols-3 gap-3 mb-4">
-              <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-3 text-center">
-                <p className="text-xs text-slate-400 mb-1">Heading</p>
-                <p className="text-xl font-bold text-slate-800">{Math.round(effectiveHeading)}°</p>
+              <div className="bg-card rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm p-3 text-center">
+                <p className="text-xs text-slate-400 dark:text-slate-500 mb-1">Heading</p>
+                <p className="text-xl font-bold text-slate-800 dark:text-slate-100">{Math.round(effectiveHeading)}°</p>
               </div>
-              <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-3 text-center">
-                <p className="text-xs text-slate-400 mb-1">Bearing</p>
-                <p className="text-xl font-bold text-amber-600">{Math.round(bearing)}°</p>
+              <div className="bg-card rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm p-3 text-center">
+                <p className="text-xs text-slate-400 dark:text-slate-500 mb-1">Bearing</p>
+                <p className="text-xl font-bold text-amber-600 dark:text-amber-400">{Math.round(bearing)}°</p>
               </div>
-              <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-3 text-center">
-                <p className="text-xs text-slate-400 mb-1">Distance</p>
-                <p className="text-lg font-bold text-slate-800 leading-tight">{distDisplay}</p>
+              <div className="bg-card rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm p-3 text-center">
+                <p className="text-xs text-slate-400 dark:text-slate-500 mb-1">Distance</p>
+                <p className="text-lg font-bold text-slate-800 dark:text-slate-100 leading-tight">{distDisplay}</p>
               </div>
             </div>
 
-            <div className="bg-white rounded-xl border border-slate-200 shadow-sm px-4 py-3 mb-4">
-              <p className="text-sm text-slate-500 text-center">
-                Jerusalem is <span className="text-amber-600 font-semibold">{distDisplay}</span> away at a bearing of <span className="text-amber-600 font-semibold">{Math.round(bearing)}°</span>.
+            <div className="bg-card rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm px-4 py-3 mb-4">
+              <p className="text-sm text-slate-500 dark:text-slate-400 text-center">
+                Jerusalem is <span className="text-amber-600 dark:text-amber-400 font-semibold">{distDisplay}</span> away at a bearing of <span className="text-amber-600 dark:text-amber-400 font-semibold">{Math.round(bearing)}°</span>.
               </p>
             </div>
 

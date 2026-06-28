@@ -79,25 +79,25 @@ export default function NextZmanCard({ zmanim }) {
     const urgent = ms < 30 * 60 * 1000; // under 30 minutes
 
     return (
-        <div className={`rounded-xl border p-4 ${urgent ? 'bg-amber-50 border-amber-200' : 'bg-blue-50 border-blue-100'}`}>
+        <div className={`rounded-xl border p-4 ${urgent ? 'bg-amber-50 dark:bg-amber-950/40 border-amber-200 dark:border-amber-800' : 'bg-blue-50 dark:bg-blue-950/40 border-blue-100 dark:border-blue-900'}`}>
             <div className="flex items-center gap-2 mb-2">
                 <Timer className={`w-4 h-4 ${urgent ? 'text-amber-500' : 'text-blue-500'}`} />
-                <p className={`text-xs font-semibold uppercase tracking-wide ${urgent ? 'text-amber-600' : 'text-blue-600'}`}>
+                <p className={`text-xs font-semibold uppercase tracking-wide ${urgent ? 'text-amber-600 dark:text-amber-400' : 'text-blue-600 dark:text-blue-400'}`}>
                     Next Zman
                 </p>
             </div>
             <div className="flex items-center justify-between">
                 <div>
-                    <p className="text-lg font-bold text-slate-800">
+                    <p className="text-lg font-bold text-slate-800 dark:text-slate-100">
                         {meta.icon} {meta.label}
                     </p>
-                    <p className="text-sm text-slate-500">{next.val}</p>
+                    <p className="text-sm text-slate-500 dark:text-slate-400">{next.val}</p>
                 </div>
                 <div className="text-right">
-                    <p className={`text-2xl font-bold tabular-nums ${urgent ? 'text-amber-600' : 'text-blue-700'}`}>
+                    <p className={`text-2xl font-bold tabular-nums ${urgent ? 'text-amber-600 dark:text-amber-400' : 'text-blue-700 dark:text-blue-400'}`}>
                         {countdown}
                     </p>
-                    <p className="text-xs text-slate-400">remaining</p>
+                    <p className="text-xs text-slate-400 dark:text-slate-500">remaining</p>
                 </div>
             </div>
         </div>
