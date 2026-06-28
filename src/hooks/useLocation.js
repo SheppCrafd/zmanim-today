@@ -36,7 +36,7 @@ export function useSavedLocation() {
                 // Reverse geocode
                 base44.integrations.Core.InvokeLLM({
                     prompt: `Reverse-geocode these exact GPS coordinates to a real-world address: latitude ${loc.latitude}, longitude ${loc.longitude}.
-Use mapping/geocoding data to find the SPECIFIC city, town, or village that physically contains this point (not the largest nearby metro). If the point is in a smaller town or suburb, return that town, not the closest big city.
+Use mapping/geocoding data to find the nearest recognized city (not a small town, village, or suburb). Return the closest proper city name.
 Return the local municipality name as "city", the state/province abbreviation (for USA, Canada, Australia; otherwise null) as "state", and the country as "country".`,
                     add_context_from_internet: true,
                     response_json_schema: {
