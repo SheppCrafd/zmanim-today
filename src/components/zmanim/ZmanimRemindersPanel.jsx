@@ -50,6 +50,14 @@ function savePrefs(prefs) {
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify(prefs)); } catch {}
 }
 
+// Detect if running as installed PWA (standalone mode)
+const isStandalone = () =>
+    window.matchMedia('(display-mode: standalone)').matches ||
+    window.navigator.standalone === true;
+
+// Detect iOS
+const isIOS = () => /iphone|ipad|ipod/i.test(navigator.userAgent);
+
 export default function ZmanimRemindersPanel({ zmanimData, currentDate }) {
     const [open, setOpen] = useState(false);
     const [prefs, setPrefs] = useState(loadPrefs);
@@ -57,6 +65,7 @@ export default function ZmanimRemindersPanel({ zmanimData, currentDate }) {
         typeof Notification !== 'undefined' ? Notification.permission : 'default'
     );
     const timeoutsRef = useRef([]);
+    const iosNotStandalone = isIOS() && !isStandalone();
 
     const date = currentDate || new Date();
     const isToday = new Date().toDateString() === new Date(date).toDateString();
@@ -144,22 +153,30 @@ export default function ZmanimRemindersPanel({ zmanimData, currentDate }) {
                 </SheetHeader>
 
                 <div className="mt-4 space-y-4">
-                    {notifPermission !== 'granted' && notifPermission !== 'denied' && (
-                        <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-sm">
-                            <p className="text-amber-800 mb-2">Enable notifications to receive reminders.</p>
-                            <button
-                                onClick={requestPermission}
-                                className="w-full py-1.5 rounded-lg bg-amber-600 text-white text-sm font-medium hover:bg-amber-700 transition-colors"
-                            >
-                                Enable Notifications
-                            </button>
+                    {iosNotStandalone ? (
+                        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-sm">
+                            <p className="text-blue-900 font-semibold mb-1">📲 Add to Home Screen</p>
+                            <p className="text-blue-800 text-xs">To enable reminders on iOS, tap the <strong>Share</strong> button in Safari, then choose <strong>"Add to Home Screen"</strong>. Open the app from there to unlock notifications.</p>
                         </div>
-                    )}
-
-                    {notifPermission === 'denied' && (
-                        <p className="text-xs text-red-600 bg-red-50 rounded-lg p-2 text-center">
-                            Notifications are blocked. Please allow them in your browser settings.
-                        </p>
+                    ) : (
+                        <>
+                            {notifPermission !== 'granted' && notifPermission !== 'denied' && (
+                                <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-sm">
+                                    <p className="text-amber-800 mb-2">Enable notifications to receive reminders.</p>
+                                    <button
+                                        onClick={requestPermission}
+                                        className="w-full py-1.5 rounded-lg bg-amber-600 text-white text-sm font-medium hover:bg-amber-700 transition-colors"
+                                    >
+                                        Enable Notifications
+                                    </button>
+                                </div>
+                            )}
+                            {notifPermission === 'denied' && (
+                                <p className="text-xs text-red-600 bg-red-50 rounded-lg p-2 text-center">
+                                    Notifications are blocked. Please allow them in your browser settings.
+                                </p>
+                            )}
+                        </>
                     )}
 
                     {!isToday && (
