@@ -265,7 +265,7 @@ Use actual astronomical calculations. Verify data is correct.`,
                                             size="sm"
                                             onClick={() => {
                                                 const locLabel = location ? [location.city, location.state, location.country].filter(Boolean).join(', ') || `${location.latitude?.toFixed(3)}°, ${location.longitude?.toFixed(3)}°` : '';
-                                                printZmanim({ zmanimData: zmanim, date: currentDate, locationLabel: locLabel, hebrewInfo });
+                                                printZmanim({ zmanimData: zmanim, date: currentDate, locationLabel: locLabel, hebrewInfo, timezone: zmanim.timezone });
                                             }}
                                             className="border-slate-300 hover:bg-slate-50"
                                             title="Print zmanim"

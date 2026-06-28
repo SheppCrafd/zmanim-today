@@ -196,7 +196,7 @@ export default function Home() {
                                         className="flex-1 flex items-center justify-center gap-2 py-2.5 px-3 bg-white border border-slate-200 rounded-xl text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors"
                                     >
                                         <Printer className="w-4 h-4 text-slate-500" />
-                                        Print Tomorrow's
+                                        Print Tomorrow's Zmanim
                                     </button>
                                 )}
                             </div>
