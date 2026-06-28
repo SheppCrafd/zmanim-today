@@ -18,24 +18,19 @@ if (typeof document !== 'undefined') {
     document.getElementById('root')?.style.setProperty('overflow', 'hidden');
 }
 
+/* ---------------- CONFIG ---------------- */
+const RENDER_BUFFER = 2;
+
 /* ---------------- HELPERS ---------------- */
 const isProbablyEnglish = (str = '') =>
     /^[\x00-\x7F\s.,;:'"!?()\-–—]*$/.test(str);
 
-/* ---------------- TEXT RENDER ---------------- */
-function SectionText({ he, en, showEnglish, showTranslit }) {
+/* ---------------- TEXT ---------------- */
+function SectionText({ he, en, showEnglish }) {
     const heArr = Array.isArray(he) ? he : he ? [he] : [];
     const enArr = Array.isArray(en) ? en : en ? [en] : [];
 
     const maxLen = Math.max(heArr.length, enArr.length);
-
-    if (!maxLen) {
-        return (
-            <p className="text-slate-400 text-sm italic">
-                No text available.
-            </p>
-        );
-    }
 
     return (
         <div className="space-y-6">
@@ -46,12 +41,12 @@ function SectionText({ he, en, showEnglish, showTranslit }) {
                     {heArr[i] && (
                         <p
                             dir="rtl"
-                            className="text-right text-lg leading-loose text-slate-800 dark:text-slate-100 font-serif"
+                            className="text-right text-lg leading-loose font-serif text-slate-800 dark:text-slate-100"
                             dangerouslySetInnerHTML={{ __html: heArr[i] }}
                         />
                     )}
 
-                    {/* English (filtered) */}
+                    {/* English filtered */}
                     {showEnglish &&
                         enArr[i] &&
                         isProbablyEnglish(enArr[i]) && (
@@ -77,13 +72,11 @@ export default function SiddurView({
     const sectionRefs = useRef([]);
 
     const [sections, setSections] = useState([]);
+    const [loaded, setLoaded] = useState({});
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(false);
 
     const [startIndex, setStartIndex] = useState(null);
-    const [loaded, setLoaded] = useState({});
-
-    /* -------- LANGUAGE TOGGLES -------- */
     const [showEnglish, setShowEnglish] = useState(true);
 
     /* ---------------- LOAD TOC ---------------- */
@@ -98,21 +91,22 @@ export default function SiddurView({
                 const nodes = schema?.nodes || [];
 
                 const flatten = (nodes, keyPath = '') => {
-                    let result = [];
+                    let res = [];
+
                     for (const node of nodes) {
                         const key = node.key || node.title;
-                        const fullKey = keyPath ? `${keyPath}, ${key}` : key;
+                        const full = keyPath ? `${keyPath}, ${key}` : key;
 
                         if (node.nodes) {
-                            result.push(...flatten(node.nodes, fullKey));
+                            res.push(...flatten(node.nodes, full));
                         } else {
-                            result.push({
+                            res.push({
                                 label: node.title,
-                                ref: fullKey
+                                ref: full
                             });
                         }
                     }
-                    return result;
+                    return res;
                 };
 
                 setSections(flatten(nodes, rootKey));
@@ -156,12 +150,38 @@ export default function SiddurView({
         await loadSection(index);
     };
 
-    /* ---------------- SCROLL INTO VIEW ---------------- */
+    /* ---------------- WINDOW LOGIC ---------------- */
+    const windowStart =
+        startIndex === null
+            ? 0
+            : Math.max(0, startIndex - RENDER_BUFFER);
+
+    const windowEnd =
+        startIndex === null
+            ? sections.length - 1
+            : Math.min(sections.length - 1, startIndex + RENDER_BUFFER);
+
+    /* ---------------- PRELOAD WINDOW ---------------- */
+    useEffect(() => {
+        if (startIndex === null) return;
+
+        const start = Math.max(0, startIndex - RENDER_BUFFER);
+        const end = Math.min(sections.length - 1, startIndex + RENDER_BUFFER);
+
+        for (let i = start; i <= end; i++) {
+            if (!loaded[i]) {
+                loadSection(i);
+            }
+        }
+    }, [startIndex]);
+
+    /* ---------------- SCROLL TO ACTIVE ---------------- */
     useEffect(() => {
         if (startIndex === null) return;
 
         sectionRefs.current[startIndex]?.scrollIntoView({
-            block: 'start'
+            block: 'start',
+            behavior: 'smooth'
         });
     }, [startIndex, loaded]);
 
@@ -174,7 +194,7 @@ export default function SiddurView({
         <div className="h-screen flex flex-col overflow-hidden bg-slate-50 dark:bg-slate-950">
 
             {/* HEADER */}
-            <div className="px-4 pt-4 pb-2 shrink-0 flex items-center justify-between">
+            <div className="px-4 pt-4 pb-2 shrink-0 flex justify-between items-center">
                 <div className="flex items-center gap-2">
                     <NavMenu />
                     <div>
@@ -183,8 +203,7 @@ export default function SiddurView({
                     </div>
                 </div>
 
-                {/* TOGGLES */}
-                <div className="flex items-center gap-2">
+                <div className="flex gap-2">
                     <Button
                         variant="ghost"
                         size="sm"
@@ -218,8 +237,17 @@ export default function SiddurView({
                 {/* TOC */}
                 {startIndex === null && (
                     <div>
-                        {loading && <div className="p-10 flex justify-center"><Loader2 /></div>}
-                        {error && <div className="p-6 text-red-500">Failed to load</div>}
+                        {loading && (
+                            <div className="p-10 flex justify-center">
+                                <Loader2 className="animate-spin" />
+                            </div>
+                        )}
+
+                        {error && (
+                            <div className="p-6 text-red-500">
+                                Failed to load
+                            </div>
+                        )}
 
                         {sections.map((sec, i) => (
                             <button
@@ -234,21 +262,37 @@ export default function SiddurView({
                     </div>
                 )}
 
-                {/* READER */}
+                {/* READER (WINDOWED RENDER) */}
                 {startIndex !== null && (
                     <div className="p-4 space-y-12">
+
                         {sections.map((sec, i) => {
+                            if (i < windowStart || i > windowEnd) return null;
+
                             const data = loaded[i];
 
                             if (!data) {
                                 loadSection(i);
+
                                 return (
                                     <div
                                         key={i}
                                         ref={el => (sectionRefs.current[i] = el)}
                                         className="flex justify-center py-10"
                                     >
-                                        <Loader2 />
+                                        <Loader2 className="animate-spin" />
+                                    </div>
+                                );
+                            }
+
+                            if (data.error) {
+                                return (
+                                    <div
+                                        key={i}
+                                        ref={el => (sectionRefs.current[i] = el)}
+                                        className="text-red-500 text-sm text-center"
+                                    >
+                                        Failed to load section
                                     </div>
                                 );
                             }
@@ -271,6 +315,7 @@ export default function SiddurView({
                                 </div>
                             );
                         })}
+
                     </div>
                 )}
 
