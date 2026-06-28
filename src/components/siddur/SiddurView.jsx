@@ -10,8 +10,7 @@ import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
 import NavMenu from '@/components/NavMenu';
 
-/* ---------------- LOCK SCROLL GLOBALLY ---------------- */
-// This is required so ONLY the card scrolls
+/* ---------------- LOCK SCROLL GLOBALLY (SAFE) ---------------- */
 if (typeof document !== 'undefined') {
     document.documentElement.style.height = '100%';
     document.body.style.height = '100%';
@@ -90,6 +89,7 @@ export default function SiddurView({
 }) {
     const navigate = useNavigate();
     const scrollRef = useRef(null);
+    const startRef = useRef(null);
 
     const [sections, setSections] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -151,11 +151,20 @@ export default function SiddurView({
     const openAt = async (index) => {
         setStartIndex(index);
         await loadSection(index);
-
-        setTimeout(() => {
-            scrollRef.current?.scrollTo({ top: 0 });
-        }, 50);
     };
+
+    /* ---------------- SCROLL TO START ---------------- */
+    useEffect(() => {
+        if (startIndex === null) return;
+
+        const el = startRef.current;
+        if (el) {
+            el.scrollIntoView({
+                behavior: 'smooth',
+                block: 'start'
+            });
+        }
+    }, [startIndex]);
 
     const sectionUrl =
         startIndex !== null
@@ -166,7 +175,7 @@ export default function SiddurView({
     return (
         <div className="h-screen flex flex-col overflow-hidden bg-gradient-to-br from-slate-50 via-blue-50 to-amber-50 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950">
 
-            {/* HEADER (fixed) */}
+            {/* HEADER */}
             <div className="px-4 pt-4 pb-2 shrink-0 flex items-center justify-between">
                 <div className="flex items-center gap-2">
                     <NavMenu />
@@ -199,7 +208,7 @@ export default function SiddurView({
                 </div>
             </div>
 
-            {/* ONLY SCROLL AREA */}
+            {/* SCROLL AREA */}
             <div
                 ref={scrollRef}
                 className="flex-1 overflow-y-auto mx-4 mb-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900"
@@ -251,11 +260,8 @@ export default function SiddurView({
                 {startIndex !== null && (
                     <div className="p-4 space-y-12">
                         {sections.map((sec, i) => {
-                            if (i < startIndex) return null;
-
                             const data = loaded[i];
 
-                            // lazy load
                             if (!data) {
                                 loadSection(i);
                                 return (
@@ -273,8 +279,14 @@ export default function SiddurView({
                                 );
                             }
 
+                            const isStart = i === startIndex;
+
                             return (
-                                <div key={i} className="space-y-4">
+                                <div
+                                    key={i}
+                                    ref={isStart ? startRef : null}
+                                    className="space-y-4"
+                                >
                                     <div className="sticky top-0 bg-white dark:bg-slate-900 py-2">
                                         <p className="font-semibold text-slate-700 dark:text-slate-100">
                                             {sec.label}
