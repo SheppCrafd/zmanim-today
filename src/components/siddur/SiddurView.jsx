@@ -7,10 +7,9 @@ import {
     ChevronRight
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { useNavigate } from 'react-router-dom';
 import NavMenu from '@/components/NavMenu';
 
-/* ---------------- LOCK SCROLL GLOBALLY (SAFE) ---------------- */
+/* ---------------- LOCK SCROLL GLOBALLY ---------------- */
 if (typeof document !== 'undefined') {
     document.documentElement.style.height = '100%';
     document.body.style.height = '100%';
@@ -19,7 +18,7 @@ if (typeof document !== 'undefined') {
     document.getElementById('root')?.style.setProperty('overflow', 'hidden');
 }
 
-/* ---------------- TOC FLATTEN ---------------- */
+/* ---------------- FLATTEN ---------------- */
 function flattenNodes(nodes, keyPath = '', labelPath = '') {
     const result = [];
 
@@ -34,7 +33,6 @@ function flattenNodes(nodes, keyPath = '', labelPath = '') {
             result.push({
                 label: node.title,
                 heLabel: node.heTitle,
-                breadcrumb: fullLabelPath,
                 ref: fullKeyPath
             });
         }
@@ -43,18 +41,14 @@ function flattenNodes(nodes, keyPath = '', labelPath = '') {
     return result;
 }
 
-/* ---------------- TEXT RENDER ---------------- */
+/* ---------------- TEXT ---------------- */
 function SectionText({ he, text }) {
     const heArr = Array.isArray(he) ? he : he ? [he] : [];
     const enArr = Array.isArray(text) ? text : text ? [text] : [];
     const maxLen = Math.max(heArr.length, enArr.length);
 
     if (!maxLen) {
-        return (
-            <p className="text-slate-400 dark:text-slate-500 text-sm italic">
-                No text available.
-            </p>
-        );
+        return <p className="text-slate-400 italic">No text.</p>;
     }
 
     return (
@@ -62,17 +56,12 @@ function SectionText({ he, text }) {
             {Array.from({ length: maxLen }).map((_, i) => (
                 <div key={i} className="space-y-2">
                     {heArr[i] && (
-                        <p
-                            dir="rtl"
-                            className="text-right text-lg leading-loose text-slate-800 dark:text-slate-100 font-serif"
-                            dangerouslySetInnerHTML={{ __html: heArr[i] }}
-                        />
+                        <p dir="rtl" className="text-right text-lg font-serif"
+                            dangerouslySetInnerHTML={{ __html: heArr[i] }} />
                     )}
                     {enArr[i] && (
-                        <p
-                            className="text-left text-sm leading-relaxed text-slate-500 dark:text-slate-400"
-                            dangerouslySetInnerHTML={{ __html: enArr[i] }}
-                        />
+                        <p className="text-sm text-slate-500"
+                            dangerouslySetInnerHTML={{ __html: enArr[i] }} />
                     )}
                 </div>
             ))}
@@ -81,43 +70,26 @@ function SectionText({ he, text }) {
 }
 
 /* ---------------- MAIN ---------------- */
-export default function SiddurView({
-    title,
-    subtitle,
-    bookRef,
-    sefariaUrl
-}) {
-    const navigate = useNavigate();
+export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
     const scrollRef = useRef(null);
     const startRef = useRef(null);
 
     const [sections, setSections] = useState([]);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState(false);
-
-    const [startIndex, setStartIndex] = useState(null);
     const [loaded, setLoaded] = useState({});
+    const [startIndex, setStartIndex] = useState(null);
+
+    /* ---- virtualization window ---- */
+    const [windowIndex, setWindowIndex] = useState(null);
+    const WINDOW_SIZE = 2;
 
     /* ---------------- LOAD TOC ---------------- */
     useEffect(() => {
-        setLoading(true);
-
         fetch(`https://www.sefaria.org/api/index/${bookRef}`)
-            .then(r => {
-                if (!r.ok) throw new Error();
-                return r.json();
-            })
+            .then(r => r.json())
             .then(data => {
-                const schema = data?.schema;
-                const rootKey = schema?.key || bookRef.replace(/_/g, ' ');
-                const nodes = schema?.nodes || [];
-
+                const nodes = data?.schema?.nodes || [];
+                const rootKey = data?.schema?.key || bookRef.replace(/_/g, ' ');
                 setSections(flattenNodes(nodes, rootKey));
-                setLoading(false);
-            })
-            .catch(() => {
-                setError(true);
-                setLoading(false);
             });
     }, [bookRef]);
 
@@ -128,80 +100,81 @@ export default function SiddurView({
         const sec = sections[index];
         if (!sec) return;
 
-        try {
-            const res = await fetch(
-                `https://www.sefaria.org/api/texts/${encodeURIComponent(sec.ref)}`
-            );
+        const res = await fetch(
+            `https://www.sefaria.org/api/texts/${encodeURIComponent(sec.ref)}`
+        );
 
-            const data = await res.json();
+        const data = await res.json();
 
-            setLoaded(prev => ({
-                ...prev,
-                [index]: data
-            }));
-        } catch {
-            setLoaded(prev => ({
-                ...prev,
-                [index]: { error: true }
-            }));
-        }
+        setLoaded(prev => ({
+            ...prev,
+            [index]: data
+        }));
     };
 
     /* ---------------- ENTER READER ---------------- */
     const openAt = async (index) => {
         setStartIndex(index);
-        await loadSection(index);
+        setWindowIndex(index);
+
+        // preload window
+        for (let i = index - WINDOW_SIZE; i <= index + WINDOW_SIZE; i++) {
+            if (i >= 0 && i < sections.length) loadSection(i);
+        }
+
+        setTimeout(() => {
+            startRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }, 50);
     };
 
-    /* ---------------- SCROLL TO START ---------------- */
-    useEffect(() => {
-        if (startIndex === null) return;
+    /* ---------------- WINDOW SHIFT ON SCROLL ---------------- */
+    const onScroll = () => {
+        const el = scrollRef.current;
+        if (!el || startIndex === null) return;
 
-        const el = startRef.current;
-        if (el) {
-            el.scrollIntoView({
-                behavior: 'smooth',
-                block: 'start'
-            });
+        const scrollTop = el.scrollTop;
+        const height = el.clientHeight;
+
+        const approxIndex = Math.floor(scrollTop / (height * 0.8));
+
+        const newWindow = startIndex + approxIndex;
+        if (Math.abs(newWindow - windowIndex) > 0) {
+            setWindowIndex(newWindow);
+
+            for (let i = newWindow - WINDOW_SIZE; i <= newWindow + WINDOW_SIZE; i++) {
+                if (i >= 0 && i < sections.length) loadSection(i);
+            }
         }
-    }, [startIndex]);
+    };
+
+    const visibleStart = Math.max(0, windowIndex - WINDOW_SIZE);
+    const visibleEnd = Math.min(sections.length - 1, windowIndex + WINDOW_SIZE);
 
     const sectionUrl =
         startIndex !== null
             ? `https://www.sefaria.org/${encodeURIComponent(sections[startIndex]?.ref)}`
             : sefariaUrl;
 
-    /* ---------------- RENDER ---------------- */
     return (
-        <div className="h-screen flex flex-col overflow-hidden bg-gradient-to-br from-slate-50 via-blue-50 to-amber-50 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950">
+        <div className="h-screen flex flex-col overflow-hidden bg-slate-50 dark:bg-slate-950">
 
             {/* HEADER */}
-            <div className="px-4 pt-4 pb-2 shrink-0 flex items-center justify-between">
-                <div className="flex items-center gap-2">
+            <div className="px-4 pt-4 pb-2 flex justify-between">
+                <div className="flex gap-2">
                     <NavMenu />
                     <div>
-                        <h1 className="text-lg font-bold text-slate-800 dark:text-slate-100">
-                            {title}
-                        </h1>
-                        <p className="text-xs text-slate-500 dark:text-slate-400">
-                            {subtitle}
-                        </p>
+                        <h1 className="font-bold">{title}</h1>
+                        <p className="text-xs text-slate-500">{subtitle}</p>
                     </div>
                 </div>
 
                 <div className="flex gap-2">
-                    <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setStartIndex(null)}
-                        className="text-slate-600 dark:text-slate-300"
-                    >
-                        <ArrowLeft className="w-4 h-4 mr-1" />
-                        {startIndex === null ? 'Back' : 'TOC'}
+                    <Button variant="ghost" onClick={() => setStartIndex(null)}>
+                        <ArrowLeft className="w-4 h-4" />
                     </Button>
 
-                    <a href={sectionUrl} target="_blank" rel="noopener noreferrer">
-                        <Button variant="outline" size="sm">
+                    <a href={sectionUrl} target="_blank">
+                        <Button variant="outline">
                             <ExternalLink className="w-4 h-4" />
                         </Button>
                     </a>
@@ -211,70 +184,40 @@ export default function SiddurView({
             {/* SCROLL AREA */}
             <div
                 ref={scrollRef}
-                className="flex-1 overflow-y-auto mx-4 mb-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900"
+                onScroll={onScroll}
+                className="flex-1 overflow-y-auto mx-4 mb-4 bg-white dark:bg-slate-900 rounded-xl"
             >
 
-                {/* ---------------- TOC ---------------- */}
+                {/* TOC */}
                 {startIndex === null && (
                     <div>
-                        {loading && (
-                            <div className="flex items-center justify-center py-20 gap-3">
-                                <Loader2 className="w-6 h-6 animate-spin text-blue-500" />
-                                Loading…
-                            </div>
-                        )}
-
-                        {error && (
-                            <div className="p-6 text-center">
-                                <AlertCircle className="mx-auto w-8 h-8 text-amber-500" />
-                                <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
-                                    Failed to load
-                                </p>
-                            </div>
-                        )}
-
                         {sections.map((sec, i) => (
                             <button
                                 key={i}
                                 onClick={() => openAt(i)}
-                                className="w-full flex justify-between px-4 py-3 border-b border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800"
+                                className="w-full flex justify-between p-3 border-b hover:bg-slate-100"
                             >
-                                <div className="text-left">
-                                    <p className="text-sm font-medium text-slate-700 dark:text-slate-200">
-                                        {sec.label}
-                                    </p>
-                                    {sec.heLabel && (
-                                        <p className="text-xs text-slate-400" dir="rtl">
-                                            {sec.heLabel}
-                                        </p>
-                                    )}
-                                </div>
-
-                                <ChevronRight className="w-4 h-4 text-slate-400" />
+                                <span>{sec.label}</span>
+                                <ChevronRight />
                             </button>
                         ))}
                     </div>
                 )}
 
-                {/* ---------------- READER MODE ---------------- */}
+                {/* READER */}
                 {startIndex !== null && (
                     <div className="p-4 space-y-12">
+
                         {sections.map((sec, i) => {
+                            if (i < visibleStart || i > visibleEnd) return null;
+
                             const data = loaded[i];
 
                             if (!data) {
                                 loadSection(i);
                                 return (
-                                    <div key={i} className="flex justify-center py-10">
-                                        <Loader2 className="animate-spin text-blue-500" />
-                                    </div>
-                                );
-                            }
-
-                            if (data.error) {
-                                return (
-                                    <div key={i} className="text-center text-red-500 text-sm">
-                                        Failed to load section
+                                    <div key={i} className="py-10 flex justify-center">
+                                        <Loader2 className="animate-spin" />
                                     </div>
                                 );
                             }
@@ -285,21 +228,19 @@ export default function SiddurView({
                                 <div
                                     key={i}
                                     ref={isStart ? startRef : null}
-                                    className="space-y-4"
+                                    className="space-y-3"
                                 >
-                                    <div className="sticky top-0 bg-white dark:bg-slate-900 py-2">
-                                        <p className="font-semibold text-slate-700 dark:text-slate-100">
-                                            {sec.label}
-                                        </p>
+                                    <div className="sticky top-0 bg-white dark:bg-slate-900 py-2 font-semibold">
+                                        {sec.label}
                                     </div>
 
                                     <SectionText he={data.he} text={data.text} />
                                 </div>
                             );
                         })}
+
                     </div>
                 )}
-
             </div>
         </div>
     );
