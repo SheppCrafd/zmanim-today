@@ -11,7 +11,6 @@ import { useNavigate } from 'react-router-dom';
 import NavMenu from '@/components/NavMenu';
 
 /* ---------------- LOCK SCROLL GLOBALLY ---------------- */
-// This is required so ONLY the card scrolls
 if (typeof document !== 'undefined') {
     document.documentElement.style.height = '100%';
     document.body.style.height = '100%';
@@ -90,6 +89,7 @@ export default function SiddurView({
 }) {
     const navigate = useNavigate();
     const scrollRef = useRef(null);
+    const sectionRefs = useRef([]);
 
     const [sections, setSections] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -151,22 +151,27 @@ export default function SiddurView({
     const openAt = async (index) => {
         setStartIndex(index);
         await loadSection(index);
-
-        setTimeout(() => {
-            scrollRef.current?.scrollTo({ top: 0 });
-        }, 50);
     };
+
+    /* ---------------- SCROLL TO SECTION ---------------- */
+    useEffect(() => {
+        if (startIndex === null) return;
+
+        sectionRefs.current[startIndex]?.scrollIntoView({
+            block: 'start',
+            behavior: 'smooth'
+        });
+    }, [startIndex, loaded]);
 
     const sectionUrl =
         startIndex !== null
             ? `https://www.sefaria.org/${encodeURIComponent(sections[startIndex]?.ref)}`
             : sefariaUrl;
 
-    /* ---------------- RENDER ---------------- */
     return (
         <div className="h-screen flex flex-col overflow-hidden bg-gradient-to-br from-slate-50 via-blue-50 to-amber-50 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950">
 
-            {/* HEADER (fixed) */}
+            {/* HEADER */}
             <div className="px-4 pt-4 pb-2 shrink-0 flex items-center justify-between">
                 <div className="flex items-center gap-2">
                     <NavMenu />
@@ -185,7 +190,6 @@ export default function SiddurView({
                         variant="ghost"
                         size="sm"
                         onClick={() => setStartIndex(null)}
-                        className="text-slate-600 dark:text-slate-300"
                     >
                         <ArrowLeft className="w-4 h-4 mr-1" />
                         {startIndex === null ? 'Back' : 'TOC'}
@@ -199,13 +203,13 @@ export default function SiddurView({
                 </div>
             </div>
 
-            {/* ONLY SCROLL AREA */}
+            {/* SCROLL AREA */}
             <div
                 ref={scrollRef}
-                className="flex-1 overflow-y-auto mx-4 mb-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900"
+                className="flex-1 min-h-0 overflow-y-auto mx-4 mb-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900"
             >
 
-                {/* ---------------- TOC ---------------- */}
+                {/* TOC */}
                 {startIndex === null && (
                     <div>
                         {loading && (
@@ -247,19 +251,21 @@ export default function SiddurView({
                     </div>
                 )}
 
-                {/* ---------------- READER MODE ---------------- */}
+                {/* READER MODE */}
                 {startIndex !== null && (
                     <div className="p-4 space-y-12">
                         {sections.map((sec, i) => {
-                            if (i < startIndex) return null;
-
                             const data = loaded[i];
 
-                            // lazy load
                             if (!data) {
                                 loadSection(i);
+
                                 return (
-                                    <div key={i} className="flex justify-center py-10">
+                                    <div
+                                        key={i}
+                                        ref={el => (sectionRefs.current[i] = el)}
+                                        className="flex justify-center py-10"
+                                    >
                                         <Loader2 className="animate-spin text-blue-500" />
                                     </div>
                                 );
@@ -267,15 +273,23 @@ export default function SiddurView({
 
                             if (data.error) {
                                 return (
-                                    <div key={i} className="text-center text-red-500 text-sm">
+                                    <div
+                                        key={i}
+                                        ref={el => (sectionRefs.current[i] = el)}
+                                        className="text-center text-red-500 text-sm"
+                                    >
                                         Failed to load section
                                     </div>
                                 );
                             }
 
                             return (
-                                <div key={i} className="space-y-4">
-                                    <div className="sticky top-0 bg-white dark:bg-slate-900 py-2">
+                                <div
+                                    key={i}
+                                    ref={el => (sectionRefs.current[i] = el)}
+                                    className="space-y-4"
+                                >
+                                    <div className="sticky top-0 z-10 bg-white dark:bg-slate-900 py-2">
                                         <p className="font-semibold text-slate-700 dark:text-slate-100">
                                             {sec.label}
                                         </p>
