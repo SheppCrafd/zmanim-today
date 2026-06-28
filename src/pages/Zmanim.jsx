@@ -15,7 +15,6 @@ import NavMenu from '@/components/NavMenu';
 import { printZmanim } from '@/lib/printZmanim';
 import { useDashboardPrefs } from '@/hooks/useDashboardPrefs';
 import { ZMANIM_GROUPS, getGroupEntries } from '@/lib/zmanimSchema';
-import SefariaFooter from '@/components/SefariaFooter';
 
 
 export default function Zmanim() {
@@ -433,7 +432,6 @@ Use actual astronomical calculations. Verify data is correct.`,
                     </p>
                 </div>
             </div>
-            <SefariaFooter />
         </div>
     );
 }

@@ -3,7 +3,6 @@ import { ExternalLink, Loader2, AlertCircle, ArrowLeft, ChevronRight, ChevronLef
 import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
 import NavMenu from '@/components/NavMenu';
-import SefariaFooter from '@/components/SefariaFooter';
 
 // Recursively flatten a Sefaria schema node tree into a list of sections
 // Uses node.key for the ref path (matches Sefaria's canonical refs) and node.title for display
@@ -227,7 +226,6 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
                     </div>
                 )}
             </div>
-            <SefariaFooter />
         </div>
     );
 }
