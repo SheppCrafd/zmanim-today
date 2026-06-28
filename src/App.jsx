@@ -4,7 +4,8 @@ import { QueryClientProvider } from '@tanstack/react-query'
 import { queryClientInstance } from '@/lib/query-client'
 import VisualEditAgent from '@/lib/VisualEditAgent'
 import NavigationTracker from '@/lib/NavigationTracker'
-import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
+import { BrowserRouter as Router, Route, Routes, Navigate } from 'react-router-dom';
+
 import PageNotFound from './lib/PageNotFound';
 import { AuthProvider, useAuth } from '@/lib/AuthContext';
 import { ThemeProvider } from '@/lib/ThemeContext';
@@ -18,7 +19,6 @@ import ChabadSiddur from './pages/ChabadSiddur';
 import Compass from './pages/Compass';
 import Settings from './pages/Settings';
 
-// ✅ ADD THIS (your new reader engine)
 import SiddurView from '@/components/siddur/SiddurView';
 
 const AuthenticatedApp = () => {
@@ -39,43 +39,20 @@ const AuthenticatedApp = () => {
 
   return (
     <Routes>
-      {/* ---------------- CORE PAGES ---------------- */}
+
       <Route path="/" element={<Home />} />
       <Route path="/Zmanim" element={<Zmanim />} />
       <Route path="/Compass" element={<Compass />} />
       <Route path="/Settings" element={<Settings />} />
 
-      {/* ---------------- SIDDUr ROOT PAGES ---------------- */}
-      <Route path="/SephardicSiddur" element={<SephardicSiddur />} />
-      <Route path="/AshkenaziSiddur" element={<AshkenaziSiddur />} />
-      <Route path="/ChabadSiddur" element={<ChabadSiddur />} />
+      {/* legacy redirects */}
+      <Route path="/SephardicSiddur" element={<Navigate to="/siddur/sephardic" />} />
+      <Route path="/AshkenaziSiddur" element={<Navigate to="/siddur/ashkenazi" />} />
+      <Route path="/ChabadSiddur" element={<Navigate to="/siddur/chabad" />} />
 
-      {/* ---------------- NEW UNIFIED READER ENGINE ---------------- */}
-      {/* Ashkenazi */}
-      <Route
-        path="/siddur/ashkenazi/:index?"
-        element={<AshkenaziSiddur />}
-      />
+      {/* unified engine */}
+      <Route path="/siddur/:type/:index?" element={<SiddurView />} />
 
-      {/* Sephardic */}
-      <Route
-        path="/siddur/sephardic/:index?"
-        element={<SephardicSiddur />}
-      />
-
-      {/* Chabad */}
-      <Route
-        path="/siddur/chabad/:index?"
-        element={<ChabadSiddur />}
-      />
-
-      {/* ---------------- OPTIONAL GENERIC ENGINE (future-proof) ---------------- */}
-      <Route
-        path="/siddur/:type/:index?"
-        element={<SiddurView />}
-      />
-
-      {/* ---------------- FALLBACK ---------------- */}
       <Route path="*" element={<PageNotFound />} />
     </Routes>
   );
