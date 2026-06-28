@@ -118,6 +118,22 @@ Use actual astronomical calculations. Verify data is correct.`,
                 }
             });
 
+            // Always derive alot_hashachar as exactly 72 min before the returned sunrise
+            if (result?.zmanim?.sunrise) {
+                const sunriseMatch = result.zmanim.sunrise.match(/(\d+):(\d+)\s*(AM|PM)/i);
+                if (sunriseMatch) {
+                    let [, h, min, ampm] = sunriseMatch;
+                    h = parseInt(h); min = parseInt(min);
+                    if (ampm.toUpperCase() === 'PM' && h !== 12) h += 12;
+                    if (ampm.toUpperCase() === 'AM' && h === 12) h = 0;
+                    const totalMin = h * 60 + min - 72;
+                    const alotH = Math.floor(((totalMin % 1440) + 1440) % 1440 / 60);
+                    const alotMin = ((totalMin % 1440) + 1440) % 1440 % 60;
+                    const period = alotH < 12 ? 'AM' : 'PM';
+                    const display12 = alotH % 12 === 0 ? 12 : alotH % 12;
+                    result.zmanim.alot_hashachar = `${display12}:${String(alotMin).padStart(2, '0')} ${period}`;
+                }
+            }
             setZmanim(result);
         } catch (err) {
             setError('Failed to calculate zmanim. Please try again.');
