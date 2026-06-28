@@ -20,6 +20,7 @@ export const ALL_DASHBOARD_ITEMS = [
 const defaultPrefs = () => ({
     items: ALL_DASHBOARD_ITEMS.map(item => ({ id: item.id, enabled: item.defaultOn })),
     use24Hour: false,
+    darkMode: false,
 });
 
 export function useDashboardPrefs() {
@@ -58,5 +59,9 @@ export function useDashboardPrefs() {
         savePrefs({ ...prefs, use24Hour: !prefs.use24Hour });
     };
 
-    return { prefs, toggleItem, reorderItems, toggle24Hour };
+    const toggleDarkMode = () => {
+        savePrefs({ ...prefs, darkMode: !prefs.darkMode });
+    };
+
+    return { prefs, toggleItem, reorderItems, toggle24Hour, toggleDarkMode };
 }
