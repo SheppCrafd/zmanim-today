@@ -19,6 +19,29 @@ function applyDayRules(result, date) {
     };
 }
 
+function fixAlotHashachar(result) {
+    if (!result?.zmanim?.sunrise) return result;
+    const m = result.zmanim.sunrise.match(/(\d+):(\d+)\s*(AM|PM)/i);
+    if (!m) return result;
+    let [, h, min, ampm] = m;
+    h = parseInt(h); min = parseInt(min);
+    if (ampm.toUpperCase() === 'PM' && h !== 12) h += 12;
+    if (ampm.toUpperCase() === 'AM' && h === 12) h = 0;
+    const totalMin = h * 60 + min - 72;
+    const norm = ((totalMin % 1440) + 1440) % 1440;
+    const alotH = Math.floor(norm / 60);
+    const alotMin = norm % 60;
+    const period = alotH < 12 ? 'AM' : 'PM';
+    const display12 = alotH % 12 === 0 ? 12 : alotH % 12;
+    return {
+        ...result,
+        zmanim: {
+            ...result.zmanim,
+            alot_hashachar: `${display12}:${String(alotMin).padStart(2, '0')} ${period}`
+        }
+    };
+}
+
 function fixCandleLighting(result) {
     if (!result?.zmanim?.sunset) return result;
     const sunsetStr = result.zmanim.sunset;
@@ -76,7 +99,7 @@ export function useZmanim(location, date = new Date()) {
         const key = cacheKey(location.latitude, location.longitude, dateStr);
         const cached = getCache(key);
         if (cached) {
-            setZmanim(applyDayRules(fixCandleLighting(cached), date));
+            setZmanim(applyDayRules(fixAlotHashachar(fixCandleLighting(cached)), date));
             return;
         }
 
@@ -130,7 +153,7 @@ LOCATION INFO:
                 }
             }
         }).then(result => {
-            const fixed = fixCandleLighting(result);
+            const fixed = fixAlotHashachar(fixCandleLighting(result));
             setZmanim(applyDayRules(fixed, date));
             setCache(key, fixed);
         }).catch(() => {
