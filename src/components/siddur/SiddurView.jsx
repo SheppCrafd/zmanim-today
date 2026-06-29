@@ -33,31 +33,7 @@ function flattenNodes(nodes, keyPath = '', labelPath = '') {
     return result;
 }
 
-/* ---------------- LANGUAGE FILTER ---------------- */
-
-const isEnglishLine = (t) => {
-    if (!t) return false;
-
-    const plain = t.replace(/<[^>]*>/g, '').trim();
-    if (plain.length < 12) return false;
-
-    const hebrew = (plain.match(/[\u0590-\u05FF]/g) || []).length;
-    const latin = (plain.match(/[A-Za-z]/g) || []).length;
-
-    const words = plain.split(/\s+/).length;
-
-    const blacklist =
-        /(YHWH|Yehovah|Adonai|Eloheinu|Kudsha|Brich|Sheckintei|Mitzrayim|Tefillin)/i;
-
-    if (blacklist.test(plain)) return false;
-
-    const total = latin + hebrew + 1;
-    const latinRatio = latin / total;
-
-    return latinRatio > 0.65 && words > 6 && latin > 5;
-};
-
-/* ---------------- SECTION RENDER ---------------- */
+/* ---------------- SECTION ---------------- */
 
 function Section({ sec, data, langMode }) {
     if (!data) {
@@ -80,10 +56,9 @@ function Section({ sec, data, langMode }) {
         ? data.he
         : (data.he ? [data.he] : []);
 
-    // IMPORTANT FIX: DO NOT FILTER ENGLISH → keeps alignment
-    const enArr = Array.isArray(data.text)
-        ? data.text
-        : (data.text ? [data.text] : []);
+    const enArr = Array.isArray(data.en)
+        ? data.en
+        : (data.en ? [data.en] : []);
 
     const showEN = langMode !== 'he';
     const showHB = langMode !== 'en';
@@ -104,7 +79,7 @@ function Section({ sec, data, langMode }) {
                 {Array.from({ length: maxLen }).map((_, i) => (
                     <div key={i} className="space-y-2">
 
-                        {/* Hebrew FIRST */}
+                        {/* Hebrew first */}
                         {showHB && heArr[i] && (
                             <p
                                 className="text-right text-lg leading-loose text-slate-800 dark:text-slate-100 font-serif"
@@ -113,7 +88,7 @@ function Section({ sec, data, langMode }) {
                             />
                         )}
 
-                        {/* English BELOW */}
+                        {/* English below */}
                         {showEN && enArr[i] && (
                             <p
                                 className="text-left text-sm leading-relaxed text-slate-500 dark:text-slate-400"
@@ -128,7 +103,7 @@ function Section({ sec, data, langMode }) {
     );
 }
 
-/* ---------------- MAIN APP ---------------- */
+/* ---------------- MAIN ---------------- */
 
 export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
     const [sections, setSections] = useState([]);
@@ -163,7 +138,7 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
             });
     }, [bookRef]);
 
-    /* ---------------- CLICK SECTION (FETCH ONLY THAT ONE) ---------------- */
+    /* ---------------- CLICK SECTION ---------------- */
 
     const openSection = async (sec) => {
         setPage('reader');
@@ -173,7 +148,7 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
 
         try {
             const res = await fetch(
-                `https://www.sefaria.org/api/texts/${ref}?lang=he&lang2=en`
+                `https://www.sefaria.org/api/texts/${encodeURIComponent(sec.ref)}?lang=he&lang2=en`
             );
 
             const data = await res.json();
