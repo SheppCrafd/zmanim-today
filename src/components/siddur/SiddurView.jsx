@@ -8,23 +8,34 @@ import {
 import { Button } from '@/components/ui/button';
 import NavMenu from '@/components/NavMenu';
 
-/* ---------------- TOC FLATTEN (REAL REFS ONLY) ---------------- */
+/* ---------------- TOC FLATTEN (SAFE) ---------------- */
 
-function flattenNodes(nodes) {
+function flattenNodes(nodes, path = []) {
     const result = [];
 
-    for (const node of nodes) {
-        if (node.nodes) {
-            result.push(...flattenNodes(node.nodes));
+    for (const node of nodes || []) {
+        const currentPath = [...path, node.title];
+
+        if (node.nodes && node.nodes.length) {
+            result.push(...flattenNodes(node.nodes, currentPath));
         } else {
             result.push({
                 label: node.title,
-                ref: node.ref // 🔥 THIS is the ONLY correct source of truth
+                path: currentPath
             });
         }
     }
 
     return result;
+}
+
+/* ---------------- BUILD SAFE SEFARIA REF ---------------- */
+
+function buildRef(path) {
+    if (!path || !path.length) return null;
+
+    // Sefaria canonical format is comma-separated
+    return path.join(', ');
 }
 
 /* ---------------- SECTION ---------------- */
@@ -54,7 +65,6 @@ function Section({ sec, data, rowRef }) {
     return (
         <div ref={rowRef} className="space-y-4 scroll-mt-24">
 
-            {/* sticky section header */}
             <div className="sticky top-0 bg-white dark:bg-slate-900 py-2 z-10 border-b">
                 <p className="font-semibold text-slate-700 dark:text-slate-100">
                     {sec.label}
@@ -98,7 +108,6 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
     const [error, setError] = useState(false);
 
     const [page, setPage] = useState('toc');
-    const [langMode, setLangMode] = useState('both');
 
     /* ---------------- LOAD TOC ---------------- */
     useEffect(() => {
@@ -108,7 +117,6 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
             .then(r => r.json())
             .then(data => {
                 const nodes = data?.schema?.nodes || [];
-
                 const flat = flattenNodes(nodes);
 
                 setSections(flat);
@@ -120,7 +128,7 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
             });
     }, [bookRef]);
 
-    /* ---------------- LOAD TEXT ---------------- */
+    /* ---------------- LOAD TEXT (SAFE FETCH) ---------------- */
     useEffect(() => {
         if (!sections.length) return;
 
@@ -128,12 +136,17 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
 
         const load = async () => {
             for (let i = 0; i < sections.length; i++) {
-                const ref = sections[i].ref; // 🔥 REAL Sefaria ref, no edits
+                const ref = buildRef(sections[i].path);
+
+                // 🚨 skip invalid refs
+                if (!ref) continue;
 
                 try {
                     const res = await fetch(
                         `https://www.sefaria.org/api/texts/${encodeURIComponent(ref)}?lang=he,en&context=0`
                     );
+
+                    if (!res.ok) throw new Error("bad ref");
 
                     const data = await res.json();
 
@@ -143,6 +156,7 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
                             [i]: data
                         }));
                     }
+
                 } catch {
                     if (!cancelled) {
                         setTextMap(prev => ({
@@ -173,10 +187,11 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
         });
     };
 
+    /* ---------------- UI ---------------- */
     return (
         <div className="h-screen flex flex-col bg-slate-50 dark:bg-slate-950 overflow-hidden">
 
-            {/* TOP BAR */}
+            {/* HEADER */}
             <div className="sticky top-0 z-50 bg-white dark:bg-slate-950 border-b">
 
                 <div className="flex items-center justify-between px-4 pt-4 pb-2">
@@ -197,36 +212,8 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
 
                 {/* CONTROLS */}
                 <div className="px-4 flex gap-2 py-2">
-                    <Button
-                        size="sm"
-                        variant={langMode === 'en' ? "default" : "outline"}
-                        onClick={() => setLangMode('en')}
-                    >
-                        EN
-                    </Button>
-
-                    <Button
-                        size="sm"
-                        variant={langMode === 'he' ? "default" : "outline"}
-                        onClick={() => setLangMode('he')}
-                    >
-                        HB
-                    </Button>
-
-                    <Button
-                        size="sm"
-                        variant={langMode === 'both' ? "default" : "outline"}
-                        onClick={() => setLangMode('both')}
-                    >
-                        BOTH
-                    </Button>
-
                     {page === 'reader' && (
-                        <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => setPage('toc')}
-                        >
+                        <Button size="sm" variant="outline" onClick={() => setPage('toc')}>
                             <ArrowLeft className="w-4 h-4 mr-1" />
                             TOC
                         </Button>
