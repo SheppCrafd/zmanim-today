@@ -33,7 +33,7 @@ function flattenNodes(nodes, keyPath = '', labelPath = '') {
     return result;
 }
 
-/* ---------------- EN FILTER (FIXED) ---------------- */
+/* ---------------- EN FILTER ---------------- */
 
 const isEnglishLine = (t) => {
     if (!t) return false;
@@ -73,7 +73,6 @@ function Section({ sec, data, rowRef, langMode }) {
 
     const heArr = Array.isArray(data.he) ? data.he : (data.he ? [data.he] : []);
     const enRaw = Array.isArray(data.text) ? data.text : (data.text ? [data.text] : []);
-
     const enArr = enRaw.filter(isEnglishLine);
 
     const showEN = langMode !== 'he';
@@ -83,7 +82,7 @@ function Section({ sec, data, rowRef, langMode }) {
 
     return (
         <div ref={rowRef} className="space-y-4 scroll-mt-24">
-            <div className="sticky top-0 bg-white dark:bg-slate-900 py-2 z-10">
+            <div className="sticky top-0 bg-white dark:bg-slate-900 py-2 z-10 border-b">
                 <p className="font-semibold text-slate-700 dark:text-slate-100">
                     {sec.label}
                 </p>
@@ -125,7 +124,7 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(false);
 
-    const [page, setPage] = useState('toc'); // toc | reader
+    const [page, setPage] = useState('toc');
     const [langMode, setLangMode] = useState('both');
 
     /* LOAD TOC */
@@ -148,7 +147,7 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
             });
     }, [bookRef]);
 
-    /* LOAD ALL TEXT (progressive, no blocking) */
+    /* LOAD TEXT */
     useEffect(() => {
         if (!sections.length) return;
 
@@ -163,30 +162,20 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
                     const data = await res.json();
 
                     if (!cancelled) {
-                        setTextMap(prev => ({
-                            ...prev,
-                            [i]: data
-                        }));
+                        setTextMap(prev => ({ ...prev, [i]: data }));
                     }
                 } catch {
                     if (!cancelled) {
-                        setTextMap(prev => ({
-                            ...prev,
-                            [i]: { error: true }
-                        }));
+                        setTextMap(prev => ({ ...prev, [i]: { error: true } }));
                     }
                 }
             }
         };
 
         loadAll();
-
-        return () => {
-            cancelled = true;
-        };
+        return () => { cancelled = true; };
     }, [sections]);
 
-    /* JUMP */
     const jumpTo = (index) => {
         setPage('reader');
 
@@ -199,10 +188,10 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
     };
 
     return (
-        <div className="min-h-screen flex flex-col bg-slate-50 dark:bg-slate-950">
+        <div className="h-screen flex flex-col bg-slate-50 dark:bg-slate-950 overflow-hidden">
 
-            {/* HEADER */}
-            <div className="px-4 pt-4 pb-2 flex items-center justify-between">
+            {/* HEADER (locked) */}
+            <div className="flex items-center justify-between px-4 pt-4 pb-2 border-b bg-white dark:bg-slate-950 z-20">
                 <div className="flex items-center gap-2">
                     <NavMenu />
                     <div>
@@ -218,83 +207,53 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
                 </a>
             </div>
 
-            {/* TOGGLES */}
-            <div className="px-4 flex gap-2 mb-2">
-                <Button
-                    size="sm"
-                    variant={langMode === 'en' ? "default" : "outline"}
-                    onClick={() => setLangMode('en')}
-                >
-                    EN
-                </Button>
-
-                <Button
-                    size="sm"
-                    variant={langMode === 'he' ? "default" : "outline"}
-                    onClick={() => setLangMode('he')}
-                >
-                    HB
-                </Button>
-
-                <Button
-                    size="sm"
-                    variant={langMode === 'both' ? "default" : "outline"}
-                    onClick={() => setLangMode('both')}
-                >
-                    BOTH
-                </Button>
+            {/* CONTROLS (locked) */}
+            <div className="px-4 flex gap-2 py-2 border-b bg-white dark:bg-slate-950 z-20">
+                <Button size="sm" variant={langMode === 'en' ? "default" : "outline"} onClick={() => setLangMode('en')}>EN</Button>
+                <Button size="sm" variant={langMode === 'he' ? "default" : "outline"} onClick={() => setLangMode('he')}>HB</Button>
+                <Button size="sm" variant={langMode === 'both' ? "default" : "outline"} onClick={() => setLangMode('both')}>BOTH</Button>
 
                 {page === 'reader' && (
-                    <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => setPage('toc')}
-                    >
+                    <Button size="sm" variant="outline" onClick={() => setPage('toc')}>
                         <ArrowLeft className="w-4 h-4 mr-1" />
                         TOC
                     </Button>
                 )}
             </div>
 
-            {/* BODY */}
-            <div className="flex flex-1 overflow-hidden">
+            {/* BODY: ONLY ONE SCROLLS AT A TIME */}
 
-                {/* TOC */}
-                {page === 'toc' && (
-                    <div className="w-full overflow-y-auto px-4">
-                        {loading && <div className="py-10">Loading…</div>}
-                        {error && <AlertCircle />}
+            {page === 'toc' && (
+                <div className="flex-1 overflow-y-auto px-4">
+                    {loading && <div className="py-10">Loading…</div>}
+                    {error && <AlertCircle />}
 
-                        {sections.map((sec, i) => (
-                            <button
-                                key={i}
-                                onClick={() => jumpTo(i)}
-                                className="w-full text-left py-3 border-b"
-                            >
-                                {sec.label}
-                            </button>
-                        ))}
-                    </div>
-                )}
+                    {sections.map((sec, i) => (
+                        <button
+                            key={i}
+                            onClick={() => jumpTo(i)}
+                            className="w-full text-left py-3 border-b"
+                        >
+                            {sec.label}
+                        </button>
+                    ))}
+                </div>
+            )}
 
-                {/* READER */}
-                {page === 'reader' && (
-                    <div className="w-full overflow-y-auto px-4 pb-10">
-                        {sections.map((sec, i) => (
-                            <Section
-                                key={i}
-                                sec={sec}
-                                data={textMap[i]}
-                                langMode={langMode}
-                                rowRef={(el) => {
-                                    rowRefs.current[i] = el;
-                                }}
-                            />
-                        ))}
-                    </div>
-                )}
+            {page === 'reader' && (
+                <div className="flex-1 overflow-y-auto px-4 pb-10">
+                    {sections.map((sec, i) => (
+                        <Section
+                            key={i}
+                            sec={sec}
+                            data={textMap[i]}
+                            langMode={langMode}
+                            rowRef={(el) => { rowRefs.current[i] = el; }}
+                        />
+                    ))}
+                </div>
+            )}
 
-            </div>
         </div>
     );
 }
