@@ -62,7 +62,6 @@ function SectionText({ he, text, showEN, showHB }) {
             {Array.from({ length: maxLen }).map((_, i) => (
                 <div key={i} className="space-y-2">
 
-                    {/* Hebrew */}
                     {showHB && heArr[i] && (
                         <p
                             className="text-right text-lg leading-loose text-slate-800 dark:text-slate-100 font-serif"
@@ -71,7 +70,6 @@ function SectionText({ he, text, showEN, showHB }) {
                         />
                     )}
 
-                    {/* English */}
                     {showEN && enArr[i] && (
                         <p
                             className="text-left text-sm leading-relaxed text-slate-500 dark:text-slate-400"
@@ -142,7 +140,6 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
     const [startIndex, setStartIndex] = useState(null);
     const [loadedSections, setLoadedSections] = useState({});
 
-    /* TOGGLES */
     const [showEN, setShowEN] = useState(true);
     const [showHB, setShowHB] = useState(true);
 
@@ -177,6 +174,7 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
             const res = await fetch(
                 `https://www.sefaria.org/api/texts/${encodeURIComponent(sec.ref)}?lang=bi`
             );
+
             const data = await res.json();
 
             setLoadedSections(prev => ({
@@ -235,7 +233,7 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
                 </Button>
             </div>
 
-            {/* MAIN */}
+            {/* MAIN CONTENT */}
             <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 pb-10">
 
                 {/* TOC */}
@@ -278,6 +276,20 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
                 )}
 
             </div>
+
+            {/* ---------------- SEFARIA CREDIT ---------------- */}
+            <div className="text-center text-xs text-slate-400 py-3 border-t border-slate-200 dark:border-slate-800">
+                Texts sourced from{' '}
+                <a
+                    href="https://www.sefaria.org"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="underline hover:text-slate-600"
+                >
+                    Sefaria.org
+                </a>
+            </div>
+
         </div>
     );
 }
