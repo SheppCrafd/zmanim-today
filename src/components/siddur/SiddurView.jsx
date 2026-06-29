@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
     ExternalLink,
     Loader2,
@@ -33,48 +33,28 @@ function flattenNodes(nodes, keyPath = '', labelPath = '') {
     return result;
 }
 
-/* ---------------- SMART ENGLISH SCORER ---------------- */
+/* ---------------- EN FILTER ---------------- */
 
-const scoreEnglish = (text) => {
-    if (!text) return 0;
+const isEnglishLine = (t) => {
+    if (!t) return false;
 
-    const s = text.replace(/<[^>]*>/g, '').trim();
-    if (s.length < 10) return 0;
+    const plain = t.replace(/<[^>]*>/g, '').trim();
+    if (plain.length < 2) return false;
 
-    let score = 0;
+    const latin = plain.match(/[A-Za-z]/g) || [];
+    const hebrew = plain.match(/[\u0590-\u05FF]/g) || [];
 
-    // must have latin letters
-    if (/[A-Za-z]/.test(s)) score += 2;
+    const total = latin.length + hebrew.length;
+    if (total === 0) return false;
 
-    // penalty for other scripts
-    if (/[\u0590-\u05FF]/.test(s)) score -= 5; // Hebrew
-    if (/[\u0400-\u04FF]/.test(s)) score -= 4; // Cyrillic
-    if (/[\u0600-\u06FF]/.test(s)) score -= 4; // Arabic
-    if (/[\u3040-\u30FF\u4E00-\u9FFF]/.test(s)) score -= 4; // JP/Chinese
+    const latinRatio = latin.length / total;
 
-    // sentence structure boost
-    const words = s.split(/\s+/).length;
-    if (words >= 6) score += 2;
-    if (words >= 12) score += 1;
-
-    // English grammar hints
-    if (/(is|are|was|were|the|and|of|to|in|for|that)/i.test(s)) {
-        score += 2;
-    }
-
-    // penalize obvious romance-language markers (NOT strict blacklist)
-    if (/(Após|Abertura|oração|Salmos|costume|para|em|de|da|do)/i.test(s)) {
-        score -= 2;
-    }
-
-    return score;
+    return latin.length > 5 && latinRatio > 0.75;
 };
-
-const isGoodEnglish = (text) => scoreEnglish(text) >= 3;
 
 /* ---------------- SECTION ---------------- */
 
-function Section({ sec, data, langMode }) {
+function Section({ sec, data, rowRef, langMode }) {
     if (!data) {
         return (
             <div className="py-10 flex justify-center">
@@ -91,18 +71,9 @@ function Section({ sec, data, langMode }) {
         );
     }
 
-    const heArr = Array.isArray(data.he)
-        ? data.he
-        : (data.he ? [data.he] : []);
-
-    const rawEn =
-        data.en ||
-        data.text ||
-        [];
-
-    const enArr = (Array.isArray(rawEn) ? rawEn : [rawEn])
-        .filter(Boolean)
-        .filter(isGoodEnglish);
+    const heArr = Array.isArray(data.he) ? data.he : (data.he ? [data.he] : []);
+    const enRaw = Array.isArray(data.text) ? data.text : (data.text ? [data.text] : []);
+    const enArr = enRaw.filter(isEnglishLine);
 
     const showEN = langMode !== 'he';
     const showHB = langMode !== 'en';
@@ -110,12 +81,10 @@ function Section({ sec, data, langMode }) {
     const maxLen = Math.max(heArr.length, enArr.length);
 
     return (
-        <div className="space-y-4 scroll-mt-24">
-
-            {/* header */}
+        <div ref={rowRef} className="space-y-4 scroll-mt-24">
             <div className="sticky top-0 bg-white dark:bg-slate-900 py-2 z-10 border-b">
                 <p className="font-semibold text-slate-700 dark:text-slate-100">
-                    {sec?.label}
+                    {sec.label}
                 </p>
             </div>
 
@@ -123,7 +92,6 @@ function Section({ sec, data, langMode }) {
                 {Array.from({ length: maxLen }).map((_, i) => (
                     <div key={i} className="space-y-2">
 
-                        {/* Hebrew */}
                         {showHB && heArr[i] && (
                             <p
                                 className="text-right text-lg leading-loose text-slate-800 dark:text-slate-100 font-serif"
@@ -132,7 +100,6 @@ function Section({ sec, data, langMode }) {
                             />
                         )}
 
-                        {/* English BELOW */}
                         {showEN && enArr[i] && (
                             <p
                                 className="text-left text-sm leading-relaxed text-slate-500 dark:text-slate-400"
@@ -150,21 +117,19 @@ function Section({ sec, data, langMode }) {
 /* ---------------- MAIN ---------------- */
 
 export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
+    const rowRefs = useRef({});
+
     const [sections, setSections] = useState([]);
-    const [loadingTOC, setLoadingTOC] = useState(true);
+    const [textMap, setTextMap] = useState({});
+    const [loading, setLoading] = useState(true);
     const [error, setError] = useState(false);
 
-    const [page, setPage] = useState('toc');
+    const [page, setPage] = useState('toc'); // toc | reader
     const [langMode, setLangMode] = useState('both');
 
-    const [activeSection, setActiveSection] = useState(null);
-    const [activeData, setActiveData] = useState(null);
-    const [loadingText, setLoadingText] = useState(false);
-
-    /* ---------------- LOAD TOC ---------------- */
-
+    /* LOAD TOC */
     useEffect(() => {
-        setLoadingTOC(true);
+        setLoading(true);
 
         fetch(`https://www.sefaria.org/api/index/${bookRef}`)
             .then(r => r.json())
@@ -174,44 +139,63 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
                 const nodes = schema?.nodes || [];
 
                 setSections(flattenNodes(nodes, rootKey));
-                setLoadingTOC(false);
+                setLoading(false);
             })
             .catch(() => {
                 setError(true);
-                setLoadingTOC(false);
+                setLoading(false);
             });
     }, [bookRef]);
 
-    /* ---------------- CLICK SECTION ---------------- */
+    /* LOAD TEXT */
+    useEffect(() => {
+        if (!sections.length) return;
 
-    const openSection = async (sec) => {
+        let cancelled = false;
+
+        const loadAll = async () => {
+            for (let i = 0; i < sections.length; i++) {
+                try {
+                    const res = await fetch(
+                        `https://www.sefaria.org/api/texts/${encodeURIComponent(sections[i].ref)}?lang=bi`
+                    );
+                    const data = await res.json();
+
+                    if (!cancelled) {
+                        setTextMap(prev => ({ ...prev, [i]: data }));
+                    }
+                } catch {
+                    if (!cancelled) {
+                        setTextMap(prev => ({ ...prev, [i]: { error: true } }));
+                    }
+                }
+            }
+        };
+
+        loadAll();
+        return () => { cancelled = true; };
+    }, [sections]);
+
+    const jumpTo = (index) => {
         setPage('reader');
-        setActiveSection(sec);
-        setLoadingText(true);
-        setActiveData(null);
 
-        try {
-            const res = await fetch(
-                `https://www.sefaria.org/api/texts/${encodeURIComponent(sec.ref)}?context=0&pad=0&lang=bi`
-            );
-
-            const data = await res.json();
-            setActiveData(data);
-        } catch {
-            setActiveData({ error: true });
-        }
-
-        setLoadingText(false);
+        requestAnimationFrame(() => {
+            rowRefs.current[index]?.scrollIntoView({
+                behavior: 'smooth',
+                block: 'start'
+            });
+        });
     };
 
     return (
         <div className="h-screen flex flex-col bg-slate-50 dark:bg-slate-950 overflow-hidden">
 
-            {/* HEADER */}
+            {/* 🔒 SINGLE LOCKED TOP BAR (fixes overlap forever) */}
             <div className="sticky top-0 z-50 bg-white dark:bg-slate-950 border-b">
 
+                {/* TITLE + MENU */}
                 <div className="flex items-center justify-between px-4 pt-4 pb-2">
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 relative z-50">
                         <NavMenu />
                         <div>
                             <h1 className="text-lg font-bold">{title}</h1>
@@ -219,40 +203,66 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
                         </div>
                     </div>
 
-                    <a href={sefariaUrl} target="_blank">
+                    <a href={sefariaUrl} target="_blank" className="relative z-50">
                         <Button size="sm" variant="outline">
                             <ExternalLink className="w-4 h-4" />
                         </Button>
                     </a>
                 </div>
 
-                {/* controls */}
+                {/* CONTROLS */}
                 <div className="px-4 flex gap-2 py-2">
-                    <Button size="sm" variant={langMode === 'en' ? "default" : "outline"} onClick={() => setLangMode('en')}>EN</Button>
-                    <Button size="sm" variant={langMode === 'he' ? "default" : "outline"} onClick={() => setLangMode('he')}>HB</Button>
-                    <Button size="sm" variant={langMode === 'both' ? "default" : "outline"} onClick={() => setLangMode('both')}>BOTH</Button>
+                    <Button
+                        size="sm"
+                        variant={langMode === 'en' ? "default" : "outline"}
+                        onClick={() => setLangMode('en')}
+                    >
+                        EN
+                    </Button>
+
+                    <Button
+                        size="sm"
+                        variant={langMode === 'he' ? "default" : "outline"}
+                        onClick={() => setLangMode('he')}
+                    >
+                        HB
+                    </Button>
+
+                    <Button
+                        size="sm"
+                        variant={langMode === 'both' ? "default" : "outline"}
+                        onClick={() => setLangMode('both')}
+                    >
+                        BOTH
+                    </Button>
 
                     {page === 'reader' && (
-                        <Button size="sm" variant="outline" onClick={() => setPage('toc')}>
+                        <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => setPage('toc')}
+                        >
                             <ArrowLeft className="w-4 h-4 mr-1" />
                             TOC
                         </Button>
                     )}
                 </div>
+
             </div>
 
-            {/* BODY */}
+            {/* BODY (ONLY SCROLLS HERE) */}
             <div className="flex-1 overflow-hidden">
 
+                {/* TOC */}
                 {page === 'toc' && (
                     <div className="h-full overflow-y-auto px-4">
-                        {loadingTOC && <div className="py-10">Loading…</div>}
-                        {error && <AlertCircle className="text-red-500" />}
+                        {loading && <div className="py-10">Loading…</div>}
+                        {error && <AlertCircle />}
 
                         {sections.map((sec, i) => (
                             <button
                                 key={i}
-                                onClick={() => openSection(sec)}
+                                onClick={() => jumpTo(i)}
                                 className="w-full text-left py-3 border-b"
                             >
                                 {sec.label}
@@ -261,27 +271,25 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
                     </div>
                 )}
 
+                {/* READER */}
                 {page === 'reader' && (
                     <div className="h-full overflow-y-auto px-4 pb-10">
-
-                        {loadingText && (
-                            <div className="py-10 flex justify-center">
-                                <Loader2 className="animate-spin text-blue-500" />
-                            </div>
-                        )}
-
-                        {!loadingText && activeData && (
+                        {sections.map((sec, i) => (
                             <Section
-                                sec={activeSection}
-                                data={activeData}
+                                key={i}
+                                sec={sec}
+                                data={textMap[i]}
                                 langMode={langMode}
+                                rowRef={(el) => {
+                                    rowRefs.current[i] = el;
+                                }}
                             />
-                        )}
-
+                        ))}
                     </div>
                 )}
 
             </div>
+
         </div>
     );
 }
