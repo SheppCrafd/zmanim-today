@@ -52,26 +52,7 @@ const isEnglishLine = (t) => {
     return latin.length > 5 && latinRatio > 0.75;
 };
 
-const fetchSection = async (i) => {
-    if (textMap[i]) return;
 
-    try {
-        const res = await fetch(
-            `https://www.sefaria.org/api/texts/${encodeURIComponent(sections[i].ref)}?lang=bi`
-        );
-        const data = await res.json();
-
-        setTextMap(prev => ({
-            ...prev,
-            [i]: data
-        }));
-    } catch {
-        setTextMap(prev => ({
-            ...prev,
-            [i]: { error: true }
-        }));
-    }
-};
 
 
 /* ---------------- SECTION ---------------- */
@@ -151,6 +132,19 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
 
     const [openingSection, setOpeningSection] = useState(false);
     const [pendingIndex, setPendingIndex] = useState(null);
+
+    const fetchSection = async (i) => {
+        if (textMap[i] || !sections[i]) return;
+        try {
+            const res = await fetch(
+                `https://www.sefaria.org/api/texts/${encodeURIComponent(sections[i].ref)}?lang=bi`
+            );
+            const data = await res.json();
+            setTextMap(prev => ({ ...prev, [i]: data }));
+        } catch {
+            setTextMap(prev => ({ ...prev, [i]: { error: true } }));
+        }
+    };
 
     /* LOAD TOC */
     useEffect(() => {
@@ -255,7 +249,7 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
         );
 
         Object.entries(rowRefs.current).forEach(([i, el]) => {
-            if (el) {
+            if (el && el instanceof Element) {
                 el.dataset.index = i;
                 observer.observe(el);
             }
