@@ -35,21 +35,30 @@ function flattenNodes(nodes, keyPath = '', labelPath = '') {
 
 /* ---------------- EN FILTER (FIXED) ---------------- */
 
-const isEnglishLine = (t) => {
+const isCleanEnglishLine = (t) => {
     if (!t) return false;
 
     const plain = t.replace(/<[^>]*>/g, '').trim();
-    if (plain.length < 2) return false;
+    if (plain.length < 3) return false;
 
-    const latin = plain.match(/[A-Za-z]/g) || [];
-    const hebrew = plain.match(/[\u0590-\u05FF]/g) || [];
+    // reject obvious Hebrew
+    if (/[\u0590-\u05FF]/.test(plain)) return false;
 
-    const total = latin.length + hebrew.length;
-    if (total === 0) return false;
+    // reject super short fragments
+    if (plain.length < 20) return false;
 
-    const latinRatio = latin.length / total;
+    // reject obvious non-English diacritics-heavy text (Portuguese/Spanish often triggers this)
+    const diacritics = (plain.match(/[áàâãéèêíïóôõöúüçñ]/gi) || []).length;
+    const letters = (plain.match(/[a-zA-Z]/g) || []).length;
 
-    return latin.length > 5 && latinRatio > 0.75;
+    if (letters === 0) return false;
+
+    const diacriticRatio = diacritics / letters;
+
+    // if too many accented letters → likely not English
+    if (diacriticRatio > 0.08) return false;
+
+    return true;
 };
 
 /* ---------------- SECTION ---------------- */
