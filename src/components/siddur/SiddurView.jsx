@@ -3,17 +3,18 @@ import { Loader2, ArrowLeft, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import NavMenu from '@/components/NavMenu';
 
+/* ---------------- LOCK SCROLL ---------------- */
 if (typeof document !== 'undefined') {
     document.documentElement.style.height = '100%';
     document.body.style.height = '100%';
     document.body.style.overflow = 'hidden';
 }
 
-/* ---------------- FLATTEN ---------------- */
+/* ---------------- FLATTEN TOC ---------------- */
 function flattenNodes(nodes, keyPath = '') {
     const out = [];
 
-    for (const n of nodes) {
+    for (const n of nodes || []) {
         const key = n.key || n.title;
         const full = keyPath ? `${keyPath}, ${key}` : key;
 
@@ -31,24 +32,47 @@ function flattenNodes(nodes, keyPath = '') {
     return out;
 }
 
-/* ---------------- TEXT ---------------- */
-function SectionText({ he, text }) {
-    const heArr = Array.isArray(he) ? he : he ? [he] : [];
-    const enArr = Array.isArray(text) ? text : text ? [text] : [];
+/* ---------------- NORMALIZE SEFARIA RESPONSE ---------------- */
+function normalizeText(data) {
+    let he = data?.he || [];
+    let en = data?.text || data?.en || data?.english || [];
 
-    const max = Math.max(heArr.length, enArr.length);
+    // Sometimes Sefaria returns nested strings instead of arrays
+    if (!Array.isArray(he)) he = he ? [he] : [];
+    if (!Array.isArray(en)) en = en ? [en] : [];
+
+    return { he, en };
+}
+
+/* ---------------- TEXT RENDER ---------------- */
+function SectionText({ he, en }) {
+    const max = Math.max(he.length, en.length);
+
+    if (!max) {
+        return (
+            <p className="text-sm text-slate-400 italic">
+                No text available.
+            </p>
+        );
+    }
 
     return (
         <div className="space-y-6">
             {Array.from({ length: max }).map((_, i) => (
                 <div key={i} className="space-y-2">
-                    {heArr[i] && (
-                        <p dir="rtl" className="text-right text-lg font-serif"
-                            dangerouslySetInnerHTML={{ __html: heArr[i] }} />
+                    {he[i] && (
+                        <p
+                            dir="rtl"
+                            className="text-right text-lg font-serif leading-relaxed"
+                            dangerouslySetInnerHTML={{ __html: he[i] }}
+                        />
                     )}
-                    {enArr[i] && (
-                        <p className="text-sm text-slate-500"
-                            dangerouslySetInnerHTML={{ __html: enArr[i] }} />
+
+                    {en[i] && (
+                        <p
+                            className="text-sm text-slate-500 leading-relaxed"
+                            dangerouslySetInnerHTML={{ __html: en[i] }}
+                        />
                     )}
                 </div>
             ))}
@@ -78,20 +102,31 @@ export default function SiddurView({ title, subtitle, bookRef }) {
             });
     }, [bookRef]);
 
-    /* ---------------- LOAD SINGLE SECTION ---------------- */
+    /* ---------------- SAFE LOAD (FIXED FOR SHEMA / AMIDAH) ---------------- */
     const load = async (i) => {
         if (loaded[i] || !sections[i]) return;
 
-        const res = await fetch(
-            `https://www.sefaria.org/api/texts/${encodeURIComponent(sections[i].ref)}`
-        );
+        try {
+            const res = await fetch(
+                `https://www.sefaria.org/api/texts/${encodeURIComponent(sections[i].ref)}?lang=he&lang2=en`
+            );
 
-        const data = await res.json();
+            const data = await res.json();
+            const { he, en } = normalizeText(data);
 
-        setLoaded(prev => ({ ...prev, [i]: data }));
+            setLoaded(prev => ({
+                ...prev,
+                [i]: { he, en }
+            }));
+        } catch {
+            setLoaded(prev => ({
+                ...prev,
+                [i]: { he: [], en: [] }
+            }));
+        }
     };
 
-    /* ---------------- OPEN ---------------- */
+    /* ---------------- OPEN SECTION ---------------- */
     const openAt = async (i) => {
         setStartIndex(i);
         setActiveIndex(i);
@@ -101,7 +136,7 @@ export default function SiddurView({ title, subtitle, bookRef }) {
         }
     };
 
-    /* ---------------- OBSERVER ---------------- */
+    /* ---------------- OBSERVER (ONLY TRACK ACTIVE) ---------------- */
     useEffect(() => {
         if (startIndex === null) return;
 
@@ -132,6 +167,12 @@ export default function SiddurView({ title, subtitle, bookRef }) {
         return () => observer.disconnect();
     }, [startIndex, sections]);
 
+    /* ---------------- RENDER WINDOW ---------------- */
+    const start = Math.max(0, activeIndex - WINDOW);
+    const end = Math.min(sections.length - 1, activeIndex + WINDOW);
+
+    const visible = sections.slice(start, end + 1);
+
     return (
         <div className="h-screen flex flex-col overflow-hidden bg-slate-50 dark:bg-slate-950">
 
@@ -148,7 +189,7 @@ export default function SiddurView({ title, subtitle, bookRef }) {
                 </Button>
             </div>
 
-            {/* SCROLL CONTAINER (IMPORTANT: FULL LIST RENDERED) */}
+            {/* SCROLL CONTAINER */}
             <div
                 ref={containerRef}
                 className="flex-1 overflow-y-auto mx-4 mb-4 bg-white dark:bg-slate-900 rounded-xl"
@@ -170,19 +211,18 @@ export default function SiddurView({ title, subtitle, bookRef }) {
                     </div>
                 )}
 
-                {/* READER (FULL HEIGHT RESTORED) */}
+                {/* READER */}
                 {startIndex !== null && (
                     <div className="p-4 space-y-12">
 
-                        {sections.map((sec, i) => {
-                            const data = loaded[i];
-
-                            if (!data) load(i);
+                        {visible.map((sec, idx) => {
+                            const real = start + idx;
+                            const data = loaded[real];
 
                             return (
                                 <div
-                                    key={i}
-                                    data-index={i}
+                                    key={real}
+                                    data-index={real}
                                     className="space-y-3"
                                 >
                                     <div className="sticky top-0 bg-white dark:bg-slate-900 py-2 font-semibold">
@@ -190,9 +230,11 @@ export default function SiddurView({ title, subtitle, bookRef }) {
                                     </div>
 
                                     {data ? (
-                                        <SectionText he={data.he} text={data.text} />
+                                        <SectionText he={data.he} en={data.en} />
                                     ) : (
-                                        <Loader2 className="animate-spin" />
+                                        <div className="flex justify-center py-6">
+                                            <Loader2 className="animate-spin" />
+                                        </div>
                                     )}
                                 </div>
                             );
