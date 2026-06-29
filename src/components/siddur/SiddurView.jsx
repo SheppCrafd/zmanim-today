@@ -83,16 +83,50 @@ function SectionText({ he, text, showEN, showHB }) {
 
 /* ---------------- ROW ---------------- */
 
-function SectionRow({ sec, index, loadedSections, loadSection, showEN, showHB }) {
+function SectionRow({
+    sec,
+    index,
+    loadedSections,
+    loadSection,
+    showEN,
+    showHB,
+    scrollRef,
+    onVisible
+}) {
+    const rowRef = useRef(null);
+
     useEffect(() => {
         loadSection(index);
     }, [index]);
+
+    useEffect(() => {
+        const el = rowRef.current;
+        const root = scrollRef?.current;
+
+        if (!el || !root) return;
+
+        const observer = new IntersectionObserver(
+            ([entry]) => {
+                if (entry.isIntersecting) {
+                    onVisible(index);
+                }
+            },
+            {
+                root,
+                threshold: 0.25
+            }
+        );
+
+        observer.observe(el);
+
+        return () => observer.disconnect();
+    }, [index, onVisible, scrollRef]);
 
     const data = loadedSections[index];
 
     if (!data) {
         return (
-            <div className="py-10 flex justify-center">
+            <div ref={rowRef} className="py-10 flex justify-center">
                 <Loader2 className="animate-spin text-blue-500" />
             </div>
         );
@@ -100,14 +134,18 @@ function SectionRow({ sec, index, loadedSections, loadSection, showEN, showHB })
 
     if (data.error) {
         return (
-            <div className="text-center text-sm text-red-500">
+            <div ref={rowRef} className="text-center text-sm text-red-500">
                 Failed to load section
             </div>
         );
     }
 
     return (
-        <div className="space-y-4 scroll-mt-20">
+        <div
+            ref={rowRef}
+            id={`section-${index}`}
+            className="space-y-4 scroll-mt-20"
+        >
             <div className="sticky top-0 bg-white dark:bg-slate-900 py-2 z-10">
                 <p className="font-semibold text-slate-700 dark:text-slate-100">
                     {sec.label}
@@ -134,6 +172,7 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
     const [error, setError] = useState(false);
 
     const [startIndex, setStartIndex] = useState(null);
+    const [currentIndex, setCurrentIndex] = useState(null);
     const [loadedSections, setLoadedSections] = useState({});
 
     const [showEN, setShowEN] = useState(true);
@@ -185,21 +224,30 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
         }
     };
 
-    /* ✅ FIXED: TOC CLICK */
-    const openAt = async (index) => {
+    /* TOC CLICK */
+    const openAt = (index) => {
         setStartIndex(index);
+        setCurrentIndex(index);
 
-        // reset scroll immediately
         requestAnimationFrame(() => {
             if (scrollRef.current) {
                 scrollRef.current.scrollTop = 0;
             }
         });
 
-        // preload current + next
-        await loadSection(index);
-        loadSection(index + 1);
+        for (
+            let i = Math.max(0, index - 2);
+            i <= Math.min(sections.length - 1, index + 4);
+            i++
+        ) {
+            loadSection(i);
+        }
     };
+
+    const center = currentIndex ?? startIndex ?? 0;
+
+    const firstSection = Math.max(0, center - 2);
+    const lastSection = Math.min(sections.length, center + 3);
 
     const sectionUrl =
         startIndex !== null
@@ -272,21 +320,51 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
                 {/* READER */}
                 {startIndex !== null && (
                     <div className="space-y-10">
-                        {sections.slice(startIndex, startIndex + 20).map((sec, i) => {
-                            const idx = startIndex + i;
+                        {sections
+                            .slice(firstSection, lastSection)
+                            .map((sec, i) => {
+                                const idx = firstSection + i;
 
-                            return (
-                                <SectionRow
-                                    key={idx}
-                                    sec={sec}
-                                    index={idx}
-                                    loadedSections={loadedSections}
-                                    loadSection={loadSection}
-                                    showEN={showEN}
-                                    showHB={showHB}
-                                />
-                            );
-                        })}
+                                return (
+                                    <SectionRow
+                                        key={idx}
+                                        sec={sec}
+                                        index={idx}
+                                        loadedSections={loadedSections}
+                                        loadSection={loadSection}
+                                        showEN={showEN}
+                                        showHB={showHB}
+                                        scrollRef={scrollRef}
+                                        onVisible={(i) => {
+                                            if (i === currentIndex) return;
+
+                                            setCurrentIndex(i);
+
+                                            for (
+                                                let j = Math.max(0, i - 2);
+                                                j <= Math.min(sections.length - 1, i + 4);
+                                                j++
+                                            ) {
+                                                loadSection(j);
+                                            }
+
+                                            setLoadedSections(prev => {
+                                                const next = {};
+
+                                                for (
+                                                    let j = Math.max(0, i - 4);
+                                                    j <= Math.min(sections.length - 1, i + 6);
+                                                    j++
+                                                ) {
+                                                    if (prev[j]) next[j] = prev[j];
+                                                }
+
+                                                return next;
+                                            });
+                                        }}
+                                    />
+                                );
+                            })}
                     </div>
                 )}
 
