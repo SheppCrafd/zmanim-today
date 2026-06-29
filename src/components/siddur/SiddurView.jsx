@@ -52,9 +52,6 @@ const isEnglishLine = (t) => {
     return latin.length > 5 && latinRatio > 0.75;
 };
 
-
-
-
 /* ---------------- SECTION ---------------- */
 
 function Section({ sec, data, rowRef, langMode }) {
@@ -127,15 +124,21 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(false);
 
-    const [page, setPage] = useState('toc'); // toc | reader
+    const [page, setPage] = useState('toc');
     const [langMode, setLangMode] = useState('both');
 
-    const [openingSection, setOpeningSection] = useState(false);
-    const [pendingIndex, setPendingIndex] = useState(null);
+    const [currentIndex, setCurrentIndex] = useState(null);
+
+    const loadedSetRef = useRef(new Set());
+
+    /* ---------------- FETCH SECTION ---------------- */
 
     const fetchSection = async (i) => {
         const sec = sections[i];
-        if (!sec || textMap[i]) return;
+        if (!sec) return;
+
+        if (loadedSetRef.current.has(i)) return;
+        loadedSetRef.current.add(i);
 
         try {
             const res = await fetch(
@@ -155,7 +158,15 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
         }
     };
 
-    /* LOAD TOC */
+    /* ---------------- WINDOW ---------------- */
+
+    const inWindow = (i) => {
+        if (currentIndex == null) return false;
+        return i >= currentIndex - 2 && i <= currentIndex + 2;
+    };
+
+    /* ---------------- LOAD TOC ---------------- */
+
     useEffect(() => {
         setLoading(true);
 
@@ -175,85 +186,88 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
             });
     }, [bookRef]);
 
-    /* LOAD TEXT */
-    useEffect(() => {
-        // DO NOTHING — we now lazy load via scroll + click
-    }, [sections]);
+    /* ---------------- SCROLL TRACKER ---------------- */
 
     useEffect(() => {
-        if (pendingIndex == null) return;
-
-        // if not loaded yet → fetch it
-        if (!textMap[pendingIndex]) {
-            fetchSection(pendingIndex);
-            return;
-        }
-
-        clearTimeout(rowRefs.current.loaderTimer);
-
-        setOpeningSection(false);
-        setPage('reader');
-
-        requestAnimationFrame(() => {
-            rowRefs.current[pendingIndex]?.scrollIntoView({
-                behavior: 'smooth',
-                block: 'start'
-            });
-        });
-
-        setPendingIndex(null);
-    }, [pendingIndex, textMap]);
-
-        useEffect(() => {
         if (page !== 'reader') return;
 
         const observer = new IntersectionObserver(
             (entries) => {
+                let bestIndex = null;
+                let bestRatio = 0;
+
                 entries.forEach((entry) => {
                     if (!entry.isIntersecting) return;
 
                     const index = Number(entry.target.dataset.index);
-                    if (!isNaN(index)) {
-                        fetchSection(index);
+                    if (isNaN(index)) return;
+
+                    if (entry.intersectionRatio > bestRatio) {
+                        bestRatio = entry.intersectionRatio;
+                        bestIndex = index;
                     }
                 });
+
+                if (bestIndex != null) {
+                    setCurrentIndex(bestIndex);
+                }
             },
             {
-                root: null,
-                rootMargin: '200px',
-                threshold: 0.1
+                rootMargin: '150px',
+                threshold: [0.25, 0.5, 0.75]
             }
         );
 
-        Object.entries(rowRefs.current).forEach(([i, el]) => {
-            if (el && el instanceof Element) {
-                el.dataset.index = i;
-                observer.observe(el);
-            }
-        });
+        const timer = setTimeout(() => {
+            Object.entries(rowRefs.current).forEach(([i, el]) => {
+                if (el instanceof Element) {
+                    el.dataset.index = i;
+                    observer.observe(el);
+                }
+            });
+        }, 100);
 
-        return () => observer.disconnect();
+        return () => {
+            clearTimeout(timer);
+            observer.disconnect();
+        };
     }, [page, sections]);
 
+    /* ---------------- WINDOW FETCH ---------------- */
+
+    useEffect(() => {
+        if (currentIndex == null) return;
+
+        for (let i = currentIndex - 2; i <= currentIndex + 2; i++) {
+            if (i < 0 || i >= sections.length) continue;
+            fetchSection(i);
+        }
+    }, [currentIndex, sections]);
+
+    /* ---------------- TOC CLICK ---------------- */
+
     const jumpTo = (index) => {
-        setPendingIndex(index);
+        setPage('reader');
+        setCurrentIndex(index);
 
-        const timer = setTimeout(() => {
-            setOpeningSection(true);
-        }, 125);
-
-        rowRefs.current.loaderTimer = timer;
+        requestAnimationFrame(() => {
+            rowRefs.current[index]?.scrollIntoView({
+                behavior: 'smooth',
+                block: 'start'
+            });
+        });
     };
+
+    /* ---------------- RENDER ---------------- */
 
     return (
         <div className="h-screen flex flex-col bg-slate-50 dark:bg-slate-950 overflow-hidden">
 
-            {/* 🔒 SINGLE LOCKED TOP BAR (fixes overlap forever) */}
+            {/* TOP BAR */}
             <div className="sticky top-0 z-50 bg-white dark:bg-slate-950 border-b">
 
-                {/* TITLE + MENU */}
                 <div className="flex items-center justify-between px-4 pt-4 pb-2">
-                    <div className="flex items-center gap-2 relative z-50">
+                    <div className="flex items-center gap-2">
                         <NavMenu />
                         <div>
                             <h1 className="text-lg font-bold">{title}</h1>
@@ -261,116 +275,57 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
                         </div>
                     </div>
 
-                    <a href={sefariaUrl} target="_blank" className="relative z-50">
+                    <a href={sefariaUrl} target="_blank">
                         <Button size="sm" variant="outline">
                             <ExternalLink className="w-4 h-4" />
                         </Button>
                     </a>
                 </div>
 
-                {/* CONTROLS */}
                 <div className="px-4 flex gap-2 py-2">
-                    <Button
-                        size="sm"
-                        variant={langMode === 'en' ? "default" : "outline"}
-                        onClick={() => setLangMode('en')}
-                    >
-                        EN
-                    </Button>
-
-                    <Button
-                        size="sm"
-                        variant={langMode === 'he' ? "default" : "outline"}
-                        onClick={() => setLangMode('he')}
-                    >
-                        HB
-                    </Button>
-
-                    <Button
-                        size="sm"
-                        variant={langMode === 'both' ? "default" : "outline"}
-                        onClick={() => setLangMode('both')}
-                    >
-                        BOTH
-                    </Button>
+                    <Button size="sm" onClick={() => setLangMode('en')}>EN</Button>
+                    <Button size="sm" onClick={() => setLangMode('he')}>HB</Button>
+                    <Button size="sm" onClick={() => setLangMode('both')}>BOTH</Button>
 
                     {page === 'reader' && (
-                        <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => setPage('toc')}
-                        >
+                        <Button size="sm" onClick={() => setPage('toc')}>
                             <ArrowLeft className="w-4 h-4 mr-1" />
                             TOC
                         </Button>
                     )}
                 </div>
-
             </div>
 
-            {/* BODY (ONLY SCROLLS HERE) */}
+            {/* BODY */}
             <div className="flex-1 overflow-hidden">
 
                 {/* TOC */}
                 {page === 'toc' && (
                     <div className="h-full overflow-y-auto px-4">
+                        {loading && <div className="py-10">Loading…</div>}
+                        {error && <AlertCircle />}
 
-                        {openingSection ? (
-                            <div className="h-full flex items-center justify-center">
-                                <div className="text-center">
-                                    <Loader2 className="w-10 h-10 text-blue-600 animate-spin mx-auto mb-4" />
-
-                                    <p className="font-medium text-slate-700 dark:text-slate-200">
-                                        Loading siddur...
-                                    </p>
-
-                                    <p className="text-sm text-slate-500 mt-2">
-                                        Some prayers are pretty big and may take a few moments.
-                                    </p>
-                                </div>
-                            </div>
-                        ) : (
-                            <>
-                                {loading && <div className="py-10">Loading…</div>}
-                                {error && (
-                                    <div className="py-10 flex justify-center">
-                                        <AlertCircle className="text-red-500" />
-                                    </div>
-                                )}
-
-                                {sections.map((sec, i) => (
-                                    <button
-                                        key={i}
-                                        onClick={() => jumpTo(i)}
-                                        className="w-full text-left py-3 border-b"
-                                    >
-                                        {sec.label}
-                                    </button>
-                                ))}
-                            </>
-                        )}
-
+                        {sections.map((sec, i) => (
+                            <button
+                                key={i}
+                                onClick={() => jumpTo(i)}
+                                className="w-full text-left py-3 border-b"
+                            >
+                                {sec.label}
+                            </button>
+                        ))}
                     </div>
                 )}
 
-                {/* READER */}
+                {/* READER (WINDOWED) */}
                 {page === 'reader' && (
                     <div className="h-full overflow-y-auto px-4 pb-10">
+
                         {sections.map((sec, i) => {
-                            const data = textMap[i];
-
-                            // only show:
-                            // - current section
-                            // - OR already loaded ones
-                            // - OR the one being opened
-                            const shouldRender =
-                                data ||
-                                i === pendingIndex;
-
-                            if (!shouldRender) {
+                            if (!inWindow(i)) {
                                 return (
-                                    <div key={i} className="py-6 flex justify-center">
-                                        <Loader2 className="w-4 h-4 animate-spin text-slate-400" />
+                                    <div key={i} className="py-6 text-center text-slate-300 text-sm">
+                                        ·
                                     </div>
                                 );
                             }
@@ -379,7 +334,7 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
                                 <Section
                                     key={i}
                                     sec={sec}
-                                    data={data}
+                                    data={textMap[i]}
                                     langMode={langMode}
                                     rowRef={(el) => {
                                         if (el) rowRefs.current[i] = el;
@@ -387,11 +342,11 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
                                 />
                             );
                         })}
+
                     </div>
                 )}
 
             </div>
-
         </div>
     );
 }
