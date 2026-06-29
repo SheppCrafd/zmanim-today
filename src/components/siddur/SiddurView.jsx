@@ -2,49 +2,16 @@ import React, { useState, useEffect, useRef } from 'react';
 import {
     ExternalLink,
     Loader2,
-    AlertCircle,
-    ArrowLeft,
-    ChevronDown
+    AlertCircle
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import NavMenu from '@/components/NavMenu';
-
-/* ---------------- TOGGLE LANG MODES ---------------- */
-
-function LanguageButtons({ showEN, setShowEN, showHB, setShowHB, showTR, setShowTR }) {
-    return (
-        <div className="flex gap-2 mb-4">
-            <Button
-                size="sm"
-                variant={showEN ? "default" : "outline"}
-                onClick={() => setShowEN(v => !v)}
-            >
-                EN
-            </Button>
-
-            <Button
-                size="sm"
-                variant={showHB ? "default" : "outline"}
-                onClick={() => setShowHB(v => !v)}
-            >
-                HB
-            </Button>
-
-            <Button
-                size="sm"
-                variant={showTR ? "default" : "outline"}
-                onClick={() => setShowTR(v => !v)}
-            >
-                TR
-            </Button>
-        </div>
-    );
-}
 
 /* ---------------- TOC FLATTEN ---------------- */
 
 function flattenNodes(nodes, keyPath = '', labelPath = '') {
     const result = [];
+
     for (const node of nodes) {
         const key = node.key || node.title;
         const fullKeyPath = keyPath ? `${keyPath}, ${key}` : key;
@@ -56,44 +23,24 @@ function flattenNodes(nodes, keyPath = '', labelPath = '') {
             result.push({
                 label: node.title,
                 heLabel: node.heTitle,
-                breadcrumb: fullLabelPath,
                 ref: fullKeyPath
             });
         }
     }
+
     return result;
-}
-
-/* ---------------- TEXT DETECTION ---------------- */
-
-function looksTransliteration(text) {
-    if (!text) return false;
-
-    const latin = (text.match(/[A-Za-z]/g) || []).length;
-    const hebrew = (text.match(/[\u0590-\u05FF]/g) || []).length;
-
-    // latin-heavy + little/no Hebrew → probably transliteration
-    return latin > 5 && hebrew === 0;
 }
 
 /* ---------------- SECTION TEXT ---------------- */
 
-function SectionText({ he, text, showEN, showHB, showTR }) {
-    const heArr = Array.isArray(he) ? he : (he ? [he] : []);
-    const enRaw = Array.isArray(text) ? text : (text ? [text] : []);
+function SectionText({ he, en, tr, showHB, showEN, showTR }) {
+    const heArr = Array.isArray(he) ? he : he ? [he] : [];
+    const enArr = Array.isArray(en) ? en : en ? [en] : [];
+    const trArr = Array.isArray(tr) ? tr : tr ? [tr] : [];
 
-    const enArr = enRaw.filter(t => {
-        if (!t) return false;
-        const latin = (t.match(/[A-Za-z]/g) || []).length;
-        const hebrew = (t.match(/[\u0590-\u05FF]/g) || []).length;
+    const maxLen = Math.max(heArr.length, enArr.length, trArr.length);
 
-        // crude "English-ish" filter (not perfect but safe)
-        return latin > hebrew;
-    });
-
-    const maxLen = Math.max(heArr.length, enArr.length);
-
-    if (maxLen === 0) {
+    if (!maxLen) {
         return (
             <p className="text-slate-400 text-sm italic">
                 No text available.
@@ -102,31 +49,30 @@ function SectionText({ he, text, showEN, showHB, showTR }) {
     }
 
     return (
-        <div className="space-y-6">
+        <div className="space-y-8">
             {Array.from({ length: maxLen }).map((_, i) => (
                 <div key={i} className="space-y-2">
 
-                    {/* Hebrew */}
+                    {/* HEBREW */}
                     {showHB && heArr[i] && (
                         <p
-                            className="text-right text-lg leading-loose text-slate-800 dark:text-slate-100 font-serif"
+                            className="text-right text-lg font-serif leading-loose"
                             dir="rtl"
                             dangerouslySetInnerHTML={{ __html: heArr[i] }}
                         />
                     )}
 
-                    {/* English */}
+                    {/* ENGLISH */}
                     {showEN && enArr[i] && (
-                        <p
-                            className="text-left text-sm leading-relaxed text-slate-500 dark:text-slate-400"
-                            dangerouslySetInnerHTML={{ __html: enArr[i] }}
-                        />
+                        <p className="text-sm text-slate-600 dark:text-slate-300">
+                            {enArr[i]?.replace(/<[^>]+>/g, '')}
+                        </p>
                     )}
 
-                    {/* Transliteration */}
-                    {showTR && enArr[i] && looksTransliteration(enArr[i]) && (
-                        <p className="text-left text-sm italic text-blue-400">
-                            {enArr[i]}
+                    {/* TRANSLITERATION (FROM SEFARIA) */}
+                    {showTR && trArr[i] && (
+                        <p className="text-sm italic text-blue-500">
+                            {trArr[i]}
                         </p>
                     )}
 
@@ -138,7 +84,15 @@ function SectionText({ he, text, showEN, showHB, showTR }) {
 
 /* ---------------- ROW ---------------- */
 
-function SectionRow({ sec, index, loadedSections, loadSection, toggles }) {
+function SectionRow({
+    sec,
+    index,
+    loadedSections,
+    loadSection,
+    showHB,
+    showEN,
+    showTR
+}) {
     useEffect(() => {
         loadSection(index);
     }, [index]);
@@ -154,7 +108,11 @@ function SectionRow({ sec, index, loadedSections, loadSection, toggles }) {
     }
 
     if (data.error) {
-        return <div className="text-center text-sm text-red-500">Failed to load section</div>;
+        return (
+            <div className="text-red-500 text-sm">
+                Failed to load section
+            </div>
+        );
     }
 
     return (
@@ -167,8 +125,11 @@ function SectionRow({ sec, index, loadedSections, loadSection, toggles }) {
 
             <SectionText
                 he={data.he}
-                text={data.text}
-                {...toggles}
+                en={data.en}
+                tr={data.tr}
+                showHB={showHB}
+                showEN={showEN}
+                showTR={showTR}
             />
         </div>
     );
@@ -186,9 +147,9 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
     const [startIndex, setStartIndex] = useState(null);
     const [loadedSections, setLoadedSections] = useState({});
 
-    /* LANGUAGE TOGGLES */
-    const [showEN, setShowEN] = useState(true);
+    /* TOGGLES */
     const [showHB, setShowHB] = useState(true);
+    const [showEN, setShowEN] = useState(true);
     const [showTR, setShowTR] = useState(false);
 
     /* LOAD TOC */
@@ -198,20 +159,14 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
         fetch(`https://www.sefaria.org/api/index/${bookRef}`)
             .then(r => r.json())
             .then(data => {
-                const schema = data?.schema;
-                const rootKey = schema?.key || bookRef.replace(/_/g, ' ');
-                const nodes = schema?.nodes || [];
-
-                setSections(flattenNodes(nodes, rootKey));
+                const nodes = data?.schema?.nodes || [];
+                setSections(flattenNodes(nodes));
                 setLoading(false);
             })
-            .catch(() => {
-                setError(true);
-                setLoading(false);
-            });
+            .catch(() => setError(true));
     }, [bookRef]);
 
-    /* LOAD SECTION */
+    /* LOAD SECTION (NOW PROPER MULTI-VERSION FETCH) */
     const loadSection = async (index) => {
         if (loadedSections[index]) return;
 
@@ -219,14 +174,27 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
         if (!sec) return;
 
         try {
-            const res = await fetch(
-                `https://www.sefaria.org/api/texts/${encodeURIComponent(sec.ref)}?lang=bi`
-            );
-            const data = await res.json();
+            const base = `https://www.sefaria.org/api/texts/${encodeURIComponent(sec.ref)}`;
+
+            const [heRes, enRes, trRes] = await Promise.all([
+                fetch(`${base}?lang=he`),
+                fetch(`${base}?lang=en`),
+                fetch(`${base}?transliteration=1`)
+            ]);
+
+            const [heData, enData, trData] = await Promise.all([
+                heRes.json(),
+                enRes.json(),
+                trRes.json()
+            ]);
 
             setLoadedSections(prev => ({
                 ...prev,
-                [index]: data
+                [index]: {
+                    he: heData.he,
+                    en: enData.text,
+                    tr: trData.text
+                }
             }));
         } catch {
             setLoadedSections(prev => ({
@@ -236,52 +204,45 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
         }
     };
 
-    const sectionUrl =
-        startIndex !== null
-            ? `https://www.sefaria.org/${encodeURIComponent(sections[startIndex]?.ref)}`
-            : sefariaUrl;
+    /* ---------------- UI ---------------- */
 
     return (
         <div className="min-h-screen flex flex-col bg-slate-50 dark:bg-slate-950">
 
             {/* HEADER */}
-            <div className="px-4 pt-4 pb-2 flex items-center justify-between">
-                <div className="flex items-center gap-2">
+            <div className="p-4 flex justify-between items-center">
+                <div>
                     <NavMenu />
-                    <div>
-                        <h1 className="text-lg font-bold">{title}</h1>
-                        <p className="text-xs text-slate-500">{subtitle}</p>
-                    </div>
+                    <h1 className="font-bold">{title}</h1>
+                    <p className="text-xs text-slate-500">{subtitle}</p>
                 </div>
 
-                <div className="flex gap-2">
-                    <a href={sectionUrl} target="_blank">
-                        <Button size="sm" variant="outline">
-                            <ExternalLink className="w-4 h-4" />
-                        </Button>
-                    </a>
-                </div>
+                <a href={sefariaUrl} target="_blank">
+                    <Button variant="outline">
+                        <ExternalLink />
+                    </Button>
+                </a>
             </div>
 
-            {/* LANGUAGE TOGGLES */}
-            <div className="px-4">
-                <LanguageButtons
-                    showEN={showEN}
-                    setShowEN={setShowEN}
-                    showHB={showHB}
-                    setShowHB={setShowHB}
-                    showTR={showTR}
-                    setShowTR={setShowTR}
-                />
+            {/* TOGGLES */}
+            <div className="px-4 flex gap-2">
+                <Button size="sm" onClick={() => setShowHB(v => !v)} variant={showHB ? "default" : "outline"}>
+                    HB
+                </Button>
+                <Button size="sm" onClick={() => setShowEN(v => !v)} variant={showEN ? "default" : "outline"}>
+                    EN
+                </Button>
+                <Button size="sm" onClick={() => setShowTR(v => !v)} variant={showTR ? "default" : "outline"}>
+                    TR
+                </Button>
             </div>
 
-            {/* MAIN */}
-            <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 pb-10">
+            {/* CONTENT */}
+            <div ref={scrollRef} className="flex-1 overflow-y-auto p-4">
 
-                {/* TOC */}
-                {startIndex === null && (
-                    <div>
-                        {loading && <div className="py-10">Loading…</div>}
+                {startIndex === null ? (
+                    <>
+                        {loading && <div>Loading...</div>}
                         {error && <AlertCircle />}
 
                         {sections.map((sec, i) => (
@@ -293,27 +254,20 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
                                 {sec.label}
                             </button>
                         ))}
-                    </div>
-                )}
-
-                {/* READER */}
-                {startIndex !== null && (
-                    <div className="space-y-10">
-                        {sections.slice(startIndex, startIndex + 20).map((sec, i) => {
-                            const idx = startIndex + i;
-
-                            return (
-                                <SectionRow
-                                    key={idx}
-                                    sec={sec}
-                                    index={idx}
-                                    loadedSections={loadedSections}
-                                    loadSection={loadSection}
-                                    toggles={{ showEN, showHB, showTR }}
-                                />
-                            );
-                        })}
-                    </div>
+                    </>
+                ) : (
+                    sections.slice(startIndex, startIndex + 20).map((sec, i) => (
+                        <SectionRow
+                            key={i}
+                            sec={sec}
+                            index={startIndex + i}
+                            loadedSections={loadedSections}
+                            loadSection={loadSection}
+                            showHB={showHB}
+                            showEN={showEN}
+                            showTR={showTR}
+                        />
+                    ))
                 )}
 
             </div>
