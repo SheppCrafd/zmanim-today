@@ -7,9 +7,6 @@ import {
 import { Button } from '@/components/ui/button';
 import NavMenu from '@/components/NavMenu';
 
-/* ---------------- CONFIG ---------------- */
-const WINDOW = 10;
-
 /* ---------------- TOC FLATTEN ---------------- */
 
 function flattenNodes(nodes, keyPath = '', labelPath = '') {
@@ -84,23 +81,9 @@ function SectionText({ he, text, showEN, showHB }) {
     );
 }
 
-/* ---------------- ROW ---------------- */
+/* ---------------- SECTION ---------------- */
 
-function SectionRow({
-    sec,
-    index,
-    loadedSections,
-    loadSection,
-    showEN,
-    showHB,
-    rowRef
-}) {
-    useEffect(() => {
-        loadSection(index);
-    }, [index]);
-
-    const data = loadedSections[index];
-
+function Section({ sec, data, rowRef, showEN, showHB }) {
     if (!data) {
         return (
             <div className="py-10 flex justify-center">
@@ -118,7 +101,7 @@ function SectionRow({
     }
 
     return (
-        <div ref={rowRef} className="space-y-4 scroll-mt-20">
+        <div ref={rowRef} className="space-y-4 scroll-mt-24">
             <div className="sticky top-0 bg-white dark:bg-slate-900 py-2 z-10">
                 <p className="font-semibold text-slate-700 dark:text-slate-100">
                     {sec.label}
@@ -138,15 +121,12 @@ function SectionRow({
 /* ---------------- MAIN ---------------- */
 
 export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
-    const scrollRef = useRef(null);
     const rowRefs = useRef({});
 
     const [sections, setSections] = useState([]);
+    const [textMap, setTextMap] = useState({});
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(false);
-
-    const [startIndex, setStartIndex] = useState(null);
-    const [loadedSections, setLoadedSections] = useState({});
 
     const [showEN, setShowEN] = useState(true);
     const [showHB, setShowHB] = useState(true);
@@ -171,64 +151,42 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
             });
     }, [bookRef]);
 
-    /* LOAD SECTION */
-    const loadSection = async (index) => {
-        if (loadedSections[index]) return;
+    /* LOAD ALL TEXT ONCE */
+    useEffect(() => {
+        if (!sections.length) return;
 
-        const sec = sections[index];
-        if (!sec) return;
+        const loadAll = async () => {
+            const results = {};
 
-        try {
-            const res = await fetch(
-                `https://www.sefaria.org/api/texts/${encodeURIComponent(sec.ref)}?lang=bi`
+            await Promise.all(
+                sections.map(async (sec, i) => {
+                    try {
+                        const res = await fetch(
+                            `https://www.sefaria.org/api/texts/${encodeURIComponent(sec.ref)}?lang=bi`
+                        );
+                        const data = await res.json();
+                        results[i] = data;
+                    } catch {
+                        results[i] = { error: true };
+                    }
+                })
             );
 
-            const data = await res.json();
+            setTextMap(results);
+        };
 
-            setLoadedSections(prev => ({
-                ...prev,
-                [index]: data
-            }));
-        } catch {
-            setLoadedSections(prev => ({
-                ...prev,
-                [index]: { error: true }
-            }));
-        }
-    };
+        loadAll();
+    }, [sections]);
 
-    /* OPEN SECTION */
-    const openAt = async (index) => {
-        setStartIndex(index);
-
-        // preload window around selection (both directions)
-        for (let i = index - WINDOW; i <= index + WINDOW; i++) {
-            if (i >= 0 && i < sections.length) {
-                loadSection(i);
-            }
-        }
-
-        // wait for DOM render then scroll
-        requestAnimationFrame(() => {
-            rowRefs.current[index]?.scrollIntoView({
-                behavior: 'auto',
-                block: 'start'
-            });
+    /* TOC CLICK */
+    const jumpTo = (index) => {
+        rowRefs.current[index]?.scrollIntoView({
+            behavior: 'smooth',
+            block: 'start'
         });
     };
 
-    const baseIndex = startIndex !== null
-        ? Math.max(0, startIndex - WINDOW)
-        : 0;
-
-    const visibleSections = startIndex !== null
-        ? sections.slice(baseIndex, startIndex + WINDOW)
-        : [];
-
-    const sectionUrl =
-        startIndex !== null
-            ? `https://www.sefaria.org/${encodeURIComponent(sections[startIndex]?.ref)}`
-            : sefariaUrl;
+    const sectionUrl = sefariaUrl;
 
     return (
         <div className="min-h-screen flex flex-col bg-slate-50 dark:bg-slate-950">
@@ -269,53 +227,40 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
                 </Button>
             </div>
 
-            {/* MAIN SCROLL */}
-            <div
-                ref={scrollRef}
-                className="flex-1 overflow-y-auto px-4 pb-10"
-            >
+            {/* BODY */}
+            <div className="flex flex-1 overflow-hidden">
 
                 {/* TOC */}
-                {startIndex === null && (
-                    <div>
-                        {loading && <div className="py-10">Loading…</div>}
-                        {error && <AlertCircle />}
+                <div className="w-1/3 overflow-y-auto border-r px-2">
+                    {loading && <div className="py-10">Loading…</div>}
+                    {error && <AlertCircle />}
 
-                        {sections.map((sec, i) => (
-                            <button
-                                key={i}
-                                onClick={() => openAt(i)}
-                                className="w-full text-left py-3 border-b"
-                            >
-                                {sec.label}
-                            </button>
-                        ))}
-                    </div>
-                )}
+                    {sections.map((sec, i) => (
+                        <button
+                            key={i}
+                            onClick={() => jumpTo(i)}
+                            className="w-full text-left py-2 border-b text-sm"
+                        >
+                            {sec.label}
+                        </button>
+                    ))}
+                </div>
 
                 {/* READER */}
-                {startIndex !== null && (
-                    <div className="space-y-10">
-                        {visibleSections.map((sec, i) => {
-                            const idx = baseIndex + i;
-
-                            return (
-                                <SectionRow
-                                    key={idx}
-                                    sec={sec}
-                                    index={idx}
-                                    loadedSections={loadedSections}
-                                    loadSection={loadSection}
-                                    showEN={showEN}
-                                    showHB={showHB}
-                                    rowRef={(el) => {
-                                        rowRefs.current[idx] = el;
-                                    }}
-                                />
-                            );
-                        })}
-                    </div>
-                )}
+                <div className="flex-1 overflow-y-auto px-4 pb-10">
+                    {sections.map((sec, i) => (
+                        <Section
+                            key={i}
+                            sec={sec}
+                            data={textMap[i]}
+                            showEN={showEN}
+                            showHB={showHB}
+                            rowRef={(el) => {
+                                rowRefs.current[i] = el;
+                            }}
+                        />
+                    ))}
+                </div>
 
             </div>
         </div>
