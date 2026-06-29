@@ -86,7 +86,15 @@ function SectionText({ he, text, showEN, showHB }) {
 
 /* ---------------- ROW ---------------- */
 
-function SectionRow({ sec, index, loadedSections, loadSection, showEN, showHB }) {
+function SectionRow({
+    sec,
+    index,
+    loadedSections,
+    loadSection,
+    showEN,
+    showHB,
+    rowRef
+}) {
     useEffect(() => {
         loadSection(index);
     }, [index]);
@@ -110,7 +118,7 @@ function SectionRow({ sec, index, loadedSections, loadSection, showEN, showHB })
     }
 
     return (
-        <div className="space-y-4 scroll-mt-20">
+        <div ref={rowRef} className="space-y-4 scroll-mt-20">
             <div className="sticky top-0 bg-white dark:bg-slate-900 py-2 z-10">
                 <p className="font-semibold text-slate-700 dark:text-slate-100">
                     {sec.label}
@@ -131,6 +139,7 @@ function SectionRow({ sec, index, loadedSections, loadSection, showEN, showHB })
 
 export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
     const scrollRef = useRef(null);
+    const rowRefs = useRef({});
 
     const [sections, setSections] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -188,20 +197,24 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
         }
     };
 
-    /* TOC CLICK */
+    /* OPEN SECTION */
     const openAt = async (index) => {
         setStartIndex(index);
 
-        requestAnimationFrame(() => {
-            scrollRef.current?.scrollTo({ top: 0, behavior: 'auto' });
-        });
-
-        // preload BOTH directions
+        // preload window around selection (both directions)
         for (let i = index - WINDOW; i <= index + WINDOW; i++) {
             if (i >= 0 && i < sections.length) {
                 loadSection(i);
             }
         }
+
+        // wait for DOM render then scroll
+        requestAnimationFrame(() => {
+            rowRefs.current[index]?.scrollIntoView({
+                behavior: 'auto',
+                block: 'start'
+            });
+        });
     };
 
     const baseIndex = startIndex !== null
@@ -295,6 +308,9 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
                                     loadSection={loadSection}
                                     showEN={showEN}
                                     showHB={showHB}
+                                    rowRef={(el) => {
+                                        rowRefs.current[idx] = el;
+                                    }}
                                 />
                             );
                         })}
