@@ -127,9 +127,6 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
     const [page, setPage] = useState('toc'); // toc | reader
     const [langMode, setLangMode] = useState('both');
 
-    const [showSlowLoader, setShowSlowLoader] = useState(false);
-    const [pendingIndex, setPendingIndex] = useState(null);
-
     /* LOAD TOC */
     useEffect(() => {
         setLoading(true);
@@ -156,78 +153,38 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
 
         let cancelled = false;
 
-        const timer = setTimeout(() => {
-            if (!cancelled) {
-                setShowSlowLoader(true);
-            }
-        }, 125);
-
         const loadAll = async () => {
             for (let i = 0; i < sections.length; i++) {
                 try {
                     const res = await fetch(
-                        `https://www.sefaria.org/api/texts/${encodeURIComponent(
-                            sections[i].ref
-                        )}?lang=bi`
+                        `https://www.sefaria.org/api/texts/${encodeURIComponent(sections[i].ref)}?lang=bi`
                     );
-
                     const data = await res.json();
 
                     if (!cancelled) {
-                        setTextMap(prev => ({
-                            ...prev,
-                            [i]: data
-                        }));
+                        setTextMap(prev => ({ ...prev, [i]: data }));
                     }
                 } catch {
                     if (!cancelled) {
-                        setTextMap(prev => ({
-                            ...prev,
-                            [i]: { error: true }
-                        }));
+                        setTextMap(prev => ({ ...prev, [i]: { error: true } }));
                     }
                 }
-            }
-
-            if (!cancelled) {
-                clearTimeout(timer);
-                setShowSlowLoader(false);
             }
         };
 
         loadAll();
-
-        return () => {
-            cancelled = true;
-            clearTimeout(timer);
-        };
+        return () => { cancelled = true; };
     }, [sections]);
 
-    useEffect(() => {
-        if (pendingIndex == null) return;
-
-        if (!textMap[pendingIndex]) return;
-
-        setShowSlowLoader(false);
+    const jumpTo = (index) => {
         setPage('reader');
 
         requestAnimationFrame(() => {
-            rowRefs.current[pendingIndex]?.scrollIntoView({
+            rowRefs.current[index]?.scrollIntoView({
                 behavior: 'smooth',
                 block: 'start'
             });
         });
-
-        setPendingIndex(null);
-    }, [textMap, pendingIndex]);
-
-    const jumpTo = (index) => {
-        setPendingIndex(index);
-        setShowSlowLoader(false);
-
-        setTimeout(() => {
-            setShowSlowLoader(true);
-        }, 125);
     };
 
     return (
@@ -295,63 +252,28 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
 
             {/* BODY (ONLY SCROLLS HERE) */}
             <div className="flex-1 overflow-hidden">
+
                 {/* TOC */}
                 {page === 'toc' && (
                     <div className="h-full overflow-y-auto px-4">
+                        {loading && <div className="py-10">Loading…</div>}
+                        {error && <AlertCircle />}
 
-                        {showSlowLoader ? (
-                            <div className="h-full flex items-center justify-center">
-                                <div className="rounded-xl bg-white dark:bg-slate-900 shadow-lg border p-8 text-center">
-                                    <Loader2 className="w-10 h-10 text-blue-600 animate-spin mx-auto mb-4" />
-
-                                    <p className="font-medium text-slate-700 dark:text-slate-200">
-                                        Loading siddur...
-                                    </p>
-
-                                    <p className="text-sm text-slate-500 mt-2">
-                                        Some prayers are pretty big and may take a few moments.
-                                    </p>
-                                </div>
-                            </div>
-                        ) : (
-                            <>
-                                {loading && <div className="py-10">Loading…</div>}
-                                {error && <AlertCircle />}
-
-                                {sections.map((sec, i) => (
-                                    <button
-                                        key={i}
-                                        onClick={() => jumpTo(i)}
-                                        className="w-full text-left py-3 border-b"
-                                    >
-                                        {sec.label}
-                                    </button>
-                                ))}
-                            </>
-                        )}
-
+                        {sections.map((sec, i) => (
+                            <button
+                                key={i}
+                                onClick={() => jumpTo(i)}
+                                className="w-full text-left py-3 border-b"
+                            >
+                                {sec.label}
+                            </button>
+                        ))}
                     </div>
                 )}
+
                 {/* READER */}
                 {page === 'reader' && (
                     <div className="h-full overflow-y-auto px-4 pb-10">
-
-                        {showSlowLoader && (
-                            <div className="sticky top-4 z-40 py-4">
-                                <div className="mx-auto max-w-md rounded-xl bg-white/90 dark:bg-slate-900/90 backdrop-blur shadow-lg border">
-                                    <div className="flex flex-col items-center justify-center py-8 px-6">
-                                        <Loader2 className="w-10 h-10 text-blue-600 animate-spin mb-4" />
-                                        <p className="text-slate-700 dark:text-slate-200 font-medium">
-                                            Loading siddur...
-                                        </p>
-                                        <p className="text-sm text-slate-500 dark:text-slate-400 mt-2 text-center">
-                                            Some sections are quite large and may take a few moments.
-                                        </p>
-                                    </div>
-                                </div>
-                            </div>
-                        )}
-
                         {sections.map((sec, i) => (
                             <Section
                                 key={i}
