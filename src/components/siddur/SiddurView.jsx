@@ -56,9 +56,16 @@ function Section({ sec, data, langMode }) {
         ? data.he
         : (data.he ? [data.he] : []);
 
-    const enArr = Array.isArray(data.en)
-        ? data.en
-        : (data.en ? [data.en] : []);
+    // 🔥 FIX: Sefaria inconsistency fallback chain
+    const enRaw =
+        data.en ||
+        data.text ||
+        data.english ||
+        [];
+
+    const enArr = Array.isArray(enRaw)
+        ? enRaw
+        : (enRaw ? [enRaw] : []);
 
     const showEN = langMode !== 'he';
     const showHB = langMode !== 'en';
@@ -88,7 +95,7 @@ function Section({ sec, data, langMode }) {
                             />
                         )}
 
-                        {/* English below */}
+                        {/* English BELOW */}
                         {showEN && enArr[i] && (
                             <p
                                 className="text-left text-sm leading-relaxed text-slate-500 dark:text-slate-400"
@@ -148,7 +155,7 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
 
         try {
             const res = await fetch(
-                `https://www.sefaria.org/api/texts/${encodeURIComponent(sec.ref)}?lang=he&lang2=en`
+                `https://www.sefaria.org/api/texts/${encodeURIComponent(sec.ref)}?lang=bi`
             );
 
             const data = await res.json();
