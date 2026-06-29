@@ -52,6 +52,28 @@ const isEnglishLine = (t) => {
     return latin.length > 5 && latinRatio > 0.75;
 };
 
+const fetchSection = async (i) => {
+    if (textMap[i]) return;
+
+    try {
+        const res = await fetch(
+            `https://www.sefaria.org/api/texts/${encodeURIComponent(sections[i].ref)}?lang=bi`
+        );
+        const data = await res.json();
+
+        setTextMap(prev => ({
+            ...prev,
+            [i]: data
+        }));
+    } catch {
+        setTextMap(prev => ({
+            ...prev,
+            [i]: { error: true }
+        }));
+    }
+};
+
+
 /* ---------------- SECTION ---------------- */
 
 function Section({ sec, data, rowRef, langMode }) {
@@ -189,7 +211,12 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
 
     useEffect(() => {
         if (pendingIndex == null) return;
-        if (!textMap[pendingIndex]) return;
+
+        // if not loaded yet → fetch it
+        if (!textMap[pendingIndex]) {
+            fetchSection(pendingIndex);
+            return;
+        }
 
         clearTimeout(rowRefs.current.loaderTimer);
 
@@ -206,29 +233,45 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
         setPendingIndex(null);
     }, [pendingIndex, textMap]);
 
-    const jumpTo = (index) => {
-        clearTimeout(rowRefs.current.loaderTimer);
+        useEffect(() => {
+        if (page !== 'reader') return;
 
-        // If already loaded, open immediately
-        if (textMap[index]) {
-            setPage('reader');
+        const observer = new IntersectionObserver(
+            (entries) => {
+                entries.forEach((entry) => {
+                    if (!entry.isIntersecting) return;
 
-            requestAnimationFrame(() => {
-                rowRefs.current[index]?.scrollIntoView({
-                    behavior: 'smooth',
-                    block: 'start'
+                    const index = Number(entry.target.dataset.index);
+                    if (!isNaN(index)) {
+                        fetchSection(index);
+                    }
                 });
-            });
+            },
+            {
+                root: null,
+                rootMargin: '200px',
+                threshold: 0.1
+            }
+        );
 
-            return;
-        }
+        Object.entries(rowRefs.current).forEach(([i, el]) => {
+            if (el) {
+                el.dataset.index = i;
+                observer.observe(el);
+            }
+        });
 
-        setOpeningSection(false);
+        return () => observer.disconnect();
+    }, [page, sections]);
+
+    const jumpTo = (index) => {
         setPendingIndex(index);
 
-        rowRefs.current.loaderTimer = setTimeout(() => {
+        const timer = setTimeout(() => {
             setOpeningSection(true);
         }, 125);
+
+        rowRefs.current.loaderTimer = timer;
     };
 
     return (
@@ -349,7 +392,9 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
                                 data={textMap[i]}
                                 langMode={langMode}
                                 rowRef={(el) => {
-                                    rowRefs.current[i] = el;
+                                    if (el) {
+                                        rowRefs.current[i] = el;
+                                    }
                                 }}
                             />
                         ))}
