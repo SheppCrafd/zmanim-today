@@ -1,10 +1,48 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { ExternalLink, Loader2, AlertCircle, ArrowLeft, ChevronDown } from 'lucide-react';
+import {
+    ExternalLink,
+    Loader2,
+    AlertCircle,
+    ArrowLeft,
+    ChevronDown
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { useNavigate } from 'react-router-dom';
 import NavMenu from '@/components/NavMenu';
 
-// Flatten TOC
+/* ---------------- TOGGLE LANG MODES ---------------- */
+
+function LanguageButtons({ showEN, setShowEN, showHB, setShowHB, showTR, setShowTR }) {
+    return (
+        <div className="flex gap-2 mb-4">
+            <Button
+                size="sm"
+                variant={showEN ? "default" : "outline"}
+                onClick={() => setShowEN(v => !v)}
+            >
+                EN
+            </Button>
+
+            <Button
+                size="sm"
+                variant={showHB ? "default" : "outline"}
+                onClick={() => setShowHB(v => !v)}
+            >
+                HB
+            </Button>
+
+            <Button
+                size="sm"
+                variant={showTR ? "default" : "outline"}
+                onClick={() => setShowTR(v => !v)}
+            >
+                TR
+            </Button>
+        </div>
+    );
+}
+
+/* ---------------- TOC FLATTEN ---------------- */
+
 function flattenNodes(nodes, keyPath = '', labelPath = '') {
     const result = [];
     for (const node of nodes) {
@@ -26,41 +64,81 @@ function flattenNodes(nodes, keyPath = '', labelPath = '') {
     return result;
 }
 
-// Section renderer
-function SectionText({ he, text }) {
+/* ---------------- TEXT DETECTION ---------------- */
+
+function looksTransliteration(text) {
+    if (!text) return false;
+
+    const latin = (text.match(/[A-Za-z]/g) || []).length;
+    const hebrew = (text.match(/[\u0590-\u05FF]/g) || []).length;
+
+    // latin-heavy + little/no Hebrew → probably transliteration
+    return latin > 5 && hebrew === 0;
+}
+
+/* ---------------- SECTION TEXT ---------------- */
+
+function SectionText({ he, text, showEN, showHB, showTR }) {
     const heArr = Array.isArray(he) ? he : (he ? [he] : []);
-    const enArr = Array.isArray(text) ? text : (text ? [text] : []);
+    const enRaw = Array.isArray(text) ? text : (text ? [text] : []);
+
+    const enArr = enRaw.filter(t => {
+        if (!t) return false;
+        const latin = (t.match(/[A-Za-z]/g) || []).length;
+        const hebrew = (t.match(/[\u0590-\u05FF]/g) || []).length;
+
+        // crude "English-ish" filter (not perfect but safe)
+        return latin > hebrew;
+    });
+
     const maxLen = Math.max(heArr.length, enArr.length);
 
     if (maxLen === 0) {
-        return <p className="text-slate-400 dark:text-slate-500 text-sm italic">No text available.</p>;
+        return (
+            <p className="text-slate-400 text-sm italic">
+                No text available.
+            </p>
+        );
     }
 
     return (
         <div className="space-y-6">
             {Array.from({ length: maxLen }).map((_, i) => (
                 <div key={i} className="space-y-2">
-                    {heArr[i] && (
+
+                    {/* Hebrew */}
+                    {showHB && heArr[i] && (
                         <p
                             className="text-right text-lg leading-loose text-slate-800 dark:text-slate-100 font-serif"
                             dir="rtl"
                             dangerouslySetInnerHTML={{ __html: heArr[i] }}
                         />
                     )}
-                    {enArr[i] && (
+
+                    {/* English */}
+                    {showEN && enArr[i] && (
                         <p
                             className="text-left text-sm leading-relaxed text-slate-500 dark:text-slate-400"
                             dangerouslySetInnerHTML={{ __html: enArr[i] }}
                         />
                     )}
+
+                    {/* Transliteration */}
+                    {showTR && enArr[i] && looksTransliteration(enArr[i]) && (
+                        <p className="text-left text-sm italic text-blue-400">
+                            {enArr[i]}
+                        </p>
+                    )}
+
                 </div>
             ))}
         </div>
     );
 }
 
-// Each section row — must be its own component so useEffect is a valid top-level hook
-function SectionRow({ sec, index, loadedSections, loadSection }) {
+/* ---------------- ROW ---------------- */
+
+function SectionRow({ sec, index, loadedSections, loadSection, toggles }) {
     useEffect(() => {
         loadSection(index);
     }, [index]);
@@ -82,15 +160,23 @@ function SectionRow({ sec, index, loadedSections, loadSection }) {
     return (
         <div className="space-y-4">
             <div className="sticky top-0 bg-white dark:bg-slate-900 py-2">
-                <p className="font-semibold text-slate-700 dark:text-slate-100">{sec.label}</p>
+                <p className="font-semibold text-slate-700 dark:text-slate-100">
+                    {sec.label}
+                </p>
             </div>
-            <SectionText he={data.he} text={data.text} />
+
+            <SectionText
+                he={data.he}
+                text={data.text}
+                {...toggles}
+            />
         </div>
     );
 }
 
+/* ---------------- MAIN ---------------- */
+
 export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
-    const navigate = useNavigate();
     const scrollRef = useRef(null);
 
     const [sections, setSections] = useState([]);
@@ -98,20 +184,24 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
     const [error, setError] = useState(false);
 
     const [startIndex, setStartIndex] = useState(null);
-    const [loadedSections, setLoadedSections] = useState({}); // cache by index
+    const [loadedSections, setLoadedSections] = useState({});
 
-    // Load TOC once
+    /* LANGUAGE TOGGLES */
+    const [showEN, setShowEN] = useState(true);
+    const [showHB, setShowHB] = useState(true);
+    const [showTR, setShowTR] = useState(false);
+
+    /* LOAD TOC */
     useEffect(() => {
         setLoading(true);
+
         fetch(`https://www.sefaria.org/api/index/${bookRef}`)
-            .then(r => {
-                if (!r.ok) throw new Error();
-                return r.json();
-            })
+            .then(r => r.json())
             .then(data => {
                 const schema = data?.schema;
                 const rootKey = schema?.key || bookRef.replace(/_/g, ' ');
                 const nodes = schema?.nodes || [];
+
                 setSections(flattenNodes(nodes, rootKey));
                 setLoading(false);
             })
@@ -121,7 +211,7 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
             });
     }, [bookRef]);
 
-    // Load a section lazily
+    /* LOAD SECTION */
     const loadSection = async (index) => {
         if (loadedSections[index]) return;
 
@@ -130,7 +220,7 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
 
         try {
             const res = await fetch(
-                `https://www.sefaria.org/api/texts/${encodeURIComponent(sec.ref)}`
+                `https://www.sefaria.org/api/texts/${encodeURIComponent(sec.ref)}?lang=bi`
             );
             const data = await res.json();
 
@@ -138,35 +228,11 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
                 ...prev,
                 [index]: data
             }));
-        } catch (e) {
+        } catch {
             setLoadedSections(prev => ({
                 ...prev,
                 [index]: { error: true }
             }));
-        }
-    };
-
-    // Jump into reader mode
-    const openAt = async (index) => {
-        setStartIndex(index);
-        await loadSection(index);
-        setTimeout(() => {
-            scrollRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
-        }, 50);
-    };
-
-    // preload next sections as user scrolls
-    const handleScroll = () => {
-        if (!scrollRef.current || startIndex === null) return;
-
-        const scrollTop = scrollRef.current.scrollTop;
-        const height = scrollRef.current.clientHeight;
-
-        const nearBottom = scrollTop + height > scrollRef.current.scrollHeight - 800;
-
-        if (nearBottom) {
-            const next = startIndex + Object.keys(loadedSections).length;
-            loadSection(next);
         }
     };
 
@@ -176,94 +242,66 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
             : sefariaUrl;
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-amber-50 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950 flex flex-col">
+        <div className="min-h-screen flex flex-col bg-slate-50 dark:bg-slate-950">
 
             {/* HEADER */}
-            <div className="px-4 pt-4 pb-2 shrink-0 flex items-center justify-between">
+            <div className="px-4 pt-4 pb-2 flex items-center justify-between">
                 <div className="flex items-center gap-2">
                     <NavMenu />
                     <div>
-                        <h1 className="text-lg font-bold text-slate-800 dark:text-slate-100">
-                            {title}
-                        </h1>
-                        <p className="text-xs text-slate-500 dark:text-slate-400">
-                            {subtitle}
-                        </p>
+                        <h1 className="text-lg font-bold">{title}</h1>
+                        <p className="text-xs text-slate-500">{subtitle}</p>
                     </div>
                 </div>
 
                 <div className="flex gap-2">
-                    <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setStartIndex(null)}
-                        className="text-slate-600 dark:text-slate-300"
-                    >
-                        <ArrowLeft className="w-4 h-4 mr-1" />
-                        {startIndex === null ? 'Back' : 'TOC'}
-                    </Button>
-
-                    <a href={sectionUrl} target="_blank" rel="noopener noreferrer">
-                        <Button variant="outline" size="sm">
+                    <a href={sectionUrl} target="_blank">
+                        <Button size="sm" variant="outline">
                             <ExternalLink className="w-4 h-4" />
                         </Button>
                     </a>
                 </div>
             </div>
 
-            {/* MAIN CARD (ONLY SCROLL AREA) */}
-            <div
-                ref={scrollRef}
-                onScroll={handleScroll}
-                className="flex-1 mx-4 mb-4 rounded-xl overflow-y-auto shadow-sm border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900"
-            >
+            {/* LANGUAGE TOGGLES */}
+            <div className="px-4">
+                <LanguageButtons
+                    showEN={showEN}
+                    setShowEN={setShowEN}
+                    showHB={showHB}
+                    setShowHB={setShowHB}
+                    showTR={showTR}
+                    setShowTR={setShowTR}
+                />
+            </div>
+
+            {/* MAIN */}
+            <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 pb-10">
 
                 {/* TOC */}
                 {startIndex === null && (
                     <div>
-                        {loading && (
-                            <div className="flex items-center justify-center py-20 gap-3">
-                                <Loader2 className="w-6 h-6 animate-spin text-blue-500" />
-                                Loading…
-                            </div>
-                        )}
-
-                        {error && (
-                            <div className="p-6 text-center">
-                                <AlertCircle className="mx-auto w-8 h-8 text-amber-500" />
-                                <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
-                                    Failed to load
-                                </p>
-                            </div>
-                        )}
+                        {loading && <div className="py-10">Loading…</div>}
+                        {error && <AlertCircle />}
 
                         {sections.map((sec, i) => (
                             <button
                                 key={i}
-                                onClick={() => openAt(i)}
-                                className="w-full flex justify-between px-4 py-3 border-b border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800"
+                                onClick={() => setStartIndex(i)}
+                                className="w-full text-left py-3 border-b"
                             >
-                                <div className="text-left">
-                                    <p className="text-sm font-medium text-slate-700 dark:text-slate-200">
-                                        {sec.label}
-                                    </p>
-                                    {sec.heLabel && (
-                                        <p className="text-xs text-slate-400" dir="rtl">
-                                            {sec.heLabel}
-                                        </p>
-                                    )}
-                                </div>
-                                <ChevronDown className="w-4 h-4 text-slate-400" />
+                                {sec.label}
                             </button>
                         ))}
                     </div>
                 )}
 
-                {/* READER MODE (infinite scroll stack) */}
+                {/* READER */}
                 {startIndex !== null && (
-                    <div className="p-4 space-y-10">
+                    <div className="space-y-10">
                         {sections.slice(startIndex, startIndex + 20).map((sec, i) => {
                             const idx = startIndex + i;
+
                             return (
                                 <SectionRow
                                     key={idx}
@@ -271,6 +309,7 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
                                     index={idx}
                                     loadedSections={loadedSections}
                                     loadSection={loadSection}
+                                    toggles={{ showEN, showHB, showTR }}
                                 />
                             );
                         })}
