@@ -39,24 +39,17 @@ const isCleanEnglishLine = (t) => {
     if (!t) return false;
 
     const plain = t.replace(/<[^>]*>/g, '').trim();
-    if (plain.length < 3) return false;
+    if (plain.length < 2) return false;
 
-    // reject obvious Hebrew
+    // hard reject Hebrew
     if (/[\u0590-\u05FF]/.test(plain)) return false;
 
-    // reject super short fragments
-    if (plain.length < 20) return false;
+    const letters = plain.match(/[a-zA-Z]/g) || [];
+    if (letters.length < 3) return false;
 
-    // reject obvious non-English diacritics-heavy text (Portuguese/Spanish often triggers this)
-    const diacritics = (plain.match(/[áàâãéèêíïóôõöúüçñ]/gi) || []).length;
-    const letters = (plain.match(/[a-zA-Z]/g) || []).length;
-
-    if (letters === 0) return false;
-
-    const diacriticRatio = diacritics / letters;
-
-    // if too many accented letters → likely not English
-    if (diacriticRatio > 0.08) return false;
+    // allow accented languages (DON'T over-filter!)
+    const hebrewishOrCyrillic = plain.match(/[\u0400-\u04FF]/g);
+    if (hebrewishOrCyrillic && hebrewishOrCyrillic.length > 0) return false;
 
     return true;
 };
