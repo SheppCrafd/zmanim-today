@@ -33,9 +33,28 @@ function flattenNodes(nodes, keyPath = '', labelPath = '') {
     return result;
 }
 
+/* ---------------- EN FILTER (FIXED) ---------------- */
+
+const isEnglishLine = (t) => {
+    if (!t) return false;
+
+    const plain = t.replace(/<[^>]*>/g, '').trim();
+    if (plain.length < 2) return false;
+
+    const latin = plain.match(/[A-Za-z]/g) || [];
+    const hebrew = plain.match(/[\u0590-\u05FF]/g) || [];
+
+    const total = latin.length + hebrew.length;
+    if (total === 0) return false;
+
+    const latinRatio = latin.length / total;
+
+    return latin.length > 5 && latinRatio > 0.75;
+};
+
 /* ---------------- SECTION ---------------- */
 
-function Section({ sec, data, rowRef, showEN, showHB }) {
+function Section({ sec, data, rowRef, langMode }) {
     if (!data) {
         return (
             <div className="py-10 flex justify-center">
@@ -55,12 +74,10 @@ function Section({ sec, data, rowRef, showEN, showHB }) {
     const heArr = Array.isArray(data.he) ? data.he : (data.he ? [data.he] : []);
     const enRaw = Array.isArray(data.text) ? data.text : (data.text ? [data.text] : []);
 
-    const enArr = enRaw.filter(t => {
-        if (!t) return false;
-        const latin = (t.match(/[A-Za-z]/g) || []).length;
-        const hebrew = (t.match(/[\u0590-\u05FF]/g) || []).length;
-        return latin > hebrew;
-    });
+    const enArr = enRaw.filter(isEnglishLine);
+
+    const showEN = langMode !== 'he';
+    const showHB = langMode !== 'en';
 
     const maxLen = Math.max(heArr.length, enArr.length);
 
@@ -108,9 +125,8 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(false);
 
-    const [page, setPage] = useState('toc'); // 👈 TOC or reader
-    const [showEN, setShowEN] = useState(true);
-    const [showHB, setShowHB] = useState(true);
+    const [page, setPage] = useState('toc'); // toc | reader
+    const [langMode, setLangMode] = useState('both');
 
     /* LOAD TOC */
     useEffect(() => {
@@ -132,23 +148,19 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
             });
     }, [bookRef]);
 
-    /* LOAD ALL TEXT */
+    /* LOAD ALL TEXT (progressive, no blocking) */
     useEffect(() => {
         if (!sections.length) return;
 
         let cancelled = false;
 
         const loadAll = async () => {
-            const results = {};
-
             for (let i = 0; i < sections.length; i++) {
                 try {
                     const res = await fetch(
                         `https://www.sefaria.org/api/texts/${encodeURIComponent(sections[i].ref)}?lang=bi`
                     );
                     const data = await res.json();
-
-                    results[i] = data;
 
                     if (!cancelled) {
                         setTextMap(prev => ({
@@ -208,8 +220,29 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
 
             {/* TOGGLES */}
             <div className="px-4 flex gap-2 mb-2">
-                <Button size="sm" variant={showEN ? "default" : "outline"} onClick={() => setShowEN(v => !v)}>EN</Button>
-                <Button size="sm" variant={showHB ? "default" : "outline"} onClick={() => setShowHB(v => !v)}>HB</Button>
+                <Button
+                    size="sm"
+                    variant={langMode === 'en' ? "default" : "outline"}
+                    onClick={() => setLangMode('en')}
+                >
+                    EN
+                </Button>
+
+                <Button
+                    size="sm"
+                    variant={langMode === 'he' ? "default" : "outline"}
+                    onClick={() => setLangMode('he')}
+                >
+                    HB
+                </Button>
+
+                <Button
+                    size="sm"
+                    variant={langMode === 'both' ? "default" : "outline"}
+                    onClick={() => setLangMode('both')}
+                >
+                    BOTH
+                </Button>
 
                 {page === 'reader' && (
                     <Button
@@ -223,10 +256,10 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
                 )}
             </div>
 
-            {/* PAGE CONTENT */}
+            {/* BODY */}
             <div className="flex flex-1 overflow-hidden">
 
-                {/* TOC PAGE */}
+                {/* TOC */}
                 {page === 'toc' && (
                     <div className="w-full overflow-y-auto px-4">
                         {loading && <div className="py-10">Loading…</div>}
@@ -244,7 +277,7 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
                     </div>
                 )}
 
-                {/* READER PAGE */}
+                {/* READER */}
                 {page === 'reader' && (
                     <div className="w-full overflow-y-auto px-4 pb-10">
                         {sections.map((sec, i) => (
@@ -252,8 +285,7 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
                                 key={i}
                                 sec={sec}
                                 data={textMap[i]}
-                                showEN={showEN}
-                                showHB={showHB}
+                                langMode={langMode}
                                 rowRef={(el) => {
                                     rowRefs.current[i] = el;
                                 }}
