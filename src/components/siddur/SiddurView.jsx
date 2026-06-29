@@ -40,10 +40,8 @@ function SectionText({ he, text, showEN, showHB }) {
 
     const enArr = enRaw.filter(t => {
         if (!t) return false;
-
         const latin = (t.match(/[A-Za-z]/g) || []).length;
         const hebrew = (t.match(/[\u0590-\u05FF]/g) || []).length;
-
         return latin > hebrew;
     });
 
@@ -73,9 +71,7 @@ function SectionText({ he, text, showEN, showHB }) {
                     {showEN && enArr[i] && (
                         <p
                             className="text-left text-sm leading-relaxed text-slate-500 dark:text-slate-400"
-                            dangerouslySetInnerHTML={{
-                                __html: enArr[i]?.replace(/<[^>]+>/g, '')
-                            }}
+                            dangerouslySetInnerHTML={{ __html: enArr[i] }}
                         />
                     )}
 
@@ -111,8 +107,8 @@ function SectionRow({ sec, index, loadedSections, loadSection, showEN, showHB })
     }
 
     return (
-        <div className="space-y-4">
-            <div className="sticky top-0 bg-white dark:bg-slate-900 py-2">
+        <div className="space-y-4 scroll-mt-20">
+            <div className="sticky top-0 bg-white dark:bg-slate-900 py-2 z-10">
                 <p className="font-semibold text-slate-700 dark:text-slate-100">
                     {sec.label}
                 </p>
@@ -189,6 +185,22 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
         }
     };
 
+    /* ✅ FIXED: TOC CLICK */
+    const openAt = async (index) => {
+        setStartIndex(index);
+
+        // reset scroll immediately
+        requestAnimationFrame(() => {
+            if (scrollRef.current) {
+                scrollRef.current.scrollTop = 0;
+            }
+        });
+
+        // preload current + next
+        await loadSection(index);
+        loadSection(index + 1);
+    };
+
     const sectionUrl =
         startIndex !== null
             ? `https://www.sefaria.org/${encodeURIComponent(sections[startIndex]?.ref)}`
@@ -214,7 +226,7 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
                 </a>
             </div>
 
-            {/* LANGUAGE TOGGLES */}
+            {/* TOGGLES */}
             <div className="px-4 flex gap-2 mb-2">
                 <Button
                     size="sm"
@@ -233,8 +245,11 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
                 </Button>
             </div>
 
-            {/* MAIN CONTENT */}
-            <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 pb-10">
+            {/* MAIN SCROLL */}
+            <div
+                ref={scrollRef}
+                className="flex-1 overflow-y-auto px-4 pb-10"
+            >
 
                 {/* TOC */}
                 {startIndex === null && (
@@ -245,7 +260,7 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
                         {sections.map((sec, i) => (
                             <button
                                 key={i}
-                                onClick={() => setStartIndex(i)}
+                                onClick={() => openAt(i)}
                                 className="w-full text-left py-3 border-b"
                             >
                                 {sec.label}
@@ -276,20 +291,6 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
                 )}
 
             </div>
-
-            {/* ---------------- SEFARIA CREDIT ---------------- */}
-            <div className="text-center text-xs text-slate-400 py-3 border-t border-slate-200 dark:border-slate-800">
-                Texts sourced from{' '}
-                <a
-                    href="https://www.sefaria.org"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="underline hover:text-slate-600"
-                >
-                    Sefaria.org
-                </a>
-            </div>
-
         </div>
     );
 }
