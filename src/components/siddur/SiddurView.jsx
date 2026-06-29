@@ -123,6 +123,7 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
     const [textMap, setTextMap] = useState({});
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(false);
+    const [showSlowLoader, setShowSlowLoader] = useState(false);
 
     const [page, setPage] = useState('toc'); // toc | reader
     const [langMode, setLangMode] = useState('both');
@@ -153,27 +154,51 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
 
         let cancelled = false;
 
+        const timer = setTimeout(() => {
+            if (!cancelled) {
+                setShowSlowLoader(true);
+            }
+        }, 125);
+
         const loadAll = async () => {
             for (let i = 0; i < sections.length; i++) {
                 try {
                     const res = await fetch(
-                        `https://www.sefaria.org/api/texts/${encodeURIComponent(sections[i].ref)}?lang=bi`
+                        `https://www.sefaria.org/api/texts/${encodeURIComponent(
+                            sections[i].ref
+                        )}?lang=bi`
                     );
+
                     const data = await res.json();
 
                     if (!cancelled) {
-                        setTextMap(prev => ({ ...prev, [i]: data }));
+                        setTextMap(prev => ({
+                            ...prev,
+                            [i]: data
+                        }));
                     }
                 } catch {
                     if (!cancelled) {
-                        setTextMap(prev => ({ ...prev, [i]: { error: true } }));
+                        setTextMap(prev => ({
+                            ...prev,
+                            [i]: { error: true }
+                        }));
                     }
                 }
+            }
+
+            if (!cancelled) {
+                clearTimeout(timer);
+                setShowSlowLoader(false);
             }
         };
 
         loadAll();
-        return () => { cancelled = true; };
+
+        return () => {
+            cancelled = true;
+            clearTimeout(timer);
+        };
     }, [sections]);
 
     const jumpTo = (index) => {
@@ -270,10 +295,26 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
                         ))}
                     </div>
                 )}
-
                 {/* READER */}
                 {page === 'reader' && (
                     <div className="h-full overflow-y-auto px-4 pb-10">
+
+                        {showSlowLoader && (
+                            <div className="sticky top-4 z-40 py-4">
+                                <div className="mx-auto max-w-md rounded-xl bg-white/90 dark:bg-slate-900/90 backdrop-blur shadow-lg border">
+                                    <div className="flex flex-col items-center justify-center py-8 px-6">
+                                        <Loader2 className="w-10 h-10 text-blue-600 animate-spin mb-4" />
+                                        <p className="text-slate-700 dark:text-slate-200 font-medium">
+                                            Loading siddur...
+                                        </p>
+                                        <p className="text-sm text-slate-500 dark:text-slate-400 mt-2 text-center">
+                                            Some sections are quite large and may take a few moments.
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
                         {sections.map((sec, i) => (
                             <Section
                                 key={i}
