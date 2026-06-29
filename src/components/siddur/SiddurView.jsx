@@ -1,11 +1,26 @@
 import React, { useState, useEffect, useRef } from 'react';
-import {
-    ExternalLink,
-    Loader2,
-    AlertCircle
-} from 'lucide-react';
+import { ExternalLink, Loader2, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import NavMenu from '@/components/NavMenu';
+
+/* ---------------- TRANSLITERATION FALLBACK ---------------- */
+
+function transliterateFallback(text = '') {
+    return text
+        .replace(/<[^>]+>/g, '')
+        .split('')
+        .map(ch => {
+            const map = {
+                'א':'a','ב':'b','ג':'g','ד':'d','ה':'h','ו':'v',
+                'ז':'z','ח':'ch','ט':'t','י':'y','כ':'k','ך':'k',
+                'ל':'l','מ':'m','ם':'m','נ':'n','ן':'n',
+                'ס':'s','ע':'a','פ':'p','ף':'f','צ':'ts','ץ':'ts',
+                'ק':'k','ר':'r','ש':'sh','ת':'t'
+            };
+            return map[ch] ?? ch;
+        })
+        .join('');
+}
 
 /* ---------------- TOC FLATTEN ---------------- */
 
@@ -31,12 +46,13 @@ function flattenNodes(nodes, keyPath = '', labelPath = '') {
     return result;
 }
 
-/* ---------------- SECTION TEXT ---------------- */
+/* ---------------- TEXT RENDERER ---------------- */
 
-function SectionText({ he, en, tr, showHB, showEN, showTR }) {
-    const heArr = Array.isArray(he) ? he : he ? [he] : [];
-    const enArr = Array.isArray(en) ? en : en ? [en] : [];
-    const trArr = Array.isArray(tr) ? tr : tr ? [tr] : [];
+function SectionText({ he, en, showHB, showEN, showTR }) {
+    const heArr = Array.isArray(he) ? he : [];
+    const enArr = Array.isArray(en) ? en : [];
+
+    const trArr = heArr.map(h => transliterateFallback(h));
 
     const maxLen = Math.max(heArr.length, enArr.length, trArr.length);
 
@@ -49,14 +65,14 @@ function SectionText({ he, en, tr, showHB, showEN, showTR }) {
     }
 
     return (
-        <div className="space-y-8">
+        <div className="space-y-6">
             {Array.from({ length: maxLen }).map((_, i) => (
                 <div key={i} className="space-y-2">
 
                     {/* HEBREW */}
                     {showHB && heArr[i] && (
                         <p
-                            className="text-right text-lg font-serif leading-loose"
+                            className="text-right text-lg font-serif leading-loose text-slate-900 dark:text-slate-100"
                             dir="rtl"
                             dangerouslySetInnerHTML={{ __html: heArr[i] }}
                         />
@@ -69,8 +85,8 @@ function SectionText({ he, en, tr, showHB, showEN, showTR }) {
                         </p>
                     )}
 
-                    {/* TRANSLITERATION (FROM SEFARIA) */}
-                    {showTR && trArr[i] && (
+                    {/* TRANSLITERATION */}
+                    {showTR && heArr[i] && (
                         <p className="text-sm italic text-blue-500">
                             {trArr[i]}
                         </p>
@@ -84,15 +100,7 @@ function SectionText({ he, en, tr, showHB, showEN, showTR }) {
 
 /* ---------------- ROW ---------------- */
 
-function SectionRow({
-    sec,
-    index,
-    loadedSections,
-    loadSection,
-    showHB,
-    showEN,
-    showTR
-}) {
+function SectionRow({ sec, index, loadedSections, loadSection, showHB, showEN, showTR }) {
     useEffect(() => {
         loadSection(index);
     }, [index]);
@@ -125,8 +133,7 @@ function SectionRow({
 
             <SectionText
                 he={data.he}
-                en={data.en}
-                tr={data.tr}
+                en={data.text}
                 showHB={showHB}
                 showEN={showEN}
                 showTR={showTR}
@@ -135,7 +142,7 @@ function SectionRow({
     );
 }
 
-/* ---------------- MAIN ---------------- */
+/* ---------------- MAIN COMPONENT ---------------- */
 
 export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
     const scrollRef = useRef(null);
@@ -166,7 +173,7 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
             .catch(() => setError(true));
     }, [bookRef]);
 
-    /* LOAD SECTION (NOW PROPER MULTI-VERSION FETCH) */
+    /* LOAD SECTION (SAFE SINGLE CALL) */
     const loadSection = async (index) => {
         if (loadedSections[index]) return;
 
@@ -174,26 +181,17 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
         if (!sec) return;
 
         try {
-            const base = `https://www.sefaria.org/api/texts/${encodeURIComponent(sec.ref)}`;
+            const url =
+                `https://www.sefaria.org/api/texts/${encodeURIComponent(sec.ref)}?lang=bi`;
 
-            const [heRes, enRes, trRes] = await Promise.all([
-                fetch(`${base}?lang=he`),
-                fetch(`${base}?lang=en`),
-                fetch(`${base}?transliteration=1`)
-            ]);
-
-            const [heData, enData, trData] = await Promise.all([
-                heRes.json(),
-                enRes.json(),
-                trRes.json()
-            ]);
+            const res = await fetch(url);
+            const data = await res.json();
 
             setLoadedSections(prev => ({
                 ...prev,
                 [index]: {
-                    he: heData.he,
-                    en: enData.text,
-                    tr: trData.text
+                    he: data.he || [],
+                    text: data.text || []
                 }
             }));
         } catch {
@@ -203,8 +201,6 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
             }));
         }
     };
-
-    /* ---------------- UI ---------------- */
 
     return (
         <div className="min-h-screen flex flex-col bg-slate-50 dark:bg-slate-950">
@@ -242,14 +238,23 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
 
                 {startIndex === null ? (
                     <>
-                        {loading && <div>Loading...</div>}
-                        {error && <AlertCircle />}
+                        {loading && (
+                            <div className="flex justify-center py-10">
+                                <Loader2 className="animate-spin text-blue-500" />
+                            </div>
+                        )}
+
+                        {error && (
+                            <div className="flex justify-center py-10 text-red-500">
+                                <AlertCircle />
+                            </div>
+                        )}
 
                         {sections.map((sec, i) => (
                             <button
                                 key={i}
                                 onClick={() => setStartIndex(i)}
-                                className="w-full text-left py-3 border-b"
+                                className="w-full text-left py-3 border-b border-slate-200 dark:border-slate-800"
                             >
                                 {sec.label}
                             </button>
