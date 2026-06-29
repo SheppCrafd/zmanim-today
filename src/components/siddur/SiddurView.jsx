@@ -14,37 +14,48 @@ if (typeof document !== 'undefined') {
 function flattenNodes(nodes, keyPath = '') {
     const out = [];
 
-    for (const n of nodes || []) {
-        const key = n.key || n.title;
-        const full = keyPath ? `${keyPath}, ${key}` : key;
+    function walk(node, path) {
+        const key = node.key || node.title;
+        const full = path ? `${path}, ${key}` : key;
 
-        if (n.nodes) {
-            out.push(...flattenNodes(n.nodes, full));
-        } else {
+        // REAL text node
+        if (node.nodeType === 'JaggedArrayNode') {
             out.push({
-                label: n.title,
-                heLabel: n.heTitle,
+                label: node.title,
+                heLabel: node.heTitle,
                 ref: full
             });
+            return;
+        }
+
+        // Container
+        if (node.nodes?.length) {
+            node.nodes.forEach(child => walk(child, full));
         }
     }
+
+    nodes?.forEach(node => walk(node, keyPath));
 
     return out;
 }
 
-/* ---------------- NORMALIZE SEFARIA RESPONSE ---------------- */
-function normalizeText(data) {
-    let he = data?.he || [];
-    let en = data?.text || data?.en || data?.english || [];
+/* ---------------- NORMALIZE ---------------- */
+function normalizeArray(x) {
+    if (x == null) return [];
 
-    // Sometimes Sefaria returns nested strings instead of arrays
-    if (!Array.isArray(he)) he = he ? [he] : [];
-    if (!Array.isArray(en)) en = en ? [en] : [];
+    if (Array.isArray(x)) {
+        return x.flat(Infinity).filter(
+            item =>
+                item !== '' &&
+                item !== null &&
+                item !== undefined
+        );
+    }
 
-    return { he, en };
+    return [x];
 }
 
-/* ---------------- TEXT RENDER ---------------- */
+/* ---------------- TEXT ---------------- */
 function SectionText({ he, en }) {
     const max = Math.max(he.length, en.length);
 
@@ -64,14 +75,18 @@ function SectionText({ he, en }) {
                         <p
                             dir="rtl"
                             className="text-right text-lg font-serif leading-relaxed"
-                            dangerouslySetInnerHTML={{ __html: he[i] }}
+                            dangerouslySetInnerHTML={{
+                                __html: he[i]
+                            }}
                         />
                     )}
 
                     {en[i] && (
                         <p
                             className="text-sm text-slate-500 leading-relaxed"
-                            dangerouslySetInnerHTML={{ __html: en[i] }}
+                            dangerouslySetInnerHTML={{
+                                __html: en[i]
+                            }}
                         />
                     )}
                 </div>
@@ -81,7 +96,11 @@ function SectionText({ he, en }) {
 }
 
 /* ---------------- MAIN ---------------- */
-export default function SiddurView({ title, subtitle, bookRef }) {
+export default function SiddurView({
+    title,
+    subtitle,
+    bookRef
+}) {
     const containerRef = useRef(null);
 
     const [sections, setSections] = useState([]);
@@ -97,149 +116,285 @@ export default function SiddurView({ title, subtitle, bookRef }) {
             .then(r => r.json())
             .then(data => {
                 const nodes = data?.schema?.nodes || [];
-                const root = data?.schema?.key || bookRef;
-                setSections(flattenNodes(nodes, root));
-            });
+                const root =
+                    data?.schema?.key || bookRef;
+
+                setSections(
+                    flattenNodes(nodes, root)
+                );
+            })
+            .catch(console.error);
     }, [bookRef]);
 
-    /* ---------------- SAFE LOAD (FIXED FOR SHEMA / AMIDAH) ---------------- */
-    const load = async (i) => {
-        if (loaded[i] || !sections[i]) return;
+    /* ---------------- LOAD TEXT ---------------- */
+    const load = async i => {
+        if (loaded[i]) return;
+        if (!sections[i]) return;
 
         try {
+            const ref = encodeURIComponent(
+                sections[i].ref
+            );
+
             const res = await fetch(
-                `https://www.sefaria.org/api/texts/${encodeURIComponent(sections[i].ref)}?lang=he&lang2=en`
+                `https://www.sefaria.org/api/texts/${ref}?lang=he&lang2=en`
             );
 
             const data = await res.json();
-            const { he, en } = normalizeText(data);
+
+            const he = normalizeArray(data.he);
+            const en = normalizeArray(
+                data.text ||
+                    data.en ||
+                    data.english
+            );
 
             setLoaded(prev => ({
                 ...prev,
-                [i]: { he, en }
+                [i]: {
+                    he,
+                    en
+                }
             }));
-        } catch {
+        } catch (err) {
+            console.error(err);
+
             setLoaded(prev => ({
                 ...prev,
-                [i]: { he: [], en: [] }
+                [i]: {
+                    he: [],
+                    en: []
+                }
             }));
         }
     };
 
-    /* ---------------- OPEN SECTION ---------------- */
-    const openAt = async (i) => {
+    /* ---------------- OPEN ---------------- */
+    const openAt = i => {
         setStartIndex(i);
         setActiveIndex(i);
-
-        for (let x = i - WINDOW; x <= i + WINDOW; x++) {
-            if (x >= 0 && x < sections.length) load(x);
-        }
     };
 
-    /* ---------------- OBSERVER (ONLY TRACK ACTIVE) ---------------- */
+    /* ---------------- PRELOAD WINDOW ---------------- */
+    useEffect(() => {
+        if (startIndex === null) return;
+
+        const first = Math.max(
+            0,
+            activeIndex - WINDOW
+        );
+
+        const last = Math.min(
+            sections.length - 1,
+            activeIndex + WINDOW
+        );
+
+        for (let i = first; i <= last; i++) {
+            load(i);
+        }
+    }, [
+        activeIndex,
+        sections,
+        startIndex
+    ]);
+
+    /* ---------------- WINDOW ---------------- */
+    const start = Math.max(
+        0,
+        activeIndex - WINDOW
+    );
+
+    const end = Math.min(
+        sections.length - 1,
+        activeIndex + WINDOW
+    );
+
+    const visible = sections.slice(
+        start,
+        end + 1
+    );
+
+    /* ---------------- OBSERVER ---------------- */
     useEffect(() => {
         if (startIndex === null) return;
 
         const root = containerRef.current;
+        if (!root) return;
 
-        const observer = new IntersectionObserver(
-            (entries) => {
-                for (const e of entries) {
-                    if (!e.isIntersecting) continue;
+        const observer =
+            new IntersectionObserver(
+                entries => {
+                    let best = null;
 
-                    const i = Number(e.target.dataset.index);
-                    setActiveIndex(i);
+                    for (const e of entries) {
+                        if (!e.isIntersecting)
+                            continue;
 
-                    for (let x = i - WINDOW; x <= i + WINDOW; x++) {
-                        if (x >= 0 && x < sections.length) load(x);
+                        if (
+                            !best ||
+                            e.intersectionRatio >
+                                best.intersectionRatio
+                        ) {
+                            best = e;
+                        }
                     }
+
+                    if (!best) return;
+
+                    const i = Number(
+                        best.target.dataset.index
+                    );
+
+                    setActiveIndex(i);
+                },
+                {
+                    root,
+                    threshold: [
+                        0.25,
+                        0.5,
+                        0.75
+                    ]
                 }
-            },
-            {
-                root,
-                threshold: 0.6
-            }
+            );
+
+        const nodes =
+            root.querySelectorAll(
+                '[data-index]'
+            );
+
+        nodes.forEach(node =>
+            observer.observe(node)
         );
 
-        const nodes = root?.querySelectorAll('[data-index]');
-        nodes?.forEach(n => observer.observe(n));
-
-        return () => observer.disconnect();
-    }, [startIndex, sections]);
-
-    /* ---------------- RENDER WINDOW ---------------- */
-    const start = Math.max(0, activeIndex - WINDOW);
-    const end = Math.min(sections.length - 1, activeIndex + WINDOW);
-
-    const visible = sections.slice(start, end + 1);
+        return () => {
+            observer.disconnect();
+        };
+    }, [
+        startIndex,
+        start,
+        end
+    ]);
 
     return (
         <div className="h-screen flex flex-col overflow-hidden bg-slate-50 dark:bg-slate-950">
-
             {/* HEADER */}
             <div className="px-4 pt-4 pb-2 flex justify-between">
                 <div>
                     <NavMenu />
-                    <h1 className="font-bold">{title}</h1>
-                    <p className="text-xs text-slate-500">{subtitle}</p>
+
+                    <h1 className="font-bold">
+                        {title}
+                    </h1>
+
+                    <p className="text-xs text-slate-500">
+                        {subtitle}
+                    </p>
                 </div>
 
-                <Button variant="ghost" onClick={() => setStartIndex(null)}>
+                <Button
+                    variant="ghost"
+                    onClick={() =>
+                        setStartIndex(null)
+                    }
+                >
                     <ArrowLeft />
                 </Button>
             </div>
 
-            {/* SCROLL CONTAINER */}
+            {/* SCROLL */}
             <div
                 ref={containerRef}
                 className="flex-1 overflow-y-auto mx-4 mb-4 bg-white dark:bg-slate-900 rounded-xl"
             >
-
                 {/* TOC */}
                 {startIndex === null && (
                     <div>
-                        {sections.map((s, i) => (
-                            <button
-                                key={i}
-                                onClick={() => openAt(i)}
-                                className="w-full flex justify-between p-3 border-b"
-                            >
-                                {s.label}
-                                <ChevronRight />
-                            </button>
-                        ))}
+                        {sections.map(
+                            (s, i) => (
+                                <button
+                                    key={i}
+                                    onClick={() =>
+                                        openAt(i)
+                                    }
+                                    className="w-full flex justify-between p-3 border-b"
+                                >
+                                    <div className="text-left">
+                                        <p>
+                                            {
+                                                s.label
+                                            }
+                                        </p>
+
+                                        {s.heLabel && (
+                                            <p
+                                                dir="rtl"
+                                                className="text-xs text-slate-400"
+                                            >
+                                                {
+                                                    s.heLabel
+                                                }
+                                            </p>
+                                        )}
+                                    </div>
+
+                                    <ChevronRight />
+                                </button>
+                            )
+                        )}
                     </div>
                 )}
 
                 {/* READER */}
                 {startIndex !== null && (
                     <div className="p-4 space-y-12">
+                        {visible.map(
+                            (
+                                sec,
+                                idx
+                            ) => {
+                                const real =
+                                    start +
+                                    idx;
 
-                        {visible.map((sec, idx) => {
-                            const real = start + idx;
-                            const data = loaded[real];
+                                const data =
+                                    loaded[
+                                        real
+                                    ];
 
-                            return (
-                                <div
-                                    key={real}
-                                    data-index={real}
-                                    className="space-y-3"
-                                >
-                                    <div className="sticky top-0 bg-white dark:bg-slate-900 py-2 font-semibold">
-                                        {sec.label}
-                                    </div>
-
-                                    {data ? (
-                                        <SectionText he={data.he} en={data.en} />
-                                    ) : (
-                                        <div className="flex justify-center py-6">
-                                            <Loader2 className="animate-spin" />
+                                return (
+                                    <div
+                                        key={
+                                            real
+                                        }
+                                        data-index={
+                                            real
+                                        }
+                                        className="space-y-3"
+                                    >
+                                        <div className="sticky top-0 bg-white dark:bg-slate-900 py-2 font-semibold">
+                                            {
+                                                sec.label
+                                            }
                                         </div>
-                                    )}
-                                </div>
-                            );
-                        })}
 
+                                        {data ? (
+                                            <SectionText
+                                                he={
+                                                    data.he
+                                                }
+                                                en={
+                                                    data.en
+                                                }
+                                            />
+                                        ) : (
+                                            <div className="flex justify-center py-6">
+                                                <Loader2 className="animate-spin" />
+                                            </div>
+                                        )}
+                                    </div>
+                                );
+                            }
+                        )}
                     </div>
                 )}
             </div>
