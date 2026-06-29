@@ -33,23 +33,33 @@ function flattenNodes(nodes, keyPath = '', labelPath = '') {
     return result;
 }
 
-/* ---------------- EN FILTER ---------------- */
+/* ---------------- STRONG LANGUAGE FILTER ---------------- */
 
 const isEnglishLine = (t) => {
     if (!t) return false;
 
     const plain = t.replace(/<[^>]*>/g, '').trim();
-    if (plain.length < 2) return false;
+    if (plain.length < 12) return false;
 
-    const latin = plain.match(/[A-Za-z]/g) || [];
-    const hebrew = plain.match(/[\u0590-\u05FF]/g) || [];
+    const hebrew = (plain.match(/[\u0590-\u05FF]/g) || []).length;
+    const latin = (plain.match(/[A-Za-z]/g) || []).length;
 
-    const total = latin.length + hebrew.length;
-    if (total === 0) return false;
+    const words = plain.split(/\s+/).length;
 
-    const latinRatio = latin.length / total;
+    // 🚫 hard reject obvious transliteration-heavy religious terms
+    const blacklist =
+        /(YHWH|Yehovah|Adonai|Eloheinu|Kudsha|Brich|Sheckintei|Mitzrayim|Tefillin)/i;
 
-    return latin.length > 5 && latinRatio > 0.75;
+    if (blacklist.test(plain)) return false;
+
+    const total = latin + hebrew + 1;
+    const latinRatio = latin / total;
+
+    return (
+        latinRatio > 0.65 &&
+        words > 6 &&
+        latin > 5
+    );
 };
 
 /* ---------------- SECTION ---------------- */
@@ -82,6 +92,8 @@ function Section({ sec, data, rowRef, langMode }) {
 
     return (
         <div ref={rowRef} className="space-y-4 scroll-mt-24">
+
+            {/* sticky section header */}
             <div className="sticky top-0 bg-white dark:bg-slate-900 py-2 z-10 border-b">
                 <p className="font-semibold text-slate-700 dark:text-slate-100">
                     {sec.label}
@@ -124,7 +136,7 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(false);
 
-    const [page, setPage] = useState('toc'); // toc | reader
+    const [page, setPage] = useState('toc');
     const [langMode, setLangMode] = useState('both');
 
     /* LOAD TOC */
@@ -190,13 +202,14 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
     return (
         <div className="h-screen flex flex-col bg-slate-50 dark:bg-slate-950 overflow-hidden">
 
-            {/* 🔒 SINGLE LOCKED TOP BAR (fixes overlap forever) */}
+            {/* 🔒 LOCKED TOP UI */}
             <div className="sticky top-0 z-50 bg-white dark:bg-slate-950 border-b">
 
-                {/* TITLE + MENU */}
+                {/* TITLE ROW */}
                 <div className="flex items-center justify-between px-4 pt-4 pb-2">
                     <div className="flex items-center gap-2 relative z-50">
                         <NavMenu />
+
                         <div>
                             <h1 className="text-lg font-bold">{title}</h1>
                             <p className="text-xs text-slate-500">{subtitle}</p>
@@ -212,36 +225,12 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
 
                 {/* CONTROLS */}
                 <div className="px-4 flex gap-2 py-2">
-                    <Button
-                        size="sm"
-                        variant={langMode === 'en' ? "default" : "outline"}
-                        onClick={() => setLangMode('en')}
-                    >
-                        EN
-                    </Button>
-
-                    <Button
-                        size="sm"
-                        variant={langMode === 'he' ? "default" : "outline"}
-                        onClick={() => setLangMode('he')}
-                    >
-                        HB
-                    </Button>
-
-                    <Button
-                        size="sm"
-                        variant={langMode === 'both' ? "default" : "outline"}
-                        onClick={() => setLangMode('both')}
-                    >
-                        BOTH
-                    </Button>
+                    <Button size="sm" variant={langMode === 'en' ? "default" : "outline"} onClick={() => setLangMode('en')}>EN</Button>
+                    <Button size="sm" variant={langMode === 'he' ? "default" : "outline"} onClick={() => setLangMode('he')}>HB</Button>
+                    <Button size="sm" variant={langMode === 'both' ? "default" : "outline"} onClick={() => setLangMode('both')}>BOTH</Button>
 
                     {page === 'reader' && (
-                        <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => setPage('toc')}
-                        >
+                        <Button size="sm" variant="outline" onClick={() => setPage('toc')}>
                             <ArrowLeft className="w-4 h-4 mr-1" />
                             TOC
                         </Button>
@@ -250,10 +239,9 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
 
             </div>
 
-            {/* BODY (ONLY SCROLLS HERE) */}
+            {/* BODY SCROLL AREA */}
             <div className="flex-1 overflow-hidden">
 
-                {/* TOC */}
                 {page === 'toc' && (
                     <div className="h-full overflow-y-auto px-4">
                         {loading && <div className="py-10">Loading…</div>}
@@ -271,7 +259,6 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
                     </div>
                 )}
 
-                {/* READER */}
                 {page === 'reader' && (
                     <div className="h-full overflow-y-auto px-4 pb-10">
                         {sections.map((sec, i) => (
@@ -289,7 +276,6 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
                 )}
 
             </div>
-
         </div>
     );
 }
