@@ -7,6 +7,9 @@ import {
 import { Button } from '@/components/ui/button';
 import NavMenu from '@/components/NavMenu';
 
+/* ---------------- CONFIG ---------------- */
+const WINDOW = 10;
+
 /* ---------------- TOC FLATTEN ---------------- */
 
 function flattenNodes(nodes, keyPath = '', labelPath = '') {
@@ -83,46 +86,16 @@ function SectionText({ he, text, showEN, showHB }) {
 
 /* ---------------- ROW ---------------- */
 
-function SectionRow({
-    sec,
-    index,
-    loadedSections,
-    loadSection,
-    showEN,
-    showHB,
-    onVisible
-}) {
-    const rowRef = React.useRef(null);
-
+function SectionRow({ sec, index, loadedSections, loadSection, showEN, showHB }) {
     useEffect(() => {
         loadSection(index);
     }, [index]);
-
-    useEffect(() => {
-        const el = rowRef.current;
-        if (!el) return;
-
-        const observer = new IntersectionObserver(
-            ([entry]) => {
-                if (entry.isIntersecting) {
-                    onVisible(index);
-                }
-            },
-            {
-                threshold: 0.7,
-                rootMargin: '-10% 0px -10% 0px'
-            }
-        );
-
-        observer.observe(el);
-        return () => observer.disconnect();
-    }, [index, onVisible]);
 
     const data = loadedSections[index];
 
     if (!data) {
         return (
-            <div ref={rowRef} className="py-10 flex justify-center">
+            <div className="py-10 flex justify-center">
                 <Loader2 className="animate-spin text-blue-500" />
             </div>
         );
@@ -130,18 +103,14 @@ function SectionRow({
 
     if (data.error) {
         return (
-            <div ref={rowRef} className="text-center text-sm text-red-500">
+            <div className="text-center text-sm text-red-500">
                 Failed to load section
             </div>
         );
     }
 
     return (
-        <div
-            ref={rowRef}
-            id={`section-${index}`}
-            className="space-y-4 scroll-mt-20"
-        >
+        <div className="space-y-4 scroll-mt-20">
             <div className="sticky top-0 bg-white dark:bg-slate-900 py-2 z-10">
                 <p className="font-semibold text-slate-700 dark:text-slate-100">
                     {sec.label}
@@ -168,13 +137,10 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
     const [error, setError] = useState(false);
 
     const [startIndex, setStartIndex] = useState(null);
-    const [currentIndex, setCurrentIndex] = useState(null);
     const [loadedSections, setLoadedSections] = useState({});
 
     const [showEN, setShowEN] = useState(true);
     const [showHB, setShowHB] = useState(true);
-
-    const updateLock = useRef(false);
 
     /* LOAD TOC */
     useEffect(() => {
@@ -223,66 +189,28 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
     };
 
     /* TOC CLICK */
-    const openAt = (index) => {
+    const openAt = async (index) => {
         setStartIndex(index);
-        setCurrentIndex(index);
 
         requestAnimationFrame(() => {
-            if (scrollRef.current) {
-                scrollRef.current.scrollTop = 0;
-            }
+            scrollRef.current?.scrollTo({ top: 0, behavior: 'auto' });
         });
 
-        for (
-            let i = Math.max(0, index - 2);
-            i <= Math.min(sections.length - 1, index + 4);
-            i++
-        ) {
-            loadSection(i);
+        // preload BOTH directions
+        for (let i = index - WINDOW; i <= index + WINDOW; i++) {
+            if (i >= 0 && i < sections.length) {
+                loadSection(i);
+            }
         }
     };
 
-    /* STABLE SCROLL UPDATE (NO LOOP) */
-    const handleVisible = (index) => {
-        if (updateLock.current) return;
+    const baseIndex = startIndex !== null
+        ? Math.max(0, startIndex - WINDOW)
+        : 0;
 
-        if (index === currentIndex) return;
-
-        updateLock.current = true;
-
-        setCurrentIndex(index);
-
-        for (
-            let j = Math.max(0, index - 2);
-            j <= Math.min(sections.length - 1, index + 4);
-            j++
-        ) {
-            loadSection(j);
-        }
-
-        setLoadedSections(prev => {
-            const next = {};
-
-            for (
-                let j = Math.max(0, index - 4);
-                j <= Math.min(sections.length - 1, index + 6);
-                j++
-            ) {
-                if (prev[j]) next[j] = prev[j];
-            }
-
-            return next;
-        });
-
-        setTimeout(() => {
-            updateLock.current = false;
-        }, 150);
-    };
-
-    const center = currentIndex ?? startIndex ?? 0;
-
-    const firstSection = Math.max(0, center - 2);
-    const lastSection = Math.min(sections.length, center + 3);
+    const visibleSections = startIndex !== null
+        ? sections.slice(baseIndex, startIndex + WINDOW)
+        : [];
 
     const sectionUrl =
         startIndex !== null
@@ -355,24 +283,21 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
                 {/* READER */}
                 {startIndex !== null && (
                     <div className="space-y-10">
-                        {sections
-                            .slice(firstSection, lastSection)
-                            .map((sec, i) => {
-                                const idx = firstSection + i;
+                        {visibleSections.map((sec, i) => {
+                            const idx = baseIndex + i;
 
-                                return (
-                                    <SectionRow
-                                        key={idx}
-                                        sec={sec}
-                                        index={idx}
-                                        loadedSections={loadedSections}
-                                        loadSection={loadSection}
-                                        showEN={showEN}
-                                        showHB={showHB}
-                                        onVisible={handleVisible}
-                                    />
-                                );
-                            })}
+                            return (
+                                <SectionRow
+                                    key={idx}
+                                    sec={sec}
+                                    index={idx}
+                                    loadedSections={loadedSections}
+                                    loadSection={loadSection}
+                                    showEN={showEN}
+                                    showHB={showHB}
+                                />
+                            );
+                        })}
                     </div>
                 )}
 
