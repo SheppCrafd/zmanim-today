@@ -52,6 +52,27 @@ const isEnglishLine = (t) => {
     return latin.length > 5 && latinRatio > 0.75;
 };
 
+/* ---------------- SIMPLE CACHE ---------------- */
+const cache = {};
+
+/* ---------------- FETCH SINGLE SECTION ---------------- */
+
+async function fetchSection(ref) {
+    if (cache[ref]) return cache[ref];
+
+    try {
+        const res = await fetch(
+            `https://www.sefaria.org/api/texts/${encodeURIComponent(ref)}?lang=bi`
+        );
+        const data = await res.json();
+        cache[ref] = data;
+        return data;
+    } catch {
+        cache[ref] = { error: true };
+        return cache[ref];
+    }
+}
+
 /* ---------------- SECTION ---------------- */
 
 function Section({ sec, data, rowRef, langMode }) {
@@ -117,22 +138,19 @@ function Section({ sec, data, rowRef, langMode }) {
 /* ---------------- MAIN ---------------- */
 
 export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
-
     const rowRefs = useRef({});
-    const cacheRef = useRef({}); // 🔥 TRUE permanent cache
-    const didLoadRef = useRef(false); // 🔥 prevents double preload
 
     const [sections, setSections] = useState([]);
     const [textMap, setTextMap] = useState({});
-
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(false);
 
     const [page, setPage] = useState('toc');
     const [langMode, setLangMode] = useState('both');
 
-    /* ---------------- LOAD TOC ---------------- */
+    const [activeIndex, setActiveIndex] = useState(null);
 
+    /* LOAD TOC */
     useEffect(() => {
         setLoading(true);
 
@@ -143,7 +161,9 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
                 const rootKey = schema?.key || bookRef.replace(/_/g, ' ');
                 const nodes = schema?.nodes || [];
 
-                setSections(flattenNodes(nodes, rootKey));
+                const flat = flattenNodes(nodes, rootKey);
+                setSections(flat);
+
                 setLoading(false);
             })
             .catch(() => {
@@ -152,47 +172,24 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
             });
     }, [bookRef]);
 
-    /* ---------------- ONE-TIME FULL PRELOAD ---------------- */
-
+    /* WINDOWED LOADING (±2 only) */
     useEffect(() => {
-        if (!sections.length) return;
-        if (didLoadRef.current) return; // 🔥 RUN ONCE ONLY
+        if (activeIndex == null || !sections.length) return;
 
-        didLoadRef.current = true;
+        const range = 2;
 
-        const loadAll = async () => {
-            const results = await Promise.all(
-                sections.map(async (sec, i) => {
-                    try {
-                        const res = await fetch(
-                            `https://www.sefaria.org/api/texts/${encodeURIComponent(sec.ref)}?lang=bi`
-                        );
-                        const data = await res.json();
-                        return [i, data];
-                    } catch {
-                        return [i, { error: true }];
-                    }
-                })
-            );
+        const start = Math.max(0, activeIndex - range);
+        const end = Math.min(sections.length - 1, activeIndex + range);
 
-            const newCache = {};
-            const newMap = {};
-
-            for (const [i, data] of results) {
-                newCache[i] = data;
-                newMap[i] = data;
-            }
-
-            cacheRef.current = newCache; // 🔥 permanent memory cache
-            setTextMap(newMap); // UI state
-        };
-
-        loadAll();
-    }, [sections]);
-
-    /* ---------------- NO MORE FETCHING EVER ---------------- */
+        for (let i = start; i <= end; i++) {
+            fetchSection(sections[i].ref).then((data) => {
+                setTextMap(prev => ({ ...prev, [i]: data }));
+            });
+        }
+    }, [activeIndex, sections]);
 
     const jumpTo = (index) => {
+        setActiveIndex(index);
         setPage('reader');
 
         requestAnimationFrame(() => {
@@ -202,8 +199,6 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
             });
         });
     };
-
-    /* ---------------- RENDER ---------------- */
 
     return (
         <div className="h-screen flex flex-col bg-slate-50 dark:bg-slate-950 overflow-hidden">
@@ -228,12 +223,12 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
                 </div>
 
                 <div className="px-4 flex gap-2 py-2">
-                    <Button size="sm" onClick={() => setLangMode('en')} variant={langMode === 'en' ? "default" : "outline"}>EN</Button>
-                    <Button size="sm" onClick={() => setLangMode('he')} variant={langMode === 'he' ? "default" : "outline"}>HB</Button>
-                    <Button size="sm" onClick={() => setLangMode('both')} variant={langMode === 'both' ? "default" : "outline"}>BOTH</Button>
+                    <Button onClick={() => setLangMode('en')} size="sm" variant={langMode === 'en' ? "default" : "outline"}>EN</Button>
+                    <Button onClick={() => setLangMode('he')} size="sm" variant={langMode === 'he' ? "default" : "outline"}>HB</Button>
+                    <Button onClick={() => setLangMode('both')} size="sm" variant={langMode === 'both' ? "default" : "outline"}>BOTH</Button>
 
                     {page === 'reader' && (
-                        <Button size="sm" variant="outline" onClick={() => setPage('toc')}>
+                        <Button onClick={() => setPage('toc')} size="sm" variant="outline">
                             <ArrowLeft className="w-4 h-4 mr-1" />
                             TOC
                         </Button>
@@ -244,7 +239,6 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
             {/* BODY */}
             <div className="flex-1 overflow-hidden">
 
-                {/* TOC */}
                 {page === 'toc' && (
                     <div className="h-full overflow-y-auto px-4">
                         {loading && <div className="py-10">Loading…</div>}
@@ -262,7 +256,6 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
                     </div>
                 )}
 
-                {/* READER */}
                 {page === 'reader' && (
                     <div className="h-full overflow-y-auto px-4 pb-10">
                         {sections.map((sec, i) => (
@@ -272,7 +265,7 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
                                 data={textMap[i]}
                                 langMode={langMode}
                                 rowRef={(el) => {
-                                    rowRefs.current[i] = el;
+                                    if (el) rowRefs.current[i] = el;
                                 }}
                             />
                         ))}
