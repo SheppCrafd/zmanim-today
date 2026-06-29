@@ -62,9 +62,9 @@ export default function SiddurView({ title, subtitle, bookRef }) {
     const [activeIndex, setActiveIndex] = useState(0);
     const [startIndex, setStartIndex] = useState(null);
 
-    const RENDER_WINDOW = 1;
-    const OBSERVE_WINDOW = 5;
+    const WINDOW = 1;
 
+    /* ---------------- LOAD INDEX ---------------- */
     useEffect(() => {
         fetch(`https://www.sefaria.org/api/index/${bookRef}`)
             .then(r => r.json())
@@ -75,6 +75,7 @@ export default function SiddurView({ title, subtitle, bookRef }) {
             });
     }, [bookRef]);
 
+    /* ---------------- SAFE LOAD (ONLY HERE) ---------------- */
     const load = async (i) => {
         if (loaded[i] || !sections[i]) return;
 
@@ -87,16 +88,13 @@ export default function SiddurView({ title, subtitle, bookRef }) {
         setLoaded(prev => ({ ...prev, [i]: data }));
     };
 
+    /* ---------------- ENTER ---------------- */
     const openAt = async (i) => {
         setStartIndex(i);
         setActiveIndex(i);
-
-        for (let x = i - OBSERVE_WINDOW; x <= i + OBSERVE_WINDOW; x++) {
-            if (x >= 0 && x < sections.length) load(x);
-        }
     };
 
-    /* ---------------- OBSERVER FIX ---------------- */
+    /* ---------------- OBSERVER (ONLY DRIVER OF STATE) ---------------- */
     useEffect(() => {
         if (startIndex === null) return;
 
@@ -110,15 +108,11 @@ export default function SiddurView({ title, subtitle, bookRef }) {
                     const i = Number(e.target.dataset.index);
 
                     setActiveIndex(i);
-
-                    for (let x = i - OBSERVE_WINDOW; x <= i + OBSERVE_WINDOW; x++) {
-                        if (x >= 0 && x < sections.length) load(x);
-                    }
                 }
             },
             {
                 root,
-                threshold: 0.4
+                threshold: 0.6
             }
         );
 
@@ -128,14 +122,24 @@ export default function SiddurView({ title, subtitle, bookRef }) {
         return () => observer.disconnect();
     }, [startIndex, sections]);
 
-    const start = Math.max(0, activeIndex - RENDER_WINDOW);
-    const end = Math.min(sections.length - 1, activeIndex + RENDER_WINDOW);
+    /* ---------------- LOAD WINDOW (CORRECT PLACE) ---------------- */
+    useEffect(() => {
+        if (startIndex === null) return;
+
+        for (let i = activeIndex - WINDOW; i <= activeIndex + WINDOW; i++) {
+            if (i >= 0 && i < sections.length) load(i);
+        }
+    }, [activeIndex, startIndex, sections]);
+
+    const start = Math.max(0, activeIndex - WINDOW);
+    const end = Math.min(sections.length - 1, activeIndex + WINDOW);
 
     const visible = sections.slice(start, end + 1);
 
     return (
         <div className="h-screen flex flex-col overflow-hidden bg-slate-50 dark:bg-slate-950">
 
+            {/* HEADER */}
             <div className="px-4 pt-4 pb-2 flex justify-between">
                 <div>
                     <NavMenu />
@@ -148,6 +152,7 @@ export default function SiddurView({ title, subtitle, bookRef }) {
                 </Button>
             </div>
 
+            {/* SCROLL */}
             <div
                 ref={containerRef}
                 className="flex-1 overflow-y-auto mx-4 mb-4 bg-white dark:bg-slate-900 rounded-xl"
@@ -174,8 +179,6 @@ export default function SiddurView({ title, subtitle, bookRef }) {
                         {visible.map((sec, idx) => {
                             const real = start + idx;
                             const data = loaded[real];
-
-                            if (!data) load(real);
 
                             return (
                                 <div
