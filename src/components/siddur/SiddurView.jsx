@@ -119,7 +119,8 @@ function Section({ sec, data, rowRef, langMode }) {
 export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
 
     const rowRefs = useRef({});
-    const containerRef = useRef(null);
+    const cacheRef = useRef({}); // 🔥 TRUE permanent cache
+    const didLoadRef = useRef(false); // 🔥 prevents double preload
 
     const [sections, setSections] = useState([]);
     const [textMap, setTextMap] = useState({});
@@ -129,9 +130,6 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
 
     const [page, setPage] = useState('toc');
     const [langMode, setLangMode] = useState('both');
-
-    const [currentIndex, setCurrentIndex] = useState(0);
-    const RANGE = 2;
 
     /* ---------------- LOAD TOC ---------------- */
 
@@ -154,85 +152,48 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
             });
     }, [bookRef]);
 
-    /* ---------------- FETCH ONE SECTION ---------------- */
-
-    const fetchSection = async (i) => {
-        if (!sections[i] || textMap[i]) return;
-
-        try {
-            const res = await fetch(
-                `https://www.sefaria.org/api/texts/${encodeURIComponent(sections[i].ref)}?lang=bi`
-            );
-            const data = await res.json();
-
-            setTextMap(prev => ({ ...prev, [i]: data }));
-        } catch {
-            setTextMap(prev => ({ ...prev, [i]: { error: true } }));
-        }
-    };
-
-    /* ---------------- WINDOWED LOADING ---------------- */
+    /* ---------------- ONE-TIME FULL PRELOAD ---------------- */
 
     useEffect(() => {
         if (!sections.length) return;
+        if (didLoadRef.current) return; // 🔥 RUN ONCE ONLY
 
-        const start = Math.max(0, currentIndex - RANGE);
-        const end = Math.min(sections.length - 1, currentIndex + RANGE);
+        didLoadRef.current = true;
 
-        for (let i = start; i <= end; i++) {
-            fetchSection(i);
-        }
-    }, [currentIndex, sections]);
-
-    /* ---------------- SCROLL TRACKING ---------------- */
-
-    useEffect(() => {
-        if (page !== 'reader') return;
-
-        const container = containerRef.current;
-        if (!container) return;
-
-        const observer = new IntersectionObserver(
-            (entries) => {
-                let bestIndex = null;
-                let bestRatio = 0;
-
-                for (const entry of entries) {
-                    if (!entry.isIntersecting) continue;
-
-                    const i = Number(entry.target.dataset.index);
-                    if (entry.intersectionRatio > bestRatio) {
-                        bestRatio = entry.intersectionRatio;
-                        bestIndex = i;
+        const loadAll = async () => {
+            const results = await Promise.all(
+                sections.map(async (sec, i) => {
+                    try {
+                        const res = await fetch(
+                            `https://www.sefaria.org/api/texts/${encodeURIComponent(sec.ref)}?lang=bi`
+                        );
+                        const data = await res.json();
+                        return [i, data];
+                    } catch {
+                        return [i, { error: true }];
                     }
-                }
+                })
+            );
 
-                if (bestIndex != null) {
-                    setCurrentIndex(bestIndex);
-                }
-            },
-            {
-                root: container,
-                rootMargin: '0px',
-                threshold: 0.4
+            const newCache = {};
+            const newMap = {};
+
+            for (const [i, data] of results) {
+                newCache[i] = data;
+                newMap[i] = data;
             }
-        );
 
-        Object.entries(rowRefs.current).forEach(([i, el]) => {
-            if (el) {
-                el.dataset.index = i;
-                observer.observe(el);
-            }
-        });
+            cacheRef.current = newCache; // 🔥 permanent memory cache
+            setTextMap(newMap); // UI state
+        };
 
-        return () => observer.disconnect();
-    }, [page, sections]);
+        loadAll();
+    }, [sections]);
 
-    /* ---------------- JUMP ---------------- */
+    /* ---------------- NO MORE FETCHING EVER ---------------- */
 
     const jumpTo = (index) => {
         setPage('reader');
-        setCurrentIndex(index);
 
         requestAnimationFrame(() => {
             rowRefs.current[index]?.scrollIntoView({
@@ -242,7 +203,7 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
         });
     };
 
-    /* ---------------- UI ---------------- */
+    /* ---------------- RENDER ---------------- */
 
     return (
         <div className="h-screen flex flex-col bg-slate-50 dark:bg-slate-950 overflow-hidden">
@@ -286,6 +247,9 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
                 {/* TOC */}
                 {page === 'toc' && (
                     <div className="h-full overflow-y-auto px-4">
+                        {loading && <div className="py-10">Loading…</div>}
+                        {error && <AlertCircle />}
+
                         {sections.map((sec, i) => (
                             <button
                                 key={i}
@@ -300,10 +264,7 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
 
                 {/* READER */}
                 {page === 'reader' && (
-                    <div
-                        ref={containerRef}
-                        className="h-full overflow-y-auto px-4 pb-10"
-                    >
+                    <div className="h-full overflow-y-auto px-4 pb-10">
                         {sections.map((sec, i) => (
                             <Section
                                 key={i}
