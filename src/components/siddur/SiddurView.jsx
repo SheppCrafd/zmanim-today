@@ -8,31 +8,56 @@ import {
 import { Button } from '@/components/ui/button';
 import NavMenu from '@/components/NavMenu';
 
-/* ---------------- CACHE ---------------- */
-const cache = {};
+/* ---------------- TOC FLATTEN ---------------- */
 
-async function fetchSection(ref) {
-    if (cache[ref]) return cache[ref];
+function flattenNodes(nodes, keyPath = '', labelPath = '') {
+    const result = [];
 
-    try {
-        const res = await fetch(
-            `https://www.sefaria.org/api/texts/${encodeURIComponent(ref)}?lang=bi`
-        );
-        const data = await res.json();
-        cache[ref] = data;
-        return data;
-    } catch {
-        cache[ref] = { error: true };
-        return cache[ref];
+    for (const node of nodes) {
+        const key = node.key || node.title;
+        const fullKeyPath = keyPath ? `${keyPath}, ${key}` : key;
+        const fullLabelPath = labelPath ? `${labelPath} > ${node.title}` : node.title;
+
+        if (node.nodes) {
+            result.push(...flattenNodes(node.nodes, fullKeyPath, fullLabelPath));
+        } else {
+            result.push({
+                label: node.title,
+                heLabel: node.heTitle,
+                breadcrumb: fullLabelPath,
+                ref: fullKeyPath
+            });
+        }
     }
+
+    return result;
 }
+
+/* ---------------- EN FILTER ---------------- */
+
+const isEnglishLine = (t) => {
+    if (!t) return false;
+
+    const plain = t.replace(/<[^>]*>/g, '').trim();
+    if (plain.length < 2) return false;
+
+    const latin = plain.match(/[A-Za-z]/g) || [];
+    const hebrew = plain.match(/[\u0590-\u05FF]/g) || [];
+
+    const total = latin.length + hebrew.length;
+    if (total === 0) return false;
+
+    const latinRatio = latin.length / total;
+
+    return latin.length > 5 && latinRatio > 0.75;
+};
 
 /* ---------------- SECTION ---------------- */
 
-function Section({ sec, index, data, langMode, setHeight, rowRef }) {
+function Section({ sec, data, rowRef, langMode }) {
     if (!data) {
         return (
-            <div ref={rowRef} className="py-10 flex justify-center">
+            <div className="py-10 flex justify-center">
                 <Loader2 className="animate-spin text-blue-500" />
             </div>
         );
@@ -40,7 +65,7 @@ function Section({ sec, index, data, langMode, setHeight, rowRef }) {
 
     if (data.error) {
         return (
-            <div ref={rowRef} className="text-red-500 py-6">
+            <div className="text-center text-sm text-red-500">
                 Failed to load section
             </div>
         );
@@ -48,51 +73,40 @@ function Section({ sec, index, data, langMode, setHeight, rowRef }) {
 
     const heArr = Array.isArray(data.he) ? data.he : (data.he ? [data.he] : []);
     const enRaw = Array.isArray(data.text) ? data.text : (data.text ? [data.text] : []);
+    const enArr = enRaw.filter(isEnglishLine);
 
     const showEN = langMode !== 'he';
     const showHB = langMode !== 'en';
 
-    const ref = useRef(null);
-
-    useEffect(() => {
-        if (!ref.current) return;
-
-        const measure = () => {
-            setHeight(index, ref.current.offsetHeight);
-        };
-
-        measure();
-
-        const obs = new ResizeObserver(measure);
-        obs.observe(ref.current);
-
-        return () => obs.disconnect();
-    }, [data]);
+    const maxLen = Math.max(heArr.length, enArr.length);
 
     return (
-        <div ref={(el) => { ref.current = el; rowRef(el); }} className="py-6 scroll-mt-24">
-
+        <div ref={rowRef} className="space-y-4 scroll-mt-24">
             <div className="sticky top-0 bg-white dark:bg-slate-900 py-2 z-10 border-b">
-                <p className="font-semibold">{sec.label}</p>
+                <p className="font-semibold text-slate-700 dark:text-slate-100">
+                    {sec.label}
+                </p>
             </div>
 
-            <div className="space-y-4">
-                {heArr.map((h, i) => (
-                    <div key={i}>
-                        {showHB && (
+            <div className="space-y-6">
+                {Array.from({ length: maxLen }).map((_, i) => (
+                    <div key={i} className="space-y-2">
+
+                        {showHB && heArr[i] && (
                             <p
-                                className="text-right font-serif text-lg"
+                                className="text-right text-lg leading-loose text-slate-800 dark:text-slate-100 font-serif"
                                 dir="rtl"
-                                dangerouslySetInnerHTML={{ __html: h }}
+                                dangerouslySetInnerHTML={{ __html: heArr[i] }}
                             />
                         )}
 
-                        {showEN && enRaw[i] && (
+                        {showEN && enArr[i] && (
                             <p
-                                className="text-sm text-slate-500"
-                                dangerouslySetInnerHTML={{ __html: enRaw[i] }}
+                                className="text-left text-sm leading-relaxed text-slate-500 dark:text-slate-400"
+                                dangerouslySetInnerHTML={{ __html: enArr[i] }}
                             />
                         )}
+
                     </div>
                 ))}
             </div>
@@ -103,176 +117,181 @@ function Section({ sec, index, data, langMode, setHeight, rowRef }) {
 /* ---------------- MAIN ---------------- */
 
 export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
-
-    const containerRef = useRef(null);
     const rowRefs = useRef({});
-    const heights = useRef({});
 
     const [sections, setSections] = useState([]);
     const [textMap, setTextMap] = useState({});
-    const [visible, setVisible] = useState({ start: 0, end: 10 });
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(false);
 
+    const [page, setPage] = useState('toc'); // toc | reader
     const [langMode, setLangMode] = useState('both');
-    const [page, setPage] = useState('toc');
 
-    /* TOC LOAD */
+    /* LOAD TOC */
     useEffect(() => {
+        setLoading(true);
+
         fetch(`https://www.sefaria.org/api/index/${bookRef}`)
             .then(r => r.json())
             .then(data => {
-                const nodes = data?.schema?.nodes || [];
-                const rootKey = data?.schema?.key || bookRef;
+                const schema = data?.schema;
+                const rootKey = schema?.key || bookRef.replace(/_/g, ' ');
+                const nodes = schema?.nodes || [];
 
-                const flatten = (nodes, keyPath = '') => {
-                    let out = [];
-                    for (const n of nodes) {
-                        const key = n.key || n.title;
-                        const full = keyPath ? `${keyPath}, ${key}` : key;
-
-                        if (n.nodes) {
-                            out.push(...flatten(n.nodes, full));
-                        } else {
-                            out.push({ label: n.title, ref: full });
-                        }
-                    }
-                    return out;
-                };
-
-                setSections(flatten(nodes, rootKey));
+                setSections(flattenNodes(nodes, rootKey));
+                setLoading(false);
+            })
+            .catch(() => {
+                setError(true);
+                setLoading(false);
             });
     }, [bookRef]);
 
-    /* REAL FETCH */
+    /* LOAD TEXT */
     useEffect(() => {
-        const { start, end } = visible;
+        if (!sections.length) return;
 
-        for (let i = start; i <= end; i++) {
-            const sec = sections[i];
-            if (!sec) continue;
+        let cancelled = false;
 
-            fetchSection(sec.ref).then(data => {
-                setTextMap(prev => ({ ...prev, [i]: data }));
-            });
-        }
-    }, [visible, sections]);
-
-    /* REAL HEIGHT TRACKING */
-    const setHeight = (i, h) => {
-        heights.current[i] = h;
-    };
-
-    /* REAL SCROLL CALC (NO APPROX) */
-    useEffect(() => {
-        const el = containerRef.current;
-        if (!el) return;
-
-        const onScroll = () => {
-            const scrollTop = el.scrollTop;
-
-            let total = 0;
-            let start = 0;
-
+        const loadAll = async () => {
             for (let i = 0; i < sections.length; i++) {
-                const h = heights.current[i] || 200;
+                try {
+                    const res = await fetch(
+                        `https://www.sefaria.org/api/texts/${encodeURIComponent(sections[i].ref)}?lang=bi`
+                    );
+                    const data = await res.json();
 
-                if (total <= scrollTop) start = i;
-                total += h;
-
-                if (total > scrollTop + el.clientHeight) {
-                    setVisible({
-                        start: Math.max(0, start - 2),
-                        end: Math.min(sections.length - 1, i + 2)
-                    });
-                    break;
+                    if (!cancelled) {
+                        setTextMap(prev => ({ ...prev, [i]: data }));
+                    }
+                } catch {
+                    if (!cancelled) {
+                        setTextMap(prev => ({ ...prev, [i]: { error: true } }));
+                    }
                 }
             }
         };
 
-        el.addEventListener('scroll', onScroll);
-        return () => el.removeEventListener('scroll', onScroll);
+        loadAll();
+        return () => { cancelled = true; };
     }, [sections]);
 
-    const jumpTo = (i) => {
+    const jumpTo = (index) => {
         setPage('reader');
 
-        let y = 0;
-        for (let k = 0; k < i; k++) {
-            y += heights.current[k] || 200;
-        }
-
         requestAnimationFrame(() => {
-            containerRef.current?.scrollTo({
-                top: y,
-                behavior: 'smooth'
+            rowRefs.current[index]?.scrollIntoView({
+                behavior: 'smooth',
+                block: 'start'
             });
         });
     };
 
     return (
-        <div className="h-screen flex flex-col overflow-hidden">
+        <div className="h-screen flex flex-col bg-slate-50 dark:bg-slate-950 overflow-hidden">
 
-            {/* TOP BAR */}
-            <div className="border-b bg-white dark:bg-slate-900">
-                <div className="flex justify-between p-3">
-                    <div className="flex gap-2 items-center">
+            {/* 🔒 SINGLE LOCKED TOP BAR (fixes overlap forever) */}
+            <div className="sticky top-0 z-50 bg-white dark:bg-slate-950 border-b">
+
+                {/* TITLE + MENU */}
+                <div className="flex items-center justify-between px-4 pt-4 pb-2">
+                    <div className="flex items-center gap-2 relative z-50">
                         <NavMenu />
                         <div>
-                            <div className="font-bold">{title}</div>
-                            <div className="text-xs text-gray-500">{subtitle}</div>
+                            <h1 className="text-lg font-bold">{title}</h1>
+                            <p className="text-xs text-slate-500">{subtitle}</p>
                         </div>
                     </div>
 
-                    <a href={sefariaUrl}>
+                    <a href={sefariaUrl} target="_blank" className="relative z-50">
                         <Button size="sm" variant="outline">
-                            <ExternalLink />
+                            <ExternalLink className="w-4 h-4" />
                         </Button>
                     </a>
                 </div>
+
+                {/* CONTROLS */}
+                <div className="px-4 flex gap-2 py-2">
+                    <Button
+                        size="sm"
+                        variant={langMode === 'en' ? "default" : "outline"}
+                        onClick={() => setLangMode('en')}
+                    >
+                        EN
+                    </Button>
+
+                    <Button
+                        size="sm"
+                        variant={langMode === 'he' ? "default" : "outline"}
+                        onClick={() => setLangMode('he')}
+                    >
+                        HB
+                    </Button>
+
+                    <Button
+                        size="sm"
+                        variant={langMode === 'both' ? "default" : "outline"}
+                        onClick={() => setLangMode('both')}
+                    >
+                        BOTH
+                    </Button>
+
+                    {page === 'reader' && (
+                        <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => setPage('toc')}
+                        >
+                            <ArrowLeft className="w-4 h-4 mr-1" />
+                            TOC
+                        </Button>
+                    )}
+                </div>
+
             </div>
 
-            {/* BODY */}
+            {/* BODY (ONLY SCROLLS HERE) */}
             <div className="flex-1 overflow-hidden">
 
+                {/* TOC */}
                 {page === 'toc' && (
-                    <div className="h-full overflow-y-auto p-3">
-                        {sections.map((s, i) => (
+                    <div className="h-full overflow-y-auto px-4">
+                        {loading && <div className="py-10">Loading…</div>}
+                        {error && <AlertCircle />}
+
+                        {sections.map((sec, i) => (
                             <button
                                 key={i}
                                 onClick={() => jumpTo(i)}
-                                className="block w-full text-left p-2 border-b"
+                                className="w-full text-left py-3 border-b"
                             >
-                                {s.label}
+                                {sec.label}
                             </button>
                         ))}
                     </div>
                 )}
 
+                {/* READER */}
                 {page === 'reader' && (
-                    <div
-                        ref={containerRef}
-                        className="h-full overflow-y-auto p-4"
-                    >
-                        {sections.map((sec, i) => {
-                            if (i < visible.start || i > visible.end) {
-                                return <div key={i} style={{ height: 20 }} />;
-                            }
-
-                            return (
-                                <Section
-                                    key={i}
-                                    index={i}
-                                    sec={sec}
-                                    data={textMap[i]}
-                                    langMode={langMode}
-                                    setHeight={setHeight}
-                                    rowRef={(el) => (rowRefs.current[i] = el)}
-                                />
-                            );
-                        })}
+                    <div className="h-full overflow-y-auto px-4 pb-10">
+                        {sections.map((sec, i) => (
+                            <Section
+                                key={i}
+                                sec={sec}
+                                data={textMap[i]}
+                                langMode={langMode}
+                                rowRef={(el) => {
+                                    rowRefs.current[i] = el;
+                                }}
+                            />
+                        ))}
                     </div>
                 )}
 
             </div>
+
         </div>
     );
 }
+
+have a cache.
