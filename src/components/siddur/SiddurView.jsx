@@ -1,21 +1,16 @@
-import React, { useState, useEffect, useRef } from 'react';
-import {
-    ExternalLink,
-    Loader2,
-    ArrowLeft,
-    ChevronRight
-} from 'lucide-react';
+import React, { useEffect, useRef, useState } from 'react';
+import { Loader2, ArrowLeft, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import NavMenu from '@/components/NavMenu';
 
-/* ---------------- LOCK OUTER SCROLL ONLY ---------------- */
+/* ---------------- SCROLL LOCK (OUTER ONLY) ---------------- */
 if (typeof document !== 'undefined') {
     document.documentElement.style.height = '100%';
     document.body.style.height = '100%';
     document.body.style.overflow = 'hidden';
 }
 
-/* ---------------- FLATTEN ---------------- */
+/* ---------------- FLATTEN SIDDUR TREE ---------------- */
 function flattenNodes(nodes, keyPath = '') {
     const out = [];
 
@@ -37,7 +32,7 @@ function flattenNodes(nodes, keyPath = '') {
     return out;
 }
 
-/* ---------------- TEXT ---------------- */
+/* ---------------- TEXT RENDER ---------------- */
 function SectionText({ he, text }) {
     const heArr = Array.isArray(he) ? he : he ? [he] : [];
     const enArr = Array.isArray(text) ? text : text ? [text] : [];
@@ -66,7 +61,7 @@ function SectionText({ he, text }) {
     );
 }
 
-/* ---------------- MAIN ---------------- */
+/* ---------------- MAIN COMPONENT ---------------- */
 export default function SiddurView({ title, subtitle, bookRef }) {
     const containerRef = useRef(null);
 
@@ -75,9 +70,9 @@ export default function SiddurView({ title, subtitle, bookRef }) {
     const [activeIndex, setActiveIndex] = useState(0);
     const [startIndex, setStartIndex] = useState(null);
 
-    const WINDOW = 2;
+    const WINDOW = 1; // previous + next only (ultra stable)
 
-    /* ---------------- LOAD TOC ---------------- */
+    /* ---------------- LOAD INDEX ---------------- */
     useEffect(() => {
         fetch(`https://www.sefaria.org/api/index/${bookRef}`)
             .then(r => r.json())
@@ -88,7 +83,7 @@ export default function SiddurView({ title, subtitle, bookRef }) {
             });
     }, [bookRef]);
 
-    /* ---------------- LOAD SECTION ---------------- */
+    /* ---------------- FETCH TEXT ---------------- */
     const load = async (i) => {
         if (loaded[i] || !sections[i]) return;
 
@@ -101,7 +96,7 @@ export default function SiddurView({ title, subtitle, bookRef }) {
         setLoaded(prev => ({ ...prev, [i]: data }));
     };
 
-    /* ---------------- OPEN READER ---------------- */
+    /* ---------------- ENTER READER ---------------- */
     const openAt = async (i) => {
         setStartIndex(i);
         setActiveIndex(i);
@@ -111,14 +106,16 @@ export default function SiddurView({ title, subtitle, bookRef }) {
         }
     };
 
-    /* ---------------- INTERSECTION OBSERVER (NO SCROLL MATH) ---------------- */
+    /* ---------------- OBSERVER (ONLY FOR ACTIVE TRACKING) ---------------- */
     useEffect(() => {
         if (startIndex === null) return;
 
+        const root = containerRef.current;
+
         const observer = new IntersectionObserver(
             (entries) => {
-                entries.forEach(entry => {
-                    if (!entry.isIntersecting) return;
+                for (const entry of entries) {
+                    if (!entry.isIntersecting) continue;
 
                     const i = Number(entry.target.dataset.index);
                     setActiveIndex(i);
@@ -126,19 +123,25 @@ export default function SiddurView({ title, subtitle, bookRef }) {
                     for (let x = i - WINDOW; x <= i + WINDOW; x++) {
                         if (x >= 0 && x < sections.length) load(x);
                     }
-                });
+                }
             },
             {
-                root: containerRef.current,
-                threshold: 0.5
+                root,
+                threshold: 0.6
             }
         );
 
-        const nodes = containerRef.current?.querySelectorAll('[data-index]');
+        const nodes = root?.querySelectorAll('[data-index]');
         nodes?.forEach(n => observer.observe(n));
 
         return () => observer.disconnect();
     }, [startIndex, sections]);
+
+    /* ---------------- VISIBLE RANGE ---------------- */
+    const start = Math.max(0, activeIndex - WINDOW);
+    const end = Math.min(sections.length - 1, activeIndex + WINDOW);
+
+    const visible = sections.slice(start, end + 1);
 
     return (
         <div className="h-screen flex flex-col overflow-hidden bg-slate-50 dark:bg-slate-950">
@@ -156,7 +159,7 @@ export default function SiddurView({ title, subtitle, bookRef }) {
                 </Button>
             </div>
 
-            {/* SCROLL CONTAINER (BROWSER OWNS SCROLL) */}
+            {/* SCROLL AREA */}
             <div
                 ref={containerRef}
                 className="flex-1 overflow-y-auto mx-4 mb-4 bg-white dark:bg-slate-900 rounded-xl"
@@ -178,19 +181,20 @@ export default function SiddurView({ title, subtitle, bookRef }) {
                     </div>
                 )}
 
-                {/* READER (FULL DOM, BUT SAFE) */}
+                {/* READER (ONLY 3 SECTIONS EXIST AT ONCE) */}
                 {startIndex !== null && (
                     <div className="p-4 space-y-12">
 
-                        {sections.map((sec, i) => {
-                            const data = loaded[i];
+                        {visible.map((sec, idx) => {
+                            const realIndex = start + idx;
+                            const data = loaded[realIndex];
 
-                            if (!data) load(i);
+                            if (!data) load(realIndex);
 
                             return (
                                 <div
-                                    key={i}
-                                    data-index={i}
+                                    key={realIndex}
+                                    data-index={realIndex}
                                     className="space-y-3"
                                 >
                                     <div className="sticky top-0 bg-white dark:bg-slate-900 py-2 font-semibold">
