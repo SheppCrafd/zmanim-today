@@ -124,7 +124,7 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(false);
 
-    const [page, setPage] = useState('toc');
+    const [page, setPage] = useState('toc'); // toc | reader
     const [langMode, setLangMode] = useState('both');
 
     /* LOAD TOC */
@@ -190,69 +190,105 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
     return (
         <div className="h-screen flex flex-col bg-slate-50 dark:bg-slate-950 overflow-hidden">
 
-            {/* HEADER (locked) */}
-            <div className="flex items-center justify-between px-4 pt-4 pb-2 border-b bg-white dark:bg-slate-950 z-20">
-                <div className="flex items-center gap-2">
-                    <NavMenu />
-                    <div>
-                        <h1 className="text-lg font-bold">{title}</h1>
-                        <p className="text-xs text-slate-500">{subtitle}</p>
+            {/* 🔒 SINGLE LOCKED TOP BAR (fixes overlap forever) */}
+            <div className="sticky top-0 z-50 bg-white dark:bg-slate-950 border-b">
+
+                {/* TITLE + MENU */}
+                <div className="flex items-center justify-between px-4 pt-4 pb-2">
+                    <div className="flex items-center gap-2 relative z-50">
+                        <NavMenu />
+                        <div>
+                            <h1 className="text-lg font-bold">{title}</h1>
+                            <p className="text-xs text-slate-500">{subtitle}</p>
+                        </div>
                     </div>
+
+                    <a href={sefariaUrl} target="_blank" className="relative z-50">
+                        <Button size="sm" variant="outline">
+                            <ExternalLink className="w-4 h-4" />
+                        </Button>
+                    </a>
                 </div>
 
-                <a href={sefariaUrl} target="_blank">
-                    <Button size="sm" variant="outline">
-                        <ExternalLink className="w-4 h-4" />
+                {/* CONTROLS */}
+                <div className="px-4 flex gap-2 py-2">
+                    <Button
+                        size="sm"
+                        variant={langMode === 'en' ? "default" : "outline"}
+                        onClick={() => setLangMode('en')}
+                    >
+                        EN
                     </Button>
-                </a>
-            </div>
 
-            {/* CONTROLS (locked) */}
-            <div className="px-4 flex gap-2 py-2 border-b bg-white dark:bg-slate-950 z-20">
-                <Button size="sm" variant={langMode === 'en' ? "default" : "outline"} onClick={() => setLangMode('en')}>EN</Button>
-                <Button size="sm" variant={langMode === 'he' ? "default" : "outline"} onClick={() => setLangMode('he')}>HB</Button>
-                <Button size="sm" variant={langMode === 'both' ? "default" : "outline"} onClick={() => setLangMode('both')}>BOTH</Button>
-
-                {page === 'reader' && (
-                    <Button size="sm" variant="outline" onClick={() => setPage('toc')}>
-                        <ArrowLeft className="w-4 h-4 mr-1" />
-                        TOC
+                    <Button
+                        size="sm"
+                        variant={langMode === 'he' ? "default" : "outline"}
+                        onClick={() => setLangMode('he')}
+                    >
+                        HB
                     </Button>
-                )}
-            </div>
 
-            {/* BODY: ONLY ONE SCROLLS AT A TIME */}
+                    <Button
+                        size="sm"
+                        variant={langMode === 'both' ? "default" : "outline"}
+                        onClick={() => setLangMode('both')}
+                    >
+                        BOTH
+                    </Button>
 
-            {page === 'toc' && (
-                <div className="flex-1 overflow-y-auto px-4">
-                    {loading && <div className="py-10">Loading…</div>}
-                    {error && <AlertCircle />}
-
-                    {sections.map((sec, i) => (
-                        <button
-                            key={i}
-                            onClick={() => jumpTo(i)}
-                            className="w-full text-left py-3 border-b"
+                    {page === 'reader' && (
+                        <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => setPage('toc')}
                         >
-                            {sec.label}
-                        </button>
-                    ))}
+                            <ArrowLeft className="w-4 h-4 mr-1" />
+                            TOC
+                        </Button>
+                    )}
                 </div>
-            )}
 
-            {page === 'reader' && (
-                <div className="flex-1 overflow-y-auto px-4 pb-10">
-                    {sections.map((sec, i) => (
-                        <Section
-                            key={i}
-                            sec={sec}
-                            data={textMap[i]}
-                            langMode={langMode}
-                            rowRef={(el) => { rowRefs.current[i] = el; }}
-                        />
-                    ))}
-                </div>
-            )}
+            </div>
+
+            {/* BODY (ONLY SCROLLS HERE) */}
+            <div className="flex-1 overflow-hidden">
+
+                {/* TOC */}
+                {page === 'toc' && (
+                    <div className="h-full overflow-y-auto px-4">
+                        {loading && <div className="py-10">Loading…</div>}
+                        {error && <AlertCircle />}
+
+                        {sections.map((sec, i) => (
+                            <button
+                                key={i}
+                                onClick={() => jumpTo(i)}
+                                className="w-full text-left py-3 border-b"
+                            >
+                                {sec.label}
+                            </button>
+                        ))}
+                    </div>
+                )}
+
+                {/* READER */}
+                {page === 'reader' && (
+                    <div className="h-full overflow-y-auto px-4 pb-10">
+                        {sections.map((sec, i) => (
+                            <Section
+                                key={i}
+                                sec={sec}
+                                data={textMap[i]}
+                                langMode={langMode}
+                                rowRef={(el) => {
+                                    rowRefs.current[i] = el;
+                                }}
+                            />
+                        ))}
+                    </div>
+                )}
+
+            </div>
 
         </div>
     );
