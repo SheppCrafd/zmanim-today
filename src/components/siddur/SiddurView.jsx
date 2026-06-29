@@ -33,29 +33,44 @@ function flattenNodes(nodes, keyPath = '', labelPath = '') {
     return result;
 }
 
-/* ---------------- CLEAN FILTER ---------------- */
+/* ---------------- SMART ENGLISH SCORER ---------------- */
 
-const isCleanEnglish = (t) => {
-    if (!t) return false;
+const scoreEnglish = (text) => {
+    if (!text) return 0;
 
-    const s = t.replace(/<[^>]*>/g, '').trim();
+    const s = text.replace(/<[^>]*>/g, '').trim();
+    if (s.length < 10) return 0;
 
-    if (s.length < 8) return false;
+    let score = 0;
 
-    // kill Hebrew
-    if (/[\u0590-\u05FF]/.test(s)) return false;
+    // must have latin letters
+    if (/[A-Za-z]/.test(s)) score += 2;
 
-    // kill Arabic/Cyrillic/etc
-    if (/[\u0600-\u06FF\u0400-\u04FF]/.test(s)) return false;
+    // penalty for other scripts
+    if (/[\u0590-\u05FF]/.test(s)) score -= 5; // Hebrew
+    if (/[\u0400-\u04FF]/.test(s)) score -= 4; // Cyrillic
+    if (/[\u0600-\u06FF]/.test(s)) score -= 4; // Arabic
+    if (/[\u3040-\u30FF\u4E00-\u9FFF]/.test(s)) score -= 4; // JP/Chinese
 
-    // kill obvious Portuguese/Spanish leaks
-    const foreignHint =
-        /(Após|Abertura|oração|Salmos|costume|oração|em|de|da|do|para)/i;
+    // sentence structure boost
+    const words = s.split(/\s+/).length;
+    if (words >= 6) score += 2;
+    if (words >= 12) score += 1;
 
-    if (foreignHint.test(s) && s.split(' ').length > 6) return false;
+    // English grammar hints
+    if (/(is|are|was|were|the|and|of|to|in|for|that)/i.test(s)) {
+        score += 2;
+    }
 
-    return true;
+    // penalize obvious romance-language markers (NOT strict blacklist)
+    if (/(Após|Abertura|oração|Salmos|costume|para|em|de|da|do)/i.test(s)) {
+        score -= 2;
+    }
+
+    return score;
 };
+
+const isGoodEnglish = (text) => scoreEnglish(text) >= 3;
 
 /* ---------------- SECTION ---------------- */
 
@@ -87,7 +102,7 @@ function Section({ sec, data, langMode }) {
 
     const enArr = (Array.isArray(rawEn) ? rawEn : [rawEn])
         .filter(Boolean)
-        .filter(isCleanEnglish);
+        .filter(isGoodEnglish);
 
     const showEN = langMode !== 'he';
     const showHB = langMode !== 'en';
