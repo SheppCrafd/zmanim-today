@@ -35,23 +35,21 @@ function flattenNodes(nodes, keyPath = '', labelPath = '') {
 
 /* ---------------- EN FILTER (FIXED) ---------------- */
 
-const isCleanEnglishLine = (t) => {
+const isEnglishLine = (t) => {
     if (!t) return false;
 
     const plain = t.replace(/<[^>]*>/g, '').trim();
     if (plain.length < 2) return false;
 
-    // hard reject Hebrew
-    if (/[\u0590-\u05FF]/.test(plain)) return false;
+    const latin = plain.match(/[A-Za-z]/g) || [];
+    const hebrew = plain.match(/[\u0590-\u05FF]/g) || [];
 
-    const letters = plain.match(/[a-zA-Z]/g) || [];
-    if (letters.length < 3) return false;
+    const total = latin.length + hebrew.length;
+    if (total === 0) return false;
 
-    // allow accented languages (DON'T over-filter!)
-    const hebrewishOrCyrillic = plain.match(/[\u0400-\u04FF]/g);
-    if (hebrewishOrCyrillic && hebrewishOrCyrillic.length > 0) return false;
+    const latinRatio = latin.length / total;
 
-    return true;
+    return latin.length > 5 && latinRatio > 0.75;
 };
 
 /* ---------------- SECTION ---------------- */
