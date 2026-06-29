@@ -123,10 +123,12 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
     const [textMap, setTextMap] = useState({});
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(false);
-    const [showSlowLoader, setShowSlowLoader] = useState(false);
 
     const [page, setPage] = useState('toc'); // toc | reader
     const [langMode, setLangMode] = useState('both');
+
+    const [showSlowLoader, setShowSlowLoader] = useState(false);
+    const [pendingIndex, setPendingIndex] = useState(null);
 
     /* LOAD TOC */
     useEffect(() => {
@@ -201,15 +203,31 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
         };
     }, [sections]);
 
-    const jumpTo = (index) => {
+    useEffect(() => {
+        if (pendingIndex == null) return;
+
+        if (!textMap[pendingIndex]) return;
+
+        setShowSlowLoader(false);
         setPage('reader');
 
         requestAnimationFrame(() => {
-            rowRefs.current[index]?.scrollIntoView({
+            rowRefs.current[pendingIndex]?.scrollIntoView({
                 behavior: 'smooth',
                 block: 'start'
             });
         });
+
+        setPendingIndex(null);
+    }, [textMap, pendingIndex]);
+
+    const jumpTo = (index) => {
+        setPendingIndex(index);
+        setShowSlowLoader(false);
+
+        setTimeout(() => {
+            setShowSlowLoader(true);
+        }, 125);
     };
 
     return (
@@ -277,22 +295,41 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
 
             {/* BODY (ONLY SCROLLS HERE) */}
             <div className="flex-1 overflow-hidden">
-
                 {/* TOC */}
                 {page === 'toc' && (
                     <div className="h-full overflow-y-auto px-4">
-                        {loading && <div className="py-10">Loading…</div>}
-                        {error && <AlertCircle />}
 
-                        {sections.map((sec, i) => (
-                            <button
-                                key={i}
-                                onClick={() => jumpTo(i)}
-                                className="w-full text-left py-3 border-b"
-                            >
-                                {sec.label}
-                            </button>
-                        ))}
+                        {showSlowLoader ? (
+                            <div className="h-full flex items-center justify-center">
+                                <div className="rounded-xl bg-white dark:bg-slate-900 shadow-lg border p-8 text-center">
+                                    <Loader2 className="w-10 h-10 text-blue-600 animate-spin mx-auto mb-4" />
+
+                                    <p className="font-medium text-slate-700 dark:text-slate-200">
+                                        Loading siddur...
+                                    </p>
+
+                                    <p className="text-sm text-slate-500 mt-2">
+                                        Some prayers are pretty big and may take a few moments.
+                                    </p>
+                                </div>
+                            </div>
+                        ) : (
+                            <>
+                                {loading && <div className="py-10">Loading…</div>}
+                                {error && <AlertCircle />}
+
+                                {sections.map((sec, i) => (
+                                    <button
+                                        key={i}
+                                        onClick={() => jumpTo(i)}
+                                        className="w-full text-left py-3 border-b"
+                                    >
+                                        {sec.label}
+                                    </button>
+                                ))}
+                            </>
+                        )}
+
                     </div>
                 )}
                 {/* READER */}
