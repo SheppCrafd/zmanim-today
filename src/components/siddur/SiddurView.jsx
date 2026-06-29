@@ -8,20 +8,18 @@ import {
 import { Button } from '@/components/ui/button';
 import NavMenu from '@/components/NavMenu';
 
-/* ---------------- TOC PARSE (REAL REFS) ---------------- */
+/* ---------------- TOC FLATTEN (REAL REFS ONLY) ---------------- */
 
-function flattenNodes(nodes, path = []) {
+function flattenNodes(nodes) {
     const result = [];
 
     for (const node of nodes) {
-        const currentPath = [...path, node.title];
-
         if (node.nodes) {
-            result.push(...flattenNodes(node.nodes, currentPath));
+            result.push(...flattenNodes(node.nodes));
         } else {
             result.push({
                 label: node.title,
-                refPath: currentPath
+                ref: node.ref // 🔥 THIS is the ONLY correct source of truth
             });
         }
     }
@@ -56,7 +54,7 @@ function Section({ sec, data, rowRef }) {
     return (
         <div ref={rowRef} className="space-y-4 scroll-mt-24">
 
-            {/* section header */}
+            {/* sticky section header */}
             <div className="sticky top-0 bg-white dark:bg-slate-900 py-2 z-10 border-b">
                 <p className="font-semibold text-slate-700 dark:text-slate-100">
                     {sec.label}
@@ -110,9 +108,10 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
             .then(r => r.json())
             .then(data => {
                 const nodes = data?.schema?.nodes || [];
-                const parsed = flattenNodes(nodes);
 
-                setSections(parsed);
+                const flat = flattenNodes(nodes);
+
+                setSections(flat);
                 setLoading(false);
             })
             .catch(() => {
@@ -121,7 +120,7 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
             });
     }, [bookRef]);
 
-    /* ---------------- LOAD SECTION TEXT ---------------- */
+    /* ---------------- LOAD TEXT ---------------- */
     useEffect(() => {
         if (!sections.length) return;
 
@@ -129,7 +128,7 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
 
         const load = async () => {
             for (let i = 0; i < sections.length; i++) {
-                const ref = sections[i].refPath.join(', ');
+                const ref = sections[i].ref; // 🔥 REAL Sefaria ref, no edits
 
                 try {
                     const res = await fetch(
@@ -174,7 +173,6 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
         });
     };
 
-    /* ---------------- UI ---------------- */
     return (
         <div className="h-screen flex flex-col bg-slate-50 dark:bg-slate-950 overflow-hidden">
 
@@ -199,12 +197,36 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
 
                 {/* CONTROLS */}
                 <div className="px-4 flex gap-2 py-2">
-                    <Button size="sm" variant={langMode === 'en' ? "default" : "outline"} onClick={() => setLangMode('en')}>EN</Button>
-                    <Button size="sm" variant={langMode === 'he' ? "default" : "outline"} onClick={() => setLangMode('he')}>HB</Button>
-                    <Button size="sm" variant={langMode === 'both' ? "default" : "outline"} onClick={() => setLangMode('both')}>BOTH</Button>
+                    <Button
+                        size="sm"
+                        variant={langMode === 'en' ? "default" : "outline"}
+                        onClick={() => setLangMode('en')}
+                    >
+                        EN
+                    </Button>
+
+                    <Button
+                        size="sm"
+                        variant={langMode === 'he' ? "default" : "outline"}
+                        onClick={() => setLangMode('he')}
+                    >
+                        HB
+                    </Button>
+
+                    <Button
+                        size="sm"
+                        variant={langMode === 'both' ? "default" : "outline"}
+                        onClick={() => setLangMode('both')}
+                    >
+                        BOTH
+                    </Button>
 
                     {page === 'reader' && (
-                        <Button size="sm" variant="outline" onClick={() => setPage('toc')}>
+                        <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => setPage('toc')}
+                        >
                             <ArrowLeft className="w-4 h-4 mr-1" />
                             TOC
                         </Button>
