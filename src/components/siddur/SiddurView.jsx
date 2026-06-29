@@ -33,6 +33,30 @@ function flattenNodes(nodes, keyPath = '', labelPath = '') {
     return result;
 }
 
+/* ---------------- CLEAN FILTER ---------------- */
+
+const isCleanEnglish = (t) => {
+    if (!t) return false;
+
+    const s = t.replace(/<[^>]*>/g, '').trim();
+
+    if (s.length < 8) return false;
+
+    // kill Hebrew
+    if (/[\u0590-\u05FF]/.test(s)) return false;
+
+    // kill Arabic/Cyrillic/etc
+    if (/[\u0600-\u06FF\u0400-\u04FF]/.test(s)) return false;
+
+    // kill obvious Portuguese/Spanish leaks
+    const foreignHint =
+        /(Após|Abertura|oração|Salmos|costume|oração|em|de|da|do|para)/i;
+
+    if (foreignHint.test(s) && s.split(' ').length > 6) return false;
+
+    return true;
+};
+
 /* ---------------- SECTION ---------------- */
 
 function Section({ sec, data, langMode }) {
@@ -56,16 +80,14 @@ function Section({ sec, data, langMode }) {
         ? data.he
         : (data.he ? [data.he] : []);
 
-    // 🔥 FIX: Sefaria inconsistency fallback chain
-    const enRaw =
+    const rawEn =
         data.en ||
         data.text ||
-        data.english ||
         [];
 
-    const enArr = Array.isArray(enRaw)
-        ? enRaw
-        : (enRaw ? [enRaw] : []);
+    const enArr = (Array.isArray(rawEn) ? rawEn : [rawEn])
+        .filter(Boolean)
+        .filter(isCleanEnglish);
 
     const showEN = langMode !== 'he';
     const showHB = langMode !== 'en';
@@ -75,7 +97,7 @@ function Section({ sec, data, langMode }) {
     return (
         <div className="space-y-4 scroll-mt-24">
 
-            {/* sticky header */}
+            {/* header */}
             <div className="sticky top-0 bg-white dark:bg-slate-900 py-2 z-10 border-b">
                 <p className="font-semibold text-slate-700 dark:text-slate-100">
                     {sec?.label}
@@ -86,7 +108,7 @@ function Section({ sec, data, langMode }) {
                 {Array.from({ length: maxLen }).map((_, i) => (
                     <div key={i} className="space-y-2">
 
-                        {/* Hebrew first */}
+                        {/* Hebrew */}
                         {showHB && heArr[i] && (
                             <p
                                 className="text-right text-lg leading-loose text-slate-800 dark:text-slate-100 font-serif"
@@ -155,7 +177,7 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
 
         try {
             const res = await fetch(
-                `https://www.sefaria.org/api/texts/${encodeURIComponent(sec.ref)}?lang=bi`
+                `https://www.sefaria.org/api/texts/${encodeURIComponent(sec.ref)}?context=0&pad=0&lang=bi`
             );
 
             const data = await res.json();
@@ -170,13 +192,12 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
     return (
         <div className="h-screen flex flex-col bg-slate-50 dark:bg-slate-950 overflow-hidden">
 
-            {/* ---------------- HEADER ---------------- */}
+            {/* HEADER */}
             <div className="sticky top-0 z-50 bg-white dark:bg-slate-950 border-b">
 
                 <div className="flex items-center justify-between px-4 pt-4 pb-2">
                     <div className="flex items-center gap-2">
                         <NavMenu />
-
                         <div>
                             <h1 className="text-lg font-bold">{title}</h1>
                             <p className="text-xs text-slate-500">{subtitle}</p>
@@ -205,10 +226,9 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
                 </div>
             </div>
 
-            {/* ---------------- BODY ---------------- */}
+            {/* BODY */}
             <div className="flex-1 overflow-hidden">
 
-                {/* TOC */}
                 {page === 'toc' && (
                     <div className="h-full overflow-y-auto px-4">
                         {loadingTOC && <div className="py-10">Loading…</div>}
@@ -226,7 +246,6 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
                     </div>
                 )}
 
-                {/* READER */}
                 {page === 'reader' && (
                     <div className="h-full overflow-y-auto px-4 pb-10">
 
