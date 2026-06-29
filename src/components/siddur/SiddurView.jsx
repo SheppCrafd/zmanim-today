@@ -57,7 +57,7 @@ const isEnglishLine = (t) => {
     return latinRatio > 0.65 && words > 6 && latin > 5;
 };
 
-/* ---------------- SECTION VIEW ---------------- */
+/* ---------------- SECTION RENDER ---------------- */
 
 function Section({ sec, data, langMode }) {
     if (!data) {
@@ -76,9 +76,14 @@ function Section({ sec, data, langMode }) {
         );
     }
 
-    const heArr = Array.isArray(data.he) ? data.he : (data.he ? [data.he] : []);
-    const enRaw = Array.isArray(data.text) ? data.text : (data.text ? [data.text] : []);
-    const enArr = enRaw.filter(isEnglishLine);
+    const heArr = Array.isArray(data.he)
+        ? data.he
+        : (data.he ? [data.he] : []);
+
+    // IMPORTANT FIX: DO NOT FILTER ENGLISH → keeps alignment
+    const enArr = Array.isArray(data.text)
+        ? data.text
+        : (data.text ? [data.text] : []);
 
     const showEN = langMode !== 'he';
     const showHB = langMode !== 'en';
@@ -99,6 +104,7 @@ function Section({ sec, data, langMode }) {
                 {Array.from({ length: maxLen }).map((_, i) => (
                     <div key={i} className="space-y-2">
 
+                        {/* Hebrew FIRST */}
                         {showHB && heArr[i] && (
                             <p
                                 className="text-right text-lg leading-loose text-slate-800 dark:text-slate-100 font-serif"
@@ -107,6 +113,7 @@ function Section({ sec, data, langMode }) {
                             />
                         )}
 
+                        {/* English BELOW */}
                         {showEN && enArr[i] && (
                             <p
                                 className="text-left text-sm leading-relaxed text-slate-500 dark:text-slate-400"
@@ -121,7 +128,7 @@ function Section({ sec, data, langMode }) {
     );
 }
 
-/* ---------------- MAIN ---------------- */
+/* ---------------- MAIN APP ---------------- */
 
 export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
     const [sections, setSections] = useState([]);
@@ -156,7 +163,7 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
             });
     }, [bookRef]);
 
-    /* ---------------- CLICK SECTION ---------------- */
+    /* ---------------- CLICK SECTION (FETCH ONLY THAT ONE) ---------------- */
 
     const openSection = async (sec) => {
         setPage('reader');
@@ -201,6 +208,7 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
                     </a>
                 </div>
 
+                {/* controls */}
                 <div className="px-4 flex gap-2 py-2">
                     <Button size="sm" variant={langMode === 'en' ? "default" : "outline"} onClick={() => setLangMode('en')}>EN</Button>
                     <Button size="sm" variant={langMode === 'he' ? "default" : "outline"} onClick={() => setLangMode('he')}>HB</Button>
