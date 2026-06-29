@@ -9,6 +9,7 @@ if (typeof document !== 'undefined') {
     document.body.style.overflow = 'hidden';
 }
 
+/* ---------------- FLATTEN ---------------- */
 function flattenNodes(nodes, keyPath = '') {
     const out = [];
 
@@ -30,6 +31,7 @@ function flattenNodes(nodes, keyPath = '') {
     return out;
 }
 
+/* ---------------- TEXT ---------------- */
 function SectionText({ he, text }) {
     const heArr = Array.isArray(he) ? he : he ? [he] : [];
     const enArr = Array.isArray(text) ? text : text ? [text] : [];
@@ -54,6 +56,7 @@ function SectionText({ he, text }) {
     );
 }
 
+/* ---------------- MAIN ---------------- */
 export default function SiddurView({ title, subtitle, bookRef }) {
     const containerRef = useRef(null);
 
@@ -62,9 +65,9 @@ export default function SiddurView({ title, subtitle, bookRef }) {
     const [activeIndex, setActiveIndex] = useState(0);
     const [startIndex, setStartIndex] = useState(null);
 
-    const WINDOW = 1;
+    const WINDOW = 3;
 
-    /* ---------------- LOAD INDEX ---------------- */
+    /* ---------------- LOAD TOC ---------------- */
     useEffect(() => {
         fetch(`https://www.sefaria.org/api/index/${bookRef}`)
             .then(r => r.json())
@@ -75,7 +78,7 @@ export default function SiddurView({ title, subtitle, bookRef }) {
             });
     }, [bookRef]);
 
-    /* ---------------- SAFE LOAD (ONLY HERE) ---------------- */
+    /* ---------------- LOAD SINGLE SECTION ---------------- */
     const load = async (i) => {
         if (loaded[i] || !sections[i]) return;
 
@@ -88,13 +91,17 @@ export default function SiddurView({ title, subtitle, bookRef }) {
         setLoaded(prev => ({ ...prev, [i]: data }));
     };
 
-    /* ---------------- ENTER ---------------- */
+    /* ---------------- OPEN ---------------- */
     const openAt = async (i) => {
         setStartIndex(i);
         setActiveIndex(i);
+
+        for (let x = i - WINDOW; x <= i + WINDOW; x++) {
+            if (x >= 0 && x < sections.length) load(x);
+        }
     };
 
-    /* ---------------- OBSERVER (ONLY DRIVER OF STATE) ---------------- */
+    /* ---------------- OBSERVER ---------------- */
     useEffect(() => {
         if (startIndex === null) return;
 
@@ -106,8 +113,11 @@ export default function SiddurView({ title, subtitle, bookRef }) {
                     if (!e.isIntersecting) continue;
 
                     const i = Number(e.target.dataset.index);
-
                     setActiveIndex(i);
+
+                    for (let x = i - WINDOW; x <= i + WINDOW; x++) {
+                        if (x >= 0 && x < sections.length) load(x);
+                    }
                 }
             },
             {
@@ -121,20 +131,6 @@ export default function SiddurView({ title, subtitle, bookRef }) {
 
         return () => observer.disconnect();
     }, [startIndex, sections]);
-
-    /* ---------------- LOAD WINDOW (CORRECT PLACE) ---------------- */
-    useEffect(() => {
-        if (startIndex === null) return;
-
-        for (let i = activeIndex - WINDOW; i <= activeIndex + WINDOW; i++) {
-            if (i >= 0 && i < sections.length) load(i);
-        }
-    }, [activeIndex, startIndex, sections]);
-
-    const start = Math.max(0, activeIndex - WINDOW);
-    const end = Math.min(sections.length - 1, activeIndex + WINDOW);
-
-    const visible = sections.slice(start, end + 1);
 
     return (
         <div className="h-screen flex flex-col overflow-hidden bg-slate-50 dark:bg-slate-950">
@@ -152,12 +148,13 @@ export default function SiddurView({ title, subtitle, bookRef }) {
                 </Button>
             </div>
 
-            {/* SCROLL */}
+            {/* SCROLL CONTAINER (IMPORTANT: FULL LIST RENDERED) */}
             <div
                 ref={containerRef}
                 className="flex-1 overflow-y-auto mx-4 mb-4 bg-white dark:bg-slate-900 rounded-xl"
             >
 
+                {/* TOC */}
                 {startIndex === null && (
                     <div>
                         {sections.map((s, i) => (
@@ -173,17 +170,19 @@ export default function SiddurView({ title, subtitle, bookRef }) {
                     </div>
                 )}
 
+                {/* READER (FULL HEIGHT RESTORED) */}
                 {startIndex !== null && (
                     <div className="p-4 space-y-12">
 
-                        {visible.map((sec, idx) => {
-                            const real = start + idx;
-                            const data = loaded[real];
+                        {sections.map((sec, i) => {
+                            const data = loaded[i];
+
+                            if (!data) load(i);
 
                             return (
                                 <div
-                                    key={real}
-                                    data-index={real}
+                                    key={i}
+                                    data-index={i}
                                     className="space-y-3"
                                 >
                                     <div className="sticky top-0 bg-white dark:bg-slate-900 py-2 font-semibold">
