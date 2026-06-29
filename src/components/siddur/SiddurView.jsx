@@ -157,22 +157,30 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
         let cancelled = false;
 
         const loadAll = async () => {
-            for (let i = 0; i < sections.length; i++) {
+            const promises = sections.map(async (sec, i) => {
                 try {
                     const res = await fetch(
-                        `https://www.sefaria.org/api/texts/${encodeURIComponent(sections[i].ref)}?lang=bi`
+                        `https://www.sefaria.org/api/texts/${encodeURIComponent(sec.ref)}?lang=bi`
                     );
                     const data = await res.json();
 
                     if (!cancelled) {
-                        setTextMap(prev => ({ ...prev, [i]: data }));
+                        setTextMap(prev => ({
+                            ...prev,
+                            [i]: data
+                        }));
                     }
                 } catch {
                     if (!cancelled) {
-                        setTextMap(prev => ({ ...prev, [i]: { error: true } }));
+                        setTextMap(prev => ({
+                            ...prev,
+                            [i]: { error: true }
+                        }));
                     }
                 }
-            }
+            });
+
+            await Promise.all(promises);
         };
 
         loadAll();
