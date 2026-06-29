@@ -90,10 +90,9 @@ function SectionRow({
     loadSection,
     showEN,
     showHB,
-    scrollRef,
     onVisible
 }) {
-    const rowRef = useRef(null);
+    const rowRef = React.useRef(null);
 
     useEffect(() => {
         loadSection(index);
@@ -101,9 +100,7 @@ function SectionRow({
 
     useEffect(() => {
         const el = rowRef.current;
-        const root = scrollRef?.current;
-
-        if (!el || !root) return;
+        if (!el) return;
 
         const observer = new IntersectionObserver(
             ([entry]) => {
@@ -112,15 +109,14 @@ function SectionRow({
                 }
             },
             {
-                root,
-                threshold: 0.25
+                threshold: 0.7,
+                rootMargin: '-10% 0px -10% 0px'
             }
         );
 
         observer.observe(el);
-
         return () => observer.disconnect();
-    }, [index, onVisible, scrollRef]);
+    }, [index, onVisible]);
 
     const data = loadedSections[index];
 
@@ -177,6 +173,8 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
 
     const [showEN, setShowEN] = useState(true);
     const [showHB, setShowHB] = useState(true);
+
+    const updateLock = useRef(false);
 
     /* LOAD TOC */
     useEffect(() => {
@@ -242,6 +240,43 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
         ) {
             loadSection(i);
         }
+    };
+
+    /* STABLE SCROLL UPDATE (NO LOOP) */
+    const handleVisible = (index) => {
+        if (updateLock.current) return;
+
+        if (index === currentIndex) return;
+
+        updateLock.current = true;
+
+        setCurrentIndex(index);
+
+        for (
+            let j = Math.max(0, index - 2);
+            j <= Math.min(sections.length - 1, index + 4);
+            j++
+        ) {
+            loadSection(j);
+        }
+
+        setLoadedSections(prev => {
+            const next = {};
+
+            for (
+                let j = Math.max(0, index - 4);
+                j <= Math.min(sections.length - 1, index + 6);
+                j++
+            ) {
+                if (prev[j]) next[j] = prev[j];
+            }
+
+            return next;
+        });
+
+        setTimeout(() => {
+            updateLock.current = false;
+        }, 150);
     };
 
     const center = currentIndex ?? startIndex ?? 0;
@@ -334,34 +369,7 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
                                         loadSection={loadSection}
                                         showEN={showEN}
                                         showHB={showHB}
-                                        scrollRef={scrollRef}
-                                        onVisible={(i) => {
-                                            if (i === currentIndex) return;
-
-                                            setCurrentIndex(i);
-
-                                            for (
-                                                let j = Math.max(0, i - 2);
-                                                j <= Math.min(sections.length - 1, i + 4);
-                                                j++
-                                            ) {
-                                                loadSection(j);
-                                            }
-
-                                            setLoadedSections(prev => {
-                                                const next = {};
-
-                                                for (
-                                                    let j = Math.max(0, i - 4);
-                                                    j <= Math.min(sections.length - 1, i + 6);
-                                                    j++
-                                                ) {
-                                                    if (prev[j]) next[j] = prev[j];
-                                                }
-
-                                                return next;
-                                            });
-                                        }}
+                                        onVisible={handleVisible}
                                     />
                                 );
                             })}
