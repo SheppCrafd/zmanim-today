@@ -173,7 +173,7 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
 
         try {
             const res = await fetch(
-                `https://www.sefaria.org/api/texts/${encodeURIComponent(sec.ref)}?lang=bi`
+                `https://www.sefaria.org/api/texts/${ref}?lang=he&lang2=en`
             );
 
             const data = await res.json();
