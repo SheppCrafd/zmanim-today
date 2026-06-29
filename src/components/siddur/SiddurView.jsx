@@ -117,53 +117,21 @@ function Section({ sec, data, rowRef, langMode }) {
 /* ---------------- MAIN ---------------- */
 
 export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
+
     const rowRefs = useRef({});
+    const containerRef = useRef(null);
 
     const [sections, setSections] = useState([]);
     const [textMap, setTextMap] = useState({});
+
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(false);
 
     const [page, setPage] = useState('toc');
     const [langMode, setLangMode] = useState('both');
 
-    const [currentIndex, setCurrentIndex] = useState(null);
-
-    const loadedSetRef = useRef(new Set());
-
-    /* ---------------- FETCH SECTION ---------------- */
-
-    const fetchSection = async (i) => {
-        const sec = sections[i];
-        if (!sec) return;
-
-        if (loadedSetRef.current.has(i)) return;
-        loadedSetRef.current.add(i);
-
-        try {
-            const res = await fetch(
-                `https://www.sefaria.org/api/texts/${encodeURIComponent(sec.ref)}?lang=bi`
-            );
-            const data = await res.json();
-
-            setTextMap(prev => ({
-                ...prev,
-                [i]: data
-            }));
-        } catch {
-            setTextMap(prev => ({
-                ...prev,
-                [i]: { error: true }
-            }));
-        }
-    };
-
-    /* ---------------- WINDOW ---------------- */
-
-    const inWindow = (i) => {
-        if (currentIndex == null) return false;
-        return i >= currentIndex - 2 && i <= currentIndex + 2;
-    };
+    const [currentIndex, setCurrentIndex] = useState(0);
+    const RANGE = 2;
 
     /* ---------------- LOAD TOC ---------------- */
 
@@ -186,65 +154,81 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
             });
     }, [bookRef]);
 
-    /* ---------------- SCROLL TRACKER ---------------- */
+    /* ---------------- FETCH ONE SECTION ---------------- */
+
+    const fetchSection = async (i) => {
+        if (!sections[i] || textMap[i]) return;
+
+        try {
+            const res = await fetch(
+                `https://www.sefaria.org/api/texts/${encodeURIComponent(sections[i].ref)}?lang=bi`
+            );
+            const data = await res.json();
+
+            setTextMap(prev => ({ ...prev, [i]: data }));
+        } catch {
+            setTextMap(prev => ({ ...prev, [i]: { error: true } }));
+        }
+    };
+
+    /* ---------------- WINDOWED LOADING ---------------- */
+
+    useEffect(() => {
+        if (!sections.length) return;
+
+        const start = Math.max(0, currentIndex - RANGE);
+        const end = Math.min(sections.length - 1, currentIndex + RANGE);
+
+        for (let i = start; i <= end; i++) {
+            fetchSection(i);
+        }
+    }, [currentIndex, sections]);
+
+    /* ---------------- SCROLL TRACKING ---------------- */
 
     useEffect(() => {
         if (page !== 'reader') return;
+
+        const container = containerRef.current;
+        if (!container) return;
 
         const observer = new IntersectionObserver(
             (entries) => {
                 let bestIndex = null;
                 let bestRatio = 0;
 
-                entries.forEach((entry) => {
-                    if (!entry.isIntersecting) return;
+                for (const entry of entries) {
+                    if (!entry.isIntersecting) continue;
 
-                    const index = Number(entry.target.dataset.index);
-                    if (isNaN(index)) return;
-
+                    const i = Number(entry.target.dataset.index);
                     if (entry.intersectionRatio > bestRatio) {
                         bestRatio = entry.intersectionRatio;
-                        bestIndex = index;
+                        bestIndex = i;
                     }
-                });
+                }
 
                 if (bestIndex != null) {
                     setCurrentIndex(bestIndex);
                 }
             },
             {
-                rootMargin: '150px',
-                threshold: [0.25, 0.5, 0.75]
+                root: container,
+                rootMargin: '0px',
+                threshold: 0.4
             }
         );
 
-        const timer = setTimeout(() => {
-            Object.entries(rowRefs.current).forEach(([i, el]) => {
-                if (el instanceof Element) {
-                    el.dataset.index = i;
-                    observer.observe(el);
-                }
-            });
-        }, 100);
+        Object.entries(rowRefs.current).forEach(([i, el]) => {
+            if (el) {
+                el.dataset.index = i;
+                observer.observe(el);
+            }
+        });
 
-        return () => {
-            clearTimeout(timer);
-            observer.disconnect();
-        };
+        return () => observer.disconnect();
     }, [page, sections]);
 
-    /* ---------------- WINDOW FETCH ---------------- */
-
-    useEffect(() => {
-        if (currentIndex == null) return;
-
-        for (let i = currentIndex - 2; i <= currentIndex + 2; i++) {
-            if (i < 0 || i >= sections.length) continue;
-            fetchSection(i);
-        }
-    }, [currentIndex, sections]);
-
-    /* ---------------- TOC CLICK ---------------- */
+    /* ---------------- JUMP ---------------- */
 
     const jumpTo = (index) => {
         setPage('reader');
@@ -258,7 +242,7 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
         });
     };
 
-    /* ---------------- RENDER ---------------- */
+    /* ---------------- UI ---------------- */
 
     return (
         <div className="h-screen flex flex-col bg-slate-50 dark:bg-slate-950 overflow-hidden">
@@ -283,12 +267,12 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
                 </div>
 
                 <div className="px-4 flex gap-2 py-2">
-                    <Button size="sm" onClick={() => setLangMode('en')}>EN</Button>
-                    <Button size="sm" onClick={() => setLangMode('he')}>HB</Button>
-                    <Button size="sm" onClick={() => setLangMode('both')}>BOTH</Button>
+                    <Button size="sm" onClick={() => setLangMode('en')} variant={langMode === 'en' ? "default" : "outline"}>EN</Button>
+                    <Button size="sm" onClick={() => setLangMode('he')} variant={langMode === 'he' ? "default" : "outline"}>HB</Button>
+                    <Button size="sm" onClick={() => setLangMode('both')} variant={langMode === 'both' ? "default" : "outline"}>BOTH</Button>
 
                     {page === 'reader' && (
-                        <Button size="sm" onClick={() => setPage('toc')}>
+                        <Button size="sm" variant="outline" onClick={() => setPage('toc')}>
                             <ArrowLeft className="w-4 h-4 mr-1" />
                             TOC
                         </Button>
@@ -302,9 +286,6 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
                 {/* TOC */}
                 {page === 'toc' && (
                     <div className="h-full overflow-y-auto px-4">
-                        {loading && <div className="py-10">Loading…</div>}
-                        {error && <AlertCircle />}
-
                         {sections.map((sec, i) => (
                             <button
                                 key={i}
@@ -317,32 +298,23 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
                     </div>
                 )}
 
-                {/* READER (WINDOWED) */}
+                {/* READER */}
                 {page === 'reader' && (
-                    <div className="h-full overflow-y-auto px-4 pb-10">
-
-                        {sections.map((sec, i) => {
-                            if (!inWindow(i)) {
-                                return (
-                                    <div key={i} className="py-6 text-center text-slate-300 text-sm">
-                                        ·
-                                    </div>
-                                );
-                            }
-
-                            return (
-                                <Section
-                                    key={i}
-                                    sec={sec}
-                                    data={textMap[i]}
-                                    langMode={langMode}
-                                    rowRef={(el) => {
-                                        if (el) rowRefs.current[i] = el;
-                                    }}
-                                />
-                            );
-                        })}
-
+                    <div
+                        ref={containerRef}
+                        className="h-full overflow-y-auto px-4 pb-10"
+                    >
+                        {sections.map((sec, i) => (
+                            <Section
+                                key={i}
+                                sec={sec}
+                                data={textMap[i]}
+                                langMode={langMode}
+                                rowRef={(el) => {
+                                    rowRefs.current[i] = el;
+                                }}
+                            />
+                        ))}
                     </div>
                 )}
 
