@@ -134,15 +134,24 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
     const [pendingIndex, setPendingIndex] = useState(null);
 
     const fetchSection = async (i) => {
-        if (textMap[i] || !sections[i]) return;
+        const sec = sections[i];
+        if (!sec || textMap[i]) return;
+
         try {
             const res = await fetch(
-                `https://www.sefaria.org/api/texts/${encodeURIComponent(sections[i].ref)}?lang=bi`
+                `https://www.sefaria.org/api/texts/${encodeURIComponent(sec.ref)}?lang=bi`
             );
             const data = await res.json();
-            setTextMap(prev => ({ ...prev, [i]: data }));
+
+            setTextMap(prev => ({
+                ...prev,
+                [i]: data
+            }));
         } catch {
-            setTextMap(prev => ({ ...prev, [i]: { error: true } }));
+            setTextMap(prev => ({
+                ...prev,
+                [i]: { error: true }
+            }));
         }
     };
 
@@ -168,39 +177,7 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
 
     /* LOAD TEXT */
     useEffect(() => {
-        if (!sections.length) return;
-
-        let cancelled = false;
-
-        const loadAll = async () => {
-            const promises = sections.map(async (sec, i) => {
-                try {
-                    const res = await fetch(
-                        `https://www.sefaria.org/api/texts/${encodeURIComponent(sec.ref)}?lang=bi`
-                    );
-                    const data = await res.json();
-
-                    if (!cancelled) {
-                        setTextMap(prev => ({
-                            ...prev,
-                            [i]: data
-                        }));
-                    }
-                } catch {
-                    if (!cancelled) {
-                        setTextMap(prev => ({
-                            ...prev,
-                            [i]: { error: true }
-                        }));
-                    }
-                }
-            });
-
-            await Promise.all(promises);
-        };
-
-        loadAll();
-        return () => { cancelled = true; };
+        // DO NOTHING — we now lazy load via scroll + click
     }, [sections]);
 
     useEffect(() => {
