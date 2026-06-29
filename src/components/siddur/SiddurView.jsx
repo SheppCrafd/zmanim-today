@@ -1,94 +1,54 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { Loader2, ArrowLeft, ChevronRight } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import {
+    ExternalLink,
+    Loader2,
+    ChevronRight
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import NavMenu from '@/components/NavMenu';
+import { useNavigate, useParams } from 'react-router-dom';
 
-/* ---------------- LOCK SCROLL ---------------- */
+/* ---------------- CONFIG ---------------- */
+const WINDOW = 2;
+
+/* ---------------- SCROLL LOCK ---------------- */
 if (typeof document !== 'undefined') {
     document.documentElement.style.height = '100%';
     document.body.style.height = '100%';
     document.body.style.overflow = 'hidden';
 }
 
-/* ---------------- FLATTEN TOC ---------------- */
-function flattenNodes(nodes, keyPath = '') {
-    const out = [];
-
-    function walk(node, path) {
-        const key = node.key || node.title;
-        const full = path ? `${path}, ${key}` : key;
-
-        // REAL text node
-        if (node.nodeType === 'JaggedArrayNode') {
-            out.push({
-                label: node.title,
-                heLabel: node.heTitle,
-                ref: full
-            });
-            return;
-        }
-
-        // Container
-        if (node.nodes?.length) {
-            node.nodes.forEach(child => walk(child, full));
-        }
-    }
-
-    nodes?.forEach(node => walk(node, keyPath));
-
-    return out;
-}
-
-/* ---------------- NORMALIZE ---------------- */
-function normalizeArray(x) {
-    if (x == null) return [];
-
-    if (Array.isArray(x)) {
-        return x.flat(Infinity).filter(
-            item =>
-                item !== '' &&
-                item !== null &&
-                item !== undefined
-        );
-    }
-
-    return [x];
-}
+/* ---------------- HELPERS ---------------- */
+const isProbablyEnglish = (str = '') =>
+    /^[\x00-\x7F\s.,;:'"!?()\-–—]*$/.test(str);
 
 /* ---------------- TEXT ---------------- */
-function SectionText({ he, en }) {
-    const max = Math.max(he.length, en.length);
-
-    if (!max) {
-        return (
-            <p className="text-sm text-slate-400 italic">
-                No text available.
-            </p>
-        );
-    }
+function SectionText({ he, en, showEnglish }) {
+    const heArr = Array.isArray(he) ? he : he ? [he] : [];
+    const enArr = Array.isArray(en) ? en : en ? [en] : [];
+    const maxLen = Math.max(heArr.length, enArr.length);
 
     return (
         <div className="space-y-6">
-            {Array.from({ length: max }).map((_, i) => (
+            {Array.from({ length: maxLen }).map((_, i) => (
                 <div key={i} className="space-y-2">
-                    {he[i] && (
+
+                    {heArr[i] && (
                         <p
                             dir="rtl"
-                            className="text-right text-lg font-serif leading-relaxed"
-                            dangerouslySetInnerHTML={{
-                                __html: he[i]
-                            }}
+                            className="text-right text-lg font-serif text-slate-900 dark:text-slate-100"
+                            dangerouslySetInnerHTML={{ __html: heArr[i] }}
                         />
                     )}
 
-                    {en[i] && (
-                        <p
-                            className="text-sm text-slate-500 leading-relaxed"
-                            dangerouslySetInnerHTML={{
-                                __html: en[i]
-                            }}
-                        />
-                    )}
+                    {showEnglish &&
+                        enArr[i] &&
+                        isProbablyEnglish(enArr[i]) && (
+                            <p
+                                className="text-sm text-slate-500 dark:text-slate-400"
+                                dangerouslySetInnerHTML={{ __html: enArr[i] }}
+                            />
+                        )}
                 </div>
             ))}
         </div>
@@ -96,307 +56,257 @@ function SectionText({ he, en }) {
 }
 
 /* ---------------- MAIN ---------------- */
-export default function SiddurView({
-    title,
-    subtitle,
-    bookRef
-}) {
-    const containerRef = useRef(null);
+export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
+    const navigate = useNavigate();
+    const { index } = useParams();
+
+    const scrollRef = useRef(null);
+    const sectionRefs = useRef([]);
 
     const [sections, setSections] = useState([]);
     const [loaded, setLoaded] = useState({});
-    const [activeIndex, setActiveIndex] = useState(0);
-    const [startIndex, setStartIndex] = useState(null);
+    const [showEnglish, setShowEnglish] = useState(true);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(false);
 
-    const WINDOW = 3;
+    const isReader = index !== undefined;
+    const activeIndex = isReader ? parseInt(index, 10) : 0;
 
     /* ---------------- LOAD TOC ---------------- */
     useEffect(() => {
+        setLoading(true);
+
         fetch(`https://www.sefaria.org/api/index/${bookRef}`)
             .then(r => r.json())
             .then(data => {
-                const nodes = data?.schema?.nodes || [];
-                const root =
-                    data?.schema?.key || bookRef;
+                const schema = data?.schema;
+                const rootKey = schema?.key || bookRef.replace(/_/g, ' ');
+                const nodes = schema?.nodes || [];
 
-                setSections(
-                    flattenNodes(nodes, root)
-                );
+                const flatten = (nodes, keyPath = '') => {
+                    let res = [];
+
+                    for (const node of nodes) {
+                        const key = node.key || node.title;
+                        const full = keyPath ? `${keyPath}, ${key}` : key;
+
+                        if (node.nodes) {
+                            res.push(...flatten(node.nodes, full));
+                        } else {
+                            res.push({
+                                label: node.title,
+                                ref: full
+                            });
+                        }
+                    }
+                    return res;
+                };
+
+                setSections(flatten(nodes, rootKey));
+                setLoading(false);
             })
-            .catch(console.error);
+            .catch(() => {
+                setError(true);
+                setLoading(false);
+            });
     }, [bookRef]);
 
-    /* ---------------- LOAD TEXT ---------------- */
-    const load = async i => {
+    /* ---------------- LOAD SECTION ---------------- */
+    const loadSection = async (i) => {
         if (loaded[i]) return;
-        if (!sections[i]) return;
+
+        const sec = sections[i];
+        if (!sec) return;
 
         try {
-            const ref = encodeURIComponent(
-                sections[i].ref
-            );
-
             const res = await fetch(
-                `https://www.sefaria.org/api/texts/${ref}?lang=he&lang2=en`
+                `https://www.sefaria.org/api/texts/${encodeURIComponent(sec.ref)}`
             );
 
             const data = await res.json();
 
-            const he = normalizeArray(data.he);
-            const en = normalizeArray(
-                data.text ||
-                    data.en ||
-                    data.english
-            );
-
             setLoaded(prev => ({
                 ...prev,
-                [i]: {
-                    he,
-                    en
-                }
+                [i]: data
             }));
-        } catch (err) {
-            console.error(err);
-
+        } catch {
             setLoaded(prev => ({
                 ...prev,
-                [i]: {
-                    he: [],
-                    en: []
-                }
+                [i]: { error: true }
             }));
         }
     };
 
-    /* ---------------- OPEN ---------------- */
-    const openAt = i => {
-        setStartIndex(i);
-        setActiveIndex(i);
+    /* ---------------- OPEN SECTION ---------------- */
+    const openAt = (i) => {
+        navigate(`/read/${i}`);
     };
 
-    /* ---------------- PRELOAD WINDOW ---------------- */
+    const goBack = () => {
+        navigate('/toc');
+    };
+
+    /* ---------------- CHUNK WINDOW ---------------- */
+    const windowStart = Math.max(0, activeIndex - WINDOW);
+    const windowEnd = Math.min(sections.length - 1, activeIndex + WINDOW);
+
+    /* ---------------- PRELOAD ---------------- */
     useEffect(() => {
-        if (startIndex === null) return;
+        if (!isReader) return;
 
-        const first = Math.max(
-            0,
-            activeIndex - WINDOW
-        );
+        const start = Math.max(0, activeIndex - WINDOW);
+        const end = Math.min(sections.length - 1, activeIndex + WINDOW);
 
-        const last = Math.min(
-            sections.length - 1,
-            activeIndex + WINDOW
-        );
-
-        for (let i = first; i <= last; i++) {
-            load(i);
+        for (let i = start; i <= end; i++) {
+            if (!loaded[i]) loadSection(i);
         }
-    }, [
-        activeIndex,
-        sections,
-        startIndex
-    ]);
+    }, [activeIndex, isReader, sections]);
 
-    /* ---------------- WINDOW ---------------- */
-    const start = Math.max(
-        0,
-        activeIndex - WINDOW
-    );
-
-    const end = Math.min(
-        sections.length - 1,
-        activeIndex + WINDOW
-    );
-
-    const visible = sections.slice(
-        start,
-        end + 1
-    );
-
-    /* ---------------- OBSERVER ---------------- */
+    /* ---------------- SCROLL TRACKING ---------------- */
     useEffect(() => {
-        if (startIndex === null) return;
+        if (!isReader) return;
 
-        const root = containerRef.current;
-        if (!root) return;
+        const el = scrollRef.current;
+        if (!el) return;
 
-        const observer =
-            new IntersectionObserver(
-                entries => {
-                    let best = null;
+        const handler = () => {
+            const nodes = sectionRefs.current;
 
-                    for (const e of entries) {
-                        if (!e.isIntersecting)
-                            continue;
+            let best = Infinity;
+            let closest = activeIndex;
 
-                        if (
-                            !best ||
-                            e.intersectionRatio >
-                                best.intersectionRatio
-                        ) {
-                            best = e;
-                        }
-                    }
+            for (let i = 0; i < nodes.length; i++) {
+                const n = nodes[i];
+                if (!n) continue;
 
-                    if (!best) return;
+                const dist = Math.abs(n.getBoundingClientRect().top);
 
-                    const i = Number(
-                        best.target.dataset.index
-                    );
-
-                    setActiveIndex(i);
-                },
-                {
-                    root,
-                    threshold: [
-                        0.25,
-                        0.5,
-                        0.75
-                    ]
+                if (dist < best) {
+                    best = dist;
+                    closest = i;
                 }
-            );
+            }
 
-        const nodes =
-            root.querySelectorAll(
-                '[data-index]'
-            );
-
-        nodes.forEach(node =>
-            observer.observe(node)
-        );
-
-        return () => {
-            observer.disconnect();
+            navigate(`/read/${closest}`, { replace: true });
         };
-    }, [
-        startIndex,
-        start,
-        end
-    ]);
+
+        el.addEventListener('scroll', handler);
+        return () => el.removeEventListener('scroll', handler);
+    }, [isReader, sections]);
+
+    /* ---------------- RENDER ---------------- */
 
     return (
         <div className="h-screen flex flex-col overflow-hidden bg-slate-50 dark:bg-slate-950">
+
             {/* HEADER */}
-            <div className="px-4 pt-4 pb-2 flex justify-between">
-                <div>
+            <div className="px-4 pt-4 pb-2 flex justify-between items-center shrink-0">
+                <div className="flex items-center gap-2">
                     <NavMenu />
-
-                    <h1 className="font-bold">
-                        {title}
-                    </h1>
-
-                    <p className="text-xs text-slate-500">
-                        {subtitle}
-                    </p>
+                    <div>
+                        <h1 className="text-lg font-bold">{title}</h1>
+                        <p className="text-xs text-slate-500">{subtitle}</p>
+                    </div>
                 </div>
 
-                <Button
-                    variant="ghost"
-                    onClick={() =>
-                        setStartIndex(null)
-                    }
-                >
-                    <ArrowLeft />
-                </Button>
+                <div className="flex gap-2">
+                    {isReader && (
+                        <Button variant="ghost" size="sm" onClick={goBack}>
+                            ← TOC
+                        </Button>
+                    )}
+
+                    {isReader && (
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setShowEnglish(v => !v)}
+                        >
+                            EN {showEnglish ? 'ON' : 'OFF'}
+                        </Button>
+                    )}
+                </div>
             </div>
 
-            {/* SCROLL */}
+            {/* BODY */}
             <div
-                ref={containerRef}
-                className="flex-1 overflow-y-auto mx-4 mb-4 bg-white dark:bg-slate-900 rounded-xl"
+                ref={scrollRef}
+                className="flex-1 min-h-0 overflow-y-auto mx-4 mb-4 rounded-xl border bg-white dark:bg-slate-900"
             >
-                {/* TOC */}
-                {startIndex === null && (
+
+                {/* ---------------- TOC ---------------- */}
+                {!isReader && (
                     <div>
-                        {sections.map(
-                            (s, i) => (
-                                <button
-                                    key={i}
-                                    onClick={() =>
-                                        openAt(i)
-                                    }
-                                    className="w-full flex justify-between p-3 border-b"
-                                >
-                                    <div className="text-left">
-                                        <p>
-                                            {
-                                                s.label
-                                            }
-                                        </p>
-
-                                        {s.heLabel && (
-                                            <p
-                                                dir="rtl"
-                                                className="text-xs text-slate-400"
-                                            >
-                                                {
-                                                    s.heLabel
-                                                }
-                                            </p>
-                                        )}
-                                    </div>
-
-                                    <ChevronRight />
-                                </button>
-                            )
+                        {loading && (
+                            <div className="p-10 flex justify-center">
+                                <Loader2 className="animate-spin" />
+                            </div>
                         )}
+
+                        {error && (
+                            <div className="p-6 text-red-500">
+                                Failed to load
+                            </div>
+                        )}
+
+                        {sections.map((sec, i) => (
+                            <button
+                                key={i}
+                                onClick={() => openAt(i)}
+                                className="w-full flex justify-between px-4 py-3 border-b hover:bg-slate-100 dark:hover:bg-slate-800"
+                            >
+                                <span>{sec.label}</span>
+                                <ChevronRight />
+                            </button>
+                        ))}
                     </div>
                 )}
 
-                {/* READER */}
-                {startIndex !== null && (
+                {/* ---------------- READER (MC CHUNKS) ---------------- */}
+                {isReader && (
                     <div className="p-4 space-y-12">
-                        {visible.map(
-                            (
-                                sec,
-                                idx
-                            ) => {
-                                const real =
-                                    start +
-                                    idx;
 
-                                const data =
-                                    loaded[
-                                        real
-                                    ];
+                        {sections.map((sec, i) => {
+                            if (i < windowStart || i > windowEnd) return null;
+
+                            const data = loaded[i];
+
+                            if (!data) {
+                                loadSection(i);
 
                                 return (
                                     <div
-                                        key={
-                                            real
-                                        }
-                                        data-index={
-                                            real
-                                        }
-                                        className="space-y-3"
+                                        key={i}
+                                        ref={el => (sectionRefs.current[i] = el)}
+                                        className="flex justify-center py-10"
                                     >
-                                        <div className="sticky top-0 bg-white dark:bg-slate-900 py-2 font-semibold">
-                                            {
-                                                sec.label
-                                            }
-                                        </div>
-
-                                        {data ? (
-                                            <SectionText
-                                                he={
-                                                    data.he
-                                                }
-                                                en={
-                                                    data.en
-                                                }
-                                            />
-                                        ) : (
-                                            <div className="flex justify-center py-6">
-                                                <Loader2 className="animate-spin" />
-                                            </div>
-                                        )}
+                                        <Loader2 className="animate-spin" />
                                     </div>
                                 );
                             }
-                        )}
+
+                            return (
+                                <div
+                                    key={i}
+                                    ref={el => (sectionRefs.current[i] = el)}
+                                    className="space-y-4"
+                                >
+                                    <div className="sticky top-0 bg-white dark:bg-slate-900 py-2 font-semibold">
+                                        {sec.label}
+                                    </div>
+
+                                    <SectionText
+                                        he={data.he}
+                                        en={data.text}
+                                        showEnglish={showEnglish}
+                                    />
+                                </div>
+                            );
+                        })}
+
                     </div>
                 )}
+
             </div>
         </div>
     );

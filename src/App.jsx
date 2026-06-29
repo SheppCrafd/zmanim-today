@@ -18,6 +18,9 @@ import ChabadSiddur from './pages/ChabadSiddur';
 import Compass from './pages/Compass';
 import Settings from './pages/Settings';
 
+// ✅ ADD THIS (your new reader engine)
+import SiddurView from '@/components/SiddurView';
+
 const AuthenticatedApp = () => {
   const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
 
@@ -35,18 +38,46 @@ const AuthenticatedApp = () => {
   }
 
   return (
-    <>
-      <Routes>
-        <Route path="/" element={<Home />} />
-        <Route path="/Zmanim" element={<Zmanim />} />
-        <Route path="/Compass" element={<Compass />} />
-        <Route path="/Settings" element={<Settings />} />
-        <Route path="/SephardicSiddur" element={<SephardicSiddur />} />
-        <Route path="/AshkenaziSiddur" element={<AshkenaziSiddur />} />
-        <Route path="/ChabadSiddur" element={<ChabadSiddur />} />
-        <Route path="*" element={<PageNotFound />} />
-      </Routes>
-    </>
+    <Routes>
+      {/* ---------------- CORE PAGES ---------------- */}
+      <Route path="/" element={<Home />} />
+      <Route path="/Zmanim" element={<Zmanim />} />
+      <Route path="/Compass" element={<Compass />} />
+      <Route path="/Settings" element={<Settings />} />
+
+      {/* ---------------- SIDDUr ROOT PAGES ---------------- */}
+      <Route path="/SephardicSiddur" element={<SephardicSiddur />} />
+      <Route path="/AshkenaziSiddur" element={<AshkenaziSiddur />} />
+      <Route path="/ChabadSiddur" element={<ChabadSiddur />} />
+
+      {/* ---------------- NEW UNIFIED READER ENGINE ---------------- */}
+      {/* Ashkenazi */}
+      <Route
+        path="/siddur/ashkenazi/:index?"
+        element={<AshkenaziSiddur />}
+      />
+
+      {/* Sephardic */}
+      <Route
+        path="/siddur/sephardic/:index?"
+        element={<SephardicSiddur />}
+      />
+
+      {/* Chabad */}
+      <Route
+        path="/siddur/chabad/:index?"
+        element={<ChabadSiddur />}
+      />
+
+      {/* ---------------- OPTIONAL GENERIC ENGINE (future-proof) ---------------- */}
+      <Route
+        path="/siddur/:type/:index?"
+        element={<SiddurView />}
+      />
+
+      {/* ---------------- FALLBACK ---------------- */}
+      <Route path="*" element={<PageNotFound />} />
+    </Routes>
   );
 };
 
