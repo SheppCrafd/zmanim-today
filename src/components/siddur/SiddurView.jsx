@@ -356,19 +356,37 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
                 {/* READER */}
                 {page === 'reader' && (
                     <div className="h-full overflow-y-auto px-4 pb-10">
-                        {sections.map((sec, i) => (
-                            <Section
-                                key={i}
-                                sec={sec}
-                                data={textMap[i]}
-                                langMode={langMode}
-                                rowRef={(el) => {
-                                    if (el) {
-                                        rowRefs.current[i] = el;
-                                    }
-                                }}
-                            />
-                        ))}
+                        {sections.map((sec, i) => {
+                            const data = textMap[i];
+
+                            // only show:
+                            // - current section
+                            // - OR already loaded ones
+                            // - OR the one being opened
+                            const shouldRender =
+                                data ||
+                                i === pendingIndex;
+
+                            if (!shouldRender) {
+                                return (
+                                    <div key={i} className="py-6 flex justify-center">
+                                        <Loader2 className="w-4 h-4 animate-spin text-slate-400" />
+                                    </div>
+                                );
+                            }
+
+                            return (
+                                <Section
+                                    key={i}
+                                    sec={sec}
+                                    data={data}
+                                    langMode={langMode}
+                                    rowRef={(el) => {
+                                        if (el) rowRefs.current[i] = el;
+                                    }}
+                                />
+                            );
+                        })}
                     </div>
                 )}
 
