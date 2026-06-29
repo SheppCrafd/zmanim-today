@@ -127,6 +127,9 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
     const [page, setPage] = useState('toc'); // toc | reader
     const [langMode, setLangMode] = useState('both');
 
+    const [openingSection, setOpeningSection] = useState(false);
+    const [pendingIndex, setPendingIndex] = useState(null);
+
     /* LOAD TOC */
     useEffect(() => {
         setLoading(true);
@@ -176,15 +179,35 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
         return () => { cancelled = true; };
     }, [sections]);
 
-    const jumpTo = (index) => {
+    useEffect(() => {
+        if (pendingIndex == null) return;
+
+        // Wait until the requested section has loaded
+        if (!textMap[pendingIndex]) return;
+
+        clearTimeout(rowRefs.current.loaderTimer);
+
+        setOpeningSection(false);
         setPage('reader');
 
         requestAnimationFrame(() => {
-            rowRefs.current[index]?.scrollIntoView({
+            rowRefs.current[pendingIndex]?.scrollIntoView({
                 behavior: 'smooth',
                 block: 'start'
             });
         });
+
+        setPendingIndex(null);
+    }, [pendingIndex, textMap]);
+
+    const jumpTo = (index) => {
+        setPendingIndex(index);
+
+        const timer = setTimeout(() => {
+            setOpeningSection(true);
+        }, 125);
+
+        rowRefs.current.loaderTimer = timer;
     };
 
     return (
@@ -256,18 +279,42 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
                 {/* TOC */}
                 {page === 'toc' && (
                     <div className="h-full overflow-y-auto px-4">
-                        {loading && <div className="py-10">Loading…</div>}
-                        {error && <AlertCircle />}
 
-                        {sections.map((sec, i) => (
-                            <button
-                                key={i}
-                                onClick={() => jumpTo(i)}
-                                className="w-full text-left py-3 border-b"
-                            >
-                                {sec.label}
-                            </button>
-                        ))}
+                        {openingSection ? (
+                            <div className="h-full flex items-center justify-center">
+                                <div className="text-center">
+                                    <Loader2 className="w-10 h-10 text-blue-600 animate-spin mx-auto mb-4" />
+
+                                    <p className="font-medium text-slate-700 dark:text-slate-200">
+                                        Loading siddur...
+                                    </p>
+
+                                    <p className="text-sm text-slate-500 mt-2">
+                                        Some prayers are pretty big and may take a few moments.
+                                    </p>
+                                </div>
+                            </div>
+                        ) : (
+                            <>
+                                {loading && <div className="py-10">Loading…</div>}
+                                {error && (
+                                    <div className="py-10 flex justify-center">
+                                        <AlertCircle className="text-red-500" />
+                                    </div>
+                                )}
+
+                                {sections.map((sec, i) => (
+                                    <button
+                                        key={i}
+                                        onClick={() => jumpTo(i)}
+                                        className="w-full text-left py-3 border-b"
+                                    >
+                                        {sec.label}
+                                    </button>
+                                ))}
+                            </>
+                        )}
+
                     </div>
                 )}
 
