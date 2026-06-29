@@ -1,26 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { ExternalLink, Loader2, AlertCircle } from 'lucide-react';
+import {
+    ExternalLink,
+    Loader2,
+    AlertCircle
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import NavMenu from '@/components/NavMenu';
-
-/* ---------------- TRANSLITERATION FALLBACK ---------------- */
-
-function transliterateFallback(text = '') {
-    return text
-        .replace(/<[^>]+>/g, '')
-        .split('')
-        .map(ch => {
-            const map = {
-                'א':'a','ב':'b','ג':'g','ד':'d','ה':'h','ו':'v',
-                'ז':'z','ח':'ch','ט':'t','י':'y','כ':'k','ך':'k',
-                'ל':'l','מ':'m','ם':'m','נ':'n','ן':'n',
-                'ס':'s','ע':'a','פ':'p','ף':'f','צ':'ts','ץ':'ts',
-                'ק':'k','ר':'r','ש':'sh','ת':'t'
-            };
-            return map[ch] ?? ch;
-        })
-        .join('');
-}
 
 /* ---------------- TOC FLATTEN ---------------- */
 
@@ -38,6 +23,7 @@ function flattenNodes(nodes, keyPath = '', labelPath = '') {
             result.push({
                 label: node.title,
                 heLabel: node.heTitle,
+                breadcrumb: fullLabelPath,
                 ref: fullKeyPath
             });
         }
@@ -46,17 +32,24 @@ function flattenNodes(nodes, keyPath = '', labelPath = '') {
     return result;
 }
 
-/* ---------------- TEXT RENDERER ---------------- */
+/* ---------------- SECTION TEXT ---------------- */
 
-function SectionText({ he, en, showHB, showEN, showTR }) {
-    const heArr = Array.isArray(he) ? he : [];
-    const enArr = Array.isArray(en) ? en : [];
+function SectionText({ he, text, showEN, showHB }) {
+    const heArr = Array.isArray(he) ? he : (he ? [he] : []);
+    const enRaw = Array.isArray(text) ? text : (text ? [text] : []);
 
-    const trArr = heArr.map(h => transliterateFallback(h));
+    const enArr = enRaw.filter(t => {
+        if (!t) return false;
 
-    const maxLen = Math.max(heArr.length, enArr.length, trArr.length);
+        const latin = (t.match(/[A-Za-z]/g) || []).length;
+        const hebrew = (t.match(/[\u0590-\u05FF]/g) || []).length;
 
-    if (!maxLen) {
+        return latin > hebrew;
+    });
+
+    const maxLen = Math.max(heArr.length, enArr.length);
+
+    if (maxLen === 0) {
         return (
             <p className="text-slate-400 text-sm italic">
                 No text available.
@@ -69,27 +62,23 @@ function SectionText({ he, en, showHB, showEN, showTR }) {
             {Array.from({ length: maxLen }).map((_, i) => (
                 <div key={i} className="space-y-2">
 
-                    {/* HEBREW */}
+                    {/* Hebrew */}
                     {showHB && heArr[i] && (
                         <p
-                            className="text-right text-lg font-serif leading-loose text-slate-900 dark:text-slate-100"
+                            className="text-right text-lg leading-loose text-slate-800 dark:text-slate-100 font-serif"
                             dir="rtl"
                             dangerouslySetInnerHTML={{ __html: heArr[i] }}
                         />
                     )}
 
-                    {/* ENGLISH */}
+                    {/* English */}
                     {showEN && enArr[i] && (
-                        <p className="text-sm text-slate-600 dark:text-slate-300">
-                            {enArr[i]?.replace(/<[^>]+>/g, '')}
-                        </p>
-                    )}
-
-                    {/* TRANSLITERATION */}
-                    {showTR && heArr[i] && (
-                        <p className="text-sm italic text-blue-500">
-                            {trArr[i]}
-                        </p>
+                        <p
+                            className="text-left text-sm leading-relaxed text-slate-500 dark:text-slate-400"
+                            dangerouslySetInnerHTML={{
+                                __html: enArr[i]?.replace(/<[^>]+>/g, '')
+                            }}
+                        />
                     )}
 
                 </div>
@@ -100,7 +89,7 @@ function SectionText({ he, en, showHB, showEN, showTR }) {
 
 /* ---------------- ROW ---------------- */
 
-function SectionRow({ sec, index, loadedSections, loadSection, showHB, showEN, showTR }) {
+function SectionRow({ sec, index, loadedSections, loadSection, showEN, showHB }) {
     useEffect(() => {
         loadSection(index);
     }, [index]);
@@ -117,7 +106,7 @@ function SectionRow({ sec, index, loadedSections, loadSection, showHB, showEN, s
 
     if (data.error) {
         return (
-            <div className="text-red-500 text-sm">
+            <div className="text-center text-sm text-red-500">
                 Failed to load section
             </div>
         );
@@ -133,16 +122,15 @@ function SectionRow({ sec, index, loadedSections, loadSection, showHB, showEN, s
 
             <SectionText
                 he={data.he}
-                en={data.text}
-                showHB={showHB}
+                text={data.text}
                 showEN={showEN}
-                showTR={showTR}
+                showHB={showHB}
             />
         </div>
     );
 }
 
-/* ---------------- MAIN COMPONENT ---------------- */
+/* ---------------- MAIN ---------------- */
 
 export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
     const scrollRef = useRef(null);
@@ -155,9 +143,8 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
     const [loadedSections, setLoadedSections] = useState({});
 
     /* TOGGLES */
-    const [showHB, setShowHB] = useState(true);
     const [showEN, setShowEN] = useState(true);
-    const [showTR, setShowTR] = useState(false);
+    const [showHB, setShowHB] = useState(true);
 
     /* LOAD TOC */
     useEffect(() => {
@@ -166,14 +153,20 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
         fetch(`https://www.sefaria.org/api/index/${bookRef}`)
             .then(r => r.json())
             .then(data => {
-                const nodes = data?.schema?.nodes || [];
-                setSections(flattenNodes(nodes));
+                const schema = data?.schema;
+                const rootKey = schema?.key || bookRef.replace(/_/g, ' ');
+                const nodes = schema?.nodes || [];
+
+                setSections(flattenNodes(nodes, rootKey));
                 setLoading(false);
             })
-            .catch(() => setError(true));
+            .catch(() => {
+                setError(true);
+                setLoading(false);
+            });
     }, [bookRef]);
 
-    /* LOAD SECTION (SAFE SINGLE CALL) */
+    /* LOAD SECTION */
     const loadSection = async (index) => {
         if (loadedSections[index]) return;
 
@@ -181,18 +174,14 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
         if (!sec) return;
 
         try {
-            const url =
-                `https://www.sefaria.org/api/texts/${encodeURIComponent(sec.ref)}?lang=bi`;
-
-            const res = await fetch(url);
+            const res = await fetch(
+                `https://www.sefaria.org/api/texts/${encodeURIComponent(sec.ref)}?lang=bi`
+            );
             const data = await res.json();
 
             setLoadedSections(prev => ({
                 ...prev,
-                [index]: {
-                    he: data.he || [],
-                    text: data.text || []
-                }
+                [index]: data
             }));
         } catch {
             setLoadedSections(prev => ({
@@ -202,77 +191,90 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
         }
     };
 
+    const sectionUrl =
+        startIndex !== null
+            ? `https://www.sefaria.org/${encodeURIComponent(sections[startIndex]?.ref)}`
+            : sefariaUrl;
+
     return (
         <div className="min-h-screen flex flex-col bg-slate-50 dark:bg-slate-950">
 
             {/* HEADER */}
-            <div className="p-4 flex justify-between items-center">
-                <div>
+            <div className="px-4 pt-4 pb-2 flex items-center justify-between">
+                <div className="flex items-center gap-2">
                     <NavMenu />
-                    <h1 className="font-bold">{title}</h1>
-                    <p className="text-xs text-slate-500">{subtitle}</p>
+                    <div>
+                        <h1 className="text-lg font-bold">{title}</h1>
+                        <p className="text-xs text-slate-500">{subtitle}</p>
+                    </div>
                 </div>
 
-                <a href={sefariaUrl} target="_blank">
-                    <Button variant="outline">
-                        <ExternalLink />
+                <a href={sectionUrl} target="_blank">
+                    <Button size="sm" variant="outline">
+                        <ExternalLink className="w-4 h-4" />
                     </Button>
                 </a>
             </div>
 
-            {/* TOGGLES */}
-            <div className="px-4 flex gap-2">
-                <Button size="sm" onClick={() => setShowHB(v => !v)} variant={showHB ? "default" : "outline"}>
-                    HB
-                </Button>
-                <Button size="sm" onClick={() => setShowEN(v => !v)} variant={showEN ? "default" : "outline"}>
+            {/* LANGUAGE TOGGLES */}
+            <div className="px-4 flex gap-2 mb-2">
+                <Button
+                    size="sm"
+                    variant={showEN ? "default" : "outline"}
+                    onClick={() => setShowEN(v => !v)}
+                >
                     EN
                 </Button>
-                <Button size="sm" onClick={() => setShowTR(v => !v)} variant={showTR ? "default" : "outline"}>
-                    TR
+
+                <Button
+                    size="sm"
+                    variant={showHB ? "default" : "outline"}
+                    onClick={() => setShowHB(v => !v)}
+                >
+                    HB
                 </Button>
             </div>
 
-            {/* CONTENT */}
-            <div ref={scrollRef} className="flex-1 overflow-y-auto p-4">
+            {/* MAIN */}
+            <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 pb-10">
 
-                {startIndex === null ? (
-                    <>
-                        {loading && (
-                            <div className="flex justify-center py-10">
-                                <Loader2 className="animate-spin text-blue-500" />
-                            </div>
-                        )}
-
-                        {error && (
-                            <div className="flex justify-center py-10 text-red-500">
-                                <AlertCircle />
-                            </div>
-                        )}
+                {/* TOC */}
+                {startIndex === null && (
+                    <div>
+                        {loading && <div className="py-10">Loading…</div>}
+                        {error && <AlertCircle />}
 
                         {sections.map((sec, i) => (
                             <button
                                 key={i}
                                 onClick={() => setStartIndex(i)}
-                                className="w-full text-left py-3 border-b border-slate-200 dark:border-slate-800"
+                                className="w-full text-left py-3 border-b"
                             >
                                 {sec.label}
                             </button>
                         ))}
-                    </>
-                ) : (
-                    sections.slice(startIndex, startIndex + 20).map((sec, i) => (
-                        <SectionRow
-                            key={i}
-                            sec={sec}
-                            index={startIndex + i}
-                            loadedSections={loadedSections}
-                            loadSection={loadSection}
-                            showHB={showHB}
-                            showEN={showEN}
-                            showTR={showTR}
-                        />
-                    ))
+                    </div>
+                )}
+
+                {/* READER */}
+                {startIndex !== null && (
+                    <div className="space-y-10">
+                        {sections.slice(startIndex, startIndex + 20).map((sec, i) => {
+                            const idx = startIndex + i;
+
+                            return (
+                                <SectionRow
+                                    key={idx}
+                                    sec={sec}
+                                    index={idx}
+                                    loadedSections={loadedSections}
+                                    loadSection={loadSection}
+                                    showEN={showEN}
+                                    showHB={showHB}
+                                />
+                            );
+                        })}
+                    </div>
                 )}
 
             </div>
