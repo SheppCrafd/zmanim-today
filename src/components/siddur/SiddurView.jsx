@@ -17,90 +17,62 @@ if (typeof document !== 'undefined') {
 
 /* ---------------- FLATTEN ---------------- */
 function flattenNodes(nodes, keyPath = '') {
-    const result = [];
+    const out = [];
 
-    for (const node of nodes) {
-        const key = node.key || node.title;
-        const fullKey = keyPath ? `${keyPath}, ${key}` : key;
+    for (const n of nodes) {
+        const key = n.key || n.title;
+        const full = keyPath ? `${keyPath}, ${key}` : key;
 
-        if (node.nodes) {
-            result.push(...flattenNodes(node.nodes, fullKey));
+        if (n.nodes) {
+            out.push(...flattenNodes(n.nodes, full));
         } else {
-            result.push({
-                label: node.title,
-                heLabel: node.heTitle,
-                ref: fullKey
+            out.push({
+                label: n.title,
+                heLabel: n.heTitle,
+                ref: full
             });
         }
     }
 
-    return result;
+    return out;
 }
 
 /* ---------------- TEXT ---------------- */
-function SectionText({ he, text, showEnglish, showTranslit }) {
+function SectionText({ he, text }) {
     const heArr = Array.isArray(he) ? he : he ? [he] : [];
     const enArr = Array.isArray(text) ? text : text ? [text] : [];
 
-    const maxLen = Math.max(heArr.length, enArr.length);
+    const max = Math.max(heArr.length, enArr.length);
 
     return (
         <div className="space-y-6">
-            {Array.from({ length: maxLen }).map((_, i) => (
+            {Array.from({ length: max }).map((_, i) => (
                 <div key={i} className="space-y-2">
-
-                    {/* HEBREW ALWAYS */}
                     {heArr[i] && (
-                        <p
-                            dir="rtl"
-                            className="text-right text-lg font-serif"
-                            dangerouslySetInnerHTML={{ __html: heArr[i] }}
-                        />
+                        <p dir="rtl" className="text-right text-lg font-serif"
+                            dangerouslySetInnerHTML={{ __html: heArr[i] }} />
                     )}
-
-                    {/* ENGLISH TOGGLE */}
-                    {showEnglish && enArr[i] && (
-                        <p className="text-sm text-slate-500">
-                            {enArr[i]}
-                        </p>
+                    {enArr[i] && (
+                        <p className="text-sm text-slate-500"
+                            dangerouslySetInnerHTML={{ __html: enArr[i] }} />
                     )}
-
-                    {/* TRANSLITERATION (best effort fallback) */}
-                    {showTranslit && enArr[i] && (
-                        <p className="text-xs italic text-slate-400">
-                            {generateTranslitFallback(enArr[i])}
-                        </p>
-                    )}
-
                 </div>
             ))}
         </div>
     );
 }
 
-/* ---------------- SIMPLE TRANSLIT FALLBACK ---------------- */
-/* (Sefaria doesn’t consistently provide translit, so this is basic fallback) */
-function generateTranslitFallback(text = '') {
-    return text
-        .replace(/[aeiou]/gi, '')
-        .replace(/[^a-zA-Z\s]/g, '')
-        .slice(0, 200);
-}
-
 /* ---------------- MAIN ---------------- */
-export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
+export default function SiddurView({ title, subtitle, bookRef }) {
     const scrollRef = useRef(null);
     const startRef = useRef(null);
 
     const [sections, setSections] = useState([]);
     const [loaded, setLoaded] = useState({});
+    const [active, setActive] = useState(0);
     const [startIndex, setStartIndex] = useState(null);
 
-    /* TOGGLES */
-    const [showEnglish, setShowEnglish] = useState(true);
-    const [showTranslit, setShowTranslit] = useState(false);
-
-    const WINDOW = 2;
+    const WINDOW = 3;
 
     /* ---------------- LOAD TOC ---------------- */
     useEffect(() => {
@@ -108,13 +80,13 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
             .then(r => r.json())
             .then(data => {
                 const nodes = data?.schema?.nodes || [];
-                const rootKey = data?.schema?.key || bookRef.replace(/_/g, ' ');
-                setSections(flattenNodes(nodes, rootKey));
+                const root = data?.schema?.key || bookRef;
+                setSections(flattenNodes(nodes, root));
             });
     }, [bookRef]);
 
-    /* ---------------- LOAD TEXT ---------------- */
-    const loadSection = async (i) => {
+    /* ---------------- LOAD SECTION ---------------- */
+    const load = async (i) => {
         if (loaded[i] || !sections[i]) return;
 
         const res = await fetch(
@@ -123,57 +95,55 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
 
         const data = await res.json();
 
-        setLoaded(prev => ({
-            ...prev,
-            [i]: data
-        }));
+        setLoaded(prev => ({ ...prev, [i]: data }));
     };
 
     /* ---------------- OPEN ---------------- */
     const openAt = async (i) => {
         setStartIndex(i);
+        setActive(i);
 
         for (let x = i - WINDOW; x <= i + WINDOW; x++) {
-            if (x >= 0 && x < sections.length) loadSection(x);
+            if (x >= 0 && x < sections.length) load(x);
         }
 
         setTimeout(() => {
-            startRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            startRef.current?.scrollIntoView({ behavior: 'smooth' });
         }, 50);
     };
+
+    /* ---------------- ACTIVE TRACKING ---------------- */
+    const onScroll = () => {
+        const el = scrollRef.current;
+        if (!el) return;
+
+        const scrollTop = el.scrollTop;
+        const approx = Math.floor(scrollTop / 120); // stable estimate per section
+
+        setActive(prev => {
+            if (prev !== approx) {
+                for (let i = approx - WINDOW; i <= approx + WINDOW; i++) {
+                    if (i >= 0 && i < sections.length) load(i);
+                }
+                return approx;
+            }
+            return prev;
+        });
+    };
+
+    /* ---------------- WINDOW ---------------- */
+    const start = Math.max(0, active - WINDOW);
+    const end = Math.min(sections.length - 1, active + WINDOW);
 
     return (
         <div className="h-screen flex flex-col overflow-hidden bg-slate-50 dark:bg-slate-950">
 
             {/* HEADER */}
-            <div className="px-4 pt-4 pb-2 flex justify-between items-start">
-                <div className="flex gap-2">
+            <div className="px-4 pt-4 pb-2 flex justify-between">
+                <div>
                     <NavMenu />
-                    <div>
-                        <h1 className="font-bold">{title}</h1>
-                        <p className="text-xs text-slate-500">{subtitle}</p>
-
-                        {/* TOGGLES */}
-                        {startIndex !== null && (
-                            <div className="flex gap-2 mt-2">
-                                <Button
-                                    size="sm"
-                                    variant={showEnglish ? "default" : "outline"}
-                                    onClick={() => setShowEnglish(v => !v)}
-                                >
-                                    EN
-                                </Button>
-
-                                <Button
-                                    size="sm"
-                                    variant={showTranslit ? "default" : "outline"}
-                                    onClick={() => setShowTranslit(v => !v)}
-                                >
-                                    Translit
-                                </Button>
-                            </div>
-                        )}
-                    </div>
+                    <h1 className="font-bold">{title}</h1>
+                    <p className="text-xs text-slate-500">{subtitle}</p>
                 </div>
 
                 <Button variant="ghost" onClick={() => setStartIndex(null)}>
@@ -181,59 +151,63 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
                 </Button>
             </div>
 
-            {/* SCROLL AREA */}
-            <div className="flex-1 overflow-y-auto mx-4 mb-4 bg-white dark:bg-slate-900 rounded-xl">
+            {/* SCROLL */}
+            <div
+                ref={scrollRef}
+                onScroll={onScroll}
+                className="flex-1 overflow-y-auto mx-4 mb-4 bg-white dark:bg-slate-900 rounded-xl"
+            >
 
                 {/* TOC */}
                 {startIndex === null && (
                     <div>
-                        {sections.map((sec, i) => (
+                        {sections.map((s, i) => (
                             <button
                                 key={i}
                                 onClick={() => openAt(i)}
                                 className="w-full flex justify-between p-3 border-b"
                             >
-                                {sec.label}
+                                {s.label}
                                 <ChevronRight />
                             </button>
                         ))}
                     </div>
                 )}
 
-                {/* READER */}
+                {/* READER (TRUE VIRTUALIZATION) */}
                 {startIndex !== null && (
-                    <div className="p-4 space-y-12">
+                    <div className="p-4">
 
-                        {sections.map((sec, i) => {
-                            const data = loaded[i];
+                        {/* TOP SPACER */}
+                        <div style={{ height: start * 200 }} />
 
-                            if (!data) loadSection(i);
+                        {sections.slice(start, end + 1).map((sec, i) => {
+                            const realIndex = start + i;
+                            const data = loaded[realIndex];
+
+                            if (!data) load(realIndex);
 
                             return (
                                 <div
-                                    key={i}
-                                    ref={i === startIndex ? startRef : null}
-                                    className="space-y-3"
+                                    key={realIndex}
+                                    ref={realIndex === startIndex ? startRef : null}
+                                    className="mb-12"
                                 >
                                     <div className="sticky top-0 bg-white dark:bg-slate-900 py-2 font-semibold">
                                         {sec.label}
                                     </div>
 
                                     {data ? (
-                                        <SectionText
-                                            he={data.he}
-                                            text={data.text}
-                                            showEnglish={showEnglish}
-                                            showTranslit={showTranslit}
-                                        />
+                                        <SectionText he={data.he} text={data.text} />
                                     ) : (
-                                        <div className="py-6 flex justify-center">
-                                            <Loader2 className="animate-spin" />
-                                        </div>
+                                        <Loader2 className="animate-spin" />
                                     )}
                                 </div>
                             );
                         })}
+
+                        {/* BOTTOM SPACER */}
+                        <div style={{ height: (sections.length - end) * 200 }} />
 
                     </div>
                 )}
