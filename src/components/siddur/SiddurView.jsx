@@ -293,5 +293,3 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
         </div>
     );
 }
-
-have a cache.
