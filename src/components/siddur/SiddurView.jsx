@@ -136,27 +136,42 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
     useEffect(() => {
         if (!sections.length) return;
 
+        let cancelled = false;
+
         const loadAll = async () => {
             const results = {};
 
-            await Promise.all(
-                sections.map(async (sec, i) => {
-                    try {
-                        const res = await fetch(
-                            `https://www.sefaria.org/api/texts/${encodeURIComponent(sec.ref)}?lang=bi`
-                        );
-                        const data = await res.json();
-                        results[i] = data;
-                    } catch {
-                        results[i] = { error: true };
-                    }
-                })
-            );
+            for (let i = 0; i < sections.length; i++) {
+                try {
+                    const res = await fetch(
+                        `https://www.sefaria.org/api/texts/${encodeURIComponent(sections[i].ref)}?lang=bi`
+                    );
+                    const data = await res.json();
 
-            setTextMap(results);
+                    results[i] = data;
+
+                    if (!cancelled) {
+                        setTextMap(prev => ({
+                            ...prev,
+                            [i]: data
+                        }));
+                    }
+                } catch {
+                    if (!cancelled) {
+                        setTextMap(prev => ({
+                            ...prev,
+                            [i]: { error: true }
+                        }));
+                    }
+                }
+            }
         };
 
         loadAll();
+
+        return () => {
+            cancelled = true;
+        };
     }, [sections]);
 
     /* JUMP */
