@@ -2,7 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import {
     ExternalLink,
     Loader2,
-    AlertCircle
+    AlertCircle,
+    ArrowLeft
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import NavMenu from '@/components/NavMenu';
@@ -32,55 +33,6 @@ function flattenNodes(nodes, keyPath = '', labelPath = '') {
     return result;
 }
 
-/* ---------------- SECTION TEXT ---------------- */
-
-function SectionText({ he, text, showEN, showHB }) {
-    const heArr = Array.isArray(he) ? he : (he ? [he] : []);
-    const enRaw = Array.isArray(text) ? text : (text ? [text] : []);
-
-    const enArr = enRaw.filter(t => {
-        if (!t) return false;
-        const latin = (t.match(/[A-Za-z]/g) || []).length;
-        const hebrew = (t.match(/[\u0590-\u05FF]/g) || []).length;
-        return latin > hebrew;
-    });
-
-    const maxLen = Math.max(heArr.length, enArr.length);
-
-    if (maxLen === 0) {
-        return (
-            <p className="text-slate-400 text-sm italic">
-                No text available.
-            </p>
-        );
-    }
-
-    return (
-        <div className="space-y-6">
-            {Array.from({ length: maxLen }).map((_, i) => (
-                <div key={i} className="space-y-2">
-
-                    {showHB && heArr[i] && (
-                        <p
-                            className="text-right text-lg leading-loose text-slate-800 dark:text-slate-100 font-serif"
-                            dir="rtl"
-                            dangerouslySetInnerHTML={{ __html: heArr[i] }}
-                        />
-                    )}
-
-                    {showEN && enArr[i] && (
-                        <p
-                            className="text-left text-sm leading-relaxed text-slate-500 dark:text-slate-400"
-                            dangerouslySetInnerHTML={{ __html: enArr[i] }}
-                        />
-                    )}
-
-                </div>
-            ))}
-        </div>
-    );
-}
-
 /* ---------------- SECTION ---------------- */
 
 function Section({ sec, data, rowRef, showEN, showHB }) {
@@ -100,6 +52,18 @@ function Section({ sec, data, rowRef, showEN, showHB }) {
         );
     }
 
+    const heArr = Array.isArray(data.he) ? data.he : (data.he ? [data.he] : []);
+    const enRaw = Array.isArray(data.text) ? data.text : (data.text ? [data.text] : []);
+
+    const enArr = enRaw.filter(t => {
+        if (!t) return false;
+        const latin = (t.match(/[A-Za-z]/g) || []).length;
+        const hebrew = (t.match(/[\u0590-\u05FF]/g) || []).length;
+        return latin > hebrew;
+    });
+
+    const maxLen = Math.max(heArr.length, enArr.length);
+
     return (
         <div ref={rowRef} className="space-y-4 scroll-mt-24">
             <div className="sticky top-0 bg-white dark:bg-slate-900 py-2 z-10">
@@ -108,12 +72,28 @@ function Section({ sec, data, rowRef, showEN, showHB }) {
                 </p>
             </div>
 
-            <SectionText
-                he={data.he}
-                text={data.text}
-                showEN={showEN}
-                showHB={showHB}
-            />
+            <div className="space-y-6">
+                {Array.from({ length: maxLen }).map((_, i) => (
+                    <div key={i} className="space-y-2">
+
+                        {showHB && heArr[i] && (
+                            <p
+                                className="text-right text-lg leading-loose text-slate-800 dark:text-slate-100 font-serif"
+                                dir="rtl"
+                                dangerouslySetInnerHTML={{ __html: heArr[i] }}
+                            />
+                        )}
+
+                        {showEN && enArr[i] && (
+                            <p
+                                className="text-left text-sm leading-relaxed text-slate-500 dark:text-slate-400"
+                                dangerouslySetInnerHTML={{ __html: enArr[i] }}
+                            />
+                        )}
+
+                    </div>
+                ))}
+            </div>
         </div>
     );
 }
@@ -128,6 +108,7 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(false);
 
+    const [page, setPage] = useState('toc'); // 👈 TOC or reader
     const [showEN, setShowEN] = useState(true);
     const [showHB, setShowHB] = useState(true);
 
@@ -151,7 +132,7 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
             });
     }, [bookRef]);
 
-    /* LOAD ALL TEXT ONCE */
+    /* LOAD ALL TEXT */
     useEffect(() => {
         if (!sections.length) return;
 
@@ -178,15 +159,17 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
         loadAll();
     }, [sections]);
 
-    /* TOC CLICK */
+    /* JUMP */
     const jumpTo = (index) => {
-        rowRefs.current[index]?.scrollIntoView({
-            behavior: 'smooth',
-            block: 'start'
+        setPage('reader');
+
+        requestAnimationFrame(() => {
+            rowRefs.current[index]?.scrollIntoView({
+                behavior: 'smooth',
+                block: 'start'
+            });
         });
     };
-
-    const sectionUrl = sefariaUrl;
 
     return (
         <div className="min-h-screen flex flex-col bg-slate-50 dark:bg-slate-950">
@@ -201,7 +184,7 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
                     </div>
                 </div>
 
-                <a href={sectionUrl} target="_blank">
+                <a href={sefariaUrl} target="_blank">
                     <Button size="sm" variant="outline">
                         <ExternalLink className="w-4 h-4" />
                     </Button>
@@ -210,57 +193,59 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
 
             {/* TOGGLES */}
             <div className="px-4 flex gap-2 mb-2">
-                <Button
-                    size="sm"
-                    variant={showEN ? "default" : "outline"}
-                    onClick={() => setShowEN(v => !v)}
-                >
-                    EN
-                </Button>
+                <Button size="sm" variant={showEN ? "default" : "outline"} onClick={() => setShowEN(v => !v)}>EN</Button>
+                <Button size="sm" variant={showHB ? "default" : "outline"} onClick={() => setShowHB(v => !v)}>HB</Button>
 
-                <Button
-                    size="sm"
-                    variant={showHB ? "default" : "outline"}
-                    onClick={() => setShowHB(v => !v)}
-                >
-                    HB
-                </Button>
+                {page === 'reader' && (
+                    <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setPage('toc')}
+                    >
+                        <ArrowLeft className="w-4 h-4 mr-1" />
+                        TOC
+                    </Button>
+                )}
             </div>
 
-            {/* BODY */}
+            {/* PAGE CONTENT */}
             <div className="flex flex-1 overflow-hidden">
 
-                {/* TOC */}
-                <div className="w-1/3 overflow-y-auto border-r px-2">
-                    {loading && <div className="py-10">Loading…</div>}
-                    {error && <AlertCircle />}
+                {/* TOC PAGE */}
+                {page === 'toc' && (
+                    <div className="w-full overflow-y-auto px-4">
+                        {loading && <div className="py-10">Loading…</div>}
+                        {error && <AlertCircle />}
 
-                    {sections.map((sec, i) => (
-                        <button
-                            key={i}
-                            onClick={() => jumpTo(i)}
-                            className="w-full text-left py-2 border-b text-sm"
-                        >
-                            {sec.label}
-                        </button>
-                    ))}
-                </div>
+                        {sections.map((sec, i) => (
+                            <button
+                                key={i}
+                                onClick={() => jumpTo(i)}
+                                className="w-full text-left py-3 border-b"
+                            >
+                                {sec.label}
+                            </button>
+                        ))}
+                    </div>
+                )}
 
-                {/* READER */}
-                <div className="flex-1 overflow-y-auto px-4 pb-10">
-                    {sections.map((sec, i) => (
-                        <Section
-                            key={i}
-                            sec={sec}
-                            data={textMap[i]}
-                            showEN={showEN}
-                            showHB={showHB}
-                            rowRef={(el) => {
-                                rowRefs.current[i] = el;
-                            }}
-                        />
-                    ))}
-                </div>
+                {/* READER PAGE */}
+                {page === 'reader' && (
+                    <div className="w-full overflow-y-auto px-4 pb-10">
+                        {sections.map((sec, i) => (
+                            <Section
+                                key={i}
+                                sec={sec}
+                                data={textMap[i]}
+                                showEN={showEN}
+                                showHB={showHB}
+                                rowRef={(el) => {
+                                    rowRefs.current[i] = el;
+                                }}
+                            />
+                        ))}
+                    </div>
+                )}
 
             </div>
         </div>
