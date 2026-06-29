@@ -179,35 +179,48 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
         return () => { cancelled = true; };
     }, [sections]);
 
-    useEffect(() => {
-        if (pendingIndex == null) return;
+useEffect(() => {
+    if (pendingIndex == null) return;
+    if (!textMap[pendingIndex]) return;
 
-        // Wait until the requested section has loaded
-        if (!textMap[pendingIndex]) return;
+    clearTimeout(rowRefs.current.loaderTimer);
 
-        clearTimeout(rowRefs.current.loaderTimer);
+    setOpeningSection(false);
+    setPage('reader');
 
-        setOpeningSection(false);
-        setPage('reader');
-
-        requestAnimationFrame(() => {
-            rowRefs.current[pendingIndex]?.scrollIntoView({
-                behavior: 'smooth',
-                block: 'start'
-            });
+    requestAnimationFrame(() => {
+        rowRefs.current[pendingIndex]?.scrollIntoView({
+            behavior: 'smooth',
+            block: 'start'
         });
+    });
 
-        setPendingIndex(null);
-    }, [pendingIndex, textMap]);
+    setPendingIndex(null);
+}, [pendingIndex, textMap]);
 
     const jumpTo = (index) => {
+        clearTimeout(rowRefs.current.loaderTimer);
+
+        // If already loaded, open immediately
+        if (textMap[index]) {
+            setPage('reader');
+
+            requestAnimationFrame(() => {
+                rowRefs.current[index]?.scrollIntoView({
+                    behavior: 'smooth',
+                    block: 'start'
+                });
+            });
+
+            return;
+        }
+
+        setOpeningSection(false);
         setPendingIndex(index);
 
-        const timer = setTimeout(() => {
+        rowRefs.current.loaderTimer = setTimeout(() => {
             setOpeningSection(true);
         }, 125);
-
-        rowRefs.current.loaderTimer = timer;
     };
 
     return (
