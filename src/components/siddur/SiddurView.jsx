@@ -8,54 +8,8 @@ import {
 import { Button } from '@/components/ui/button';
 import NavMenu from '@/components/NavMenu';
 
-/* ---------------- TOC FLATTEN ---------------- */
-
-function flattenNodes(nodes, keyPath = '', labelPath = '') {
-    const result = [];
-
-    for (const node of nodes) {
-        const key = node.key || node.title;
-        const fullKeyPath = keyPath ? `${keyPath}, ${key}` : key;
-        const fullLabelPath = labelPath ? `${labelPath} > ${node.title}` : node.title;
-
-        if (node.nodes) {
-            result.push(...flattenNodes(node.nodes, fullKeyPath, fullLabelPath));
-        } else {
-            result.push({
-                label: node.title,
-                heLabel: node.heTitle,
-                breadcrumb: fullLabelPath,
-                ref: fullKeyPath
-            });
-        }
-    }
-
-    return result;
-}
-
-/* ---------------- EN FILTER ---------------- */
-
-const isEnglishLine = (t) => {
-    if (!t) return false;
-
-    const plain = t.replace(/<[^>]*>/g, '').trim();
-    if (plain.length < 2) return false;
-
-    const latin = plain.match(/[A-Za-z]/g) || [];
-    const hebrew = plain.match(/[\u0590-\u05FF]/g) || [];
-
-    const total = latin.length + hebrew.length;
-    if (total === 0) return false;
-
-    const latinRatio = latin.length / total;
-
-    return latin.length > 5 && latinRatio > 0.75;
-};
-
-/* ---------------- SIMPLE CACHE ---------------- */
+/* ---------------- CACHE ---------------- */
 const cache = {};
-
-/* ---------------- FETCH SINGLE SECTION ---------------- */
 
 async function fetchSection(ref) {
     if (cache[ref]) return cache[ref];
@@ -75,10 +29,10 @@ async function fetchSection(ref) {
 
 /* ---------------- SECTION ---------------- */
 
-function Section({ sec, data, rowRef, langMode }) {
+function Section({ sec, index, data, langMode, setHeight, rowRef }) {
     if (!data) {
         return (
-            <div className="py-10 flex justify-center">
+            <div ref={rowRef} className="py-10 flex justify-center">
                 <Loader2 className="animate-spin text-blue-500" />
             </div>
         );
@@ -86,7 +40,7 @@ function Section({ sec, data, rowRef, langMode }) {
 
     if (data.error) {
         return (
-            <div className="text-center text-sm text-red-500">
+            <div ref={rowRef} className="text-red-500 py-6">
                 Failed to load section
             </div>
         );
@@ -94,40 +48,51 @@ function Section({ sec, data, rowRef, langMode }) {
 
     const heArr = Array.isArray(data.he) ? data.he : (data.he ? [data.he] : []);
     const enRaw = Array.isArray(data.text) ? data.text : (data.text ? [data.text] : []);
-    const enArr = enRaw.filter(isEnglishLine);
 
     const showEN = langMode !== 'he';
     const showHB = langMode !== 'en';
 
-    const maxLen = Math.max(heArr.length, enArr.length);
+    const ref = useRef(null);
+
+    useEffect(() => {
+        if (!ref.current) return;
+
+        const measure = () => {
+            setHeight(index, ref.current.offsetHeight);
+        };
+
+        measure();
+
+        const obs = new ResizeObserver(measure);
+        obs.observe(ref.current);
+
+        return () => obs.disconnect();
+    }, [data]);
 
     return (
-        <div ref={rowRef} className="space-y-4 scroll-mt-24">
+        <div ref={(el) => { ref.current = el; rowRef(el); }} className="py-6 scroll-mt-24">
+
             <div className="sticky top-0 bg-white dark:bg-slate-900 py-2 z-10 border-b">
-                <p className="font-semibold text-slate-700 dark:text-slate-100">
-                    {sec.label}
-                </p>
+                <p className="font-semibold">{sec.label}</p>
             </div>
 
-            <div className="space-y-6">
-                {Array.from({ length: maxLen }).map((_, i) => (
-                    <div key={i} className="space-y-2">
-
-                        {showHB && heArr[i] && (
+            <div className="space-y-4">
+                {heArr.map((h, i) => (
+                    <div key={i}>
+                        {showHB && (
                             <p
-                                className="text-right text-lg leading-loose text-slate-800 dark:text-slate-100 font-serif"
+                                className="text-right font-serif text-lg"
                                 dir="rtl"
-                                dangerouslySetInnerHTML={{ __html: heArr[i] }}
+                                dangerouslySetInnerHTML={{ __html: h }}
                             />
                         )}
 
-                        {showEN && enArr[i] && (
+                        {showEN && enRaw[i] && (
                             <p
-                                className="text-left text-sm leading-relaxed text-slate-500 dark:text-slate-400"
-                                dangerouslySetInnerHTML={{ __html: enArr[i] }}
+                                className="text-sm text-slate-500"
+                                dangerouslySetInnerHTML={{ __html: enRaw[i] }}
                             />
                         )}
-
                     </div>
                 ))}
             </div>
@@ -138,101 +103,130 @@ function Section({ sec, data, rowRef, langMode }) {
 /* ---------------- MAIN ---------------- */
 
 export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
+
+    const containerRef = useRef(null);
     const rowRefs = useRef({});
+    const heights = useRef({});
 
     const [sections, setSections] = useState([]);
     const [textMap, setTextMap] = useState({});
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState(false);
+    const [visible, setVisible] = useState({ start: 0, end: 10 });
 
-    const [page, setPage] = useState('toc');
     const [langMode, setLangMode] = useState('both');
+    const [page, setPage] = useState('toc');
 
-    const [activeIndex, setActiveIndex] = useState(null);
-
-    /* LOAD TOC */
+    /* TOC LOAD */
     useEffect(() => {
-        setLoading(true);
-
         fetch(`https://www.sefaria.org/api/index/${bookRef}`)
             .then(r => r.json())
             .then(data => {
-                const schema = data?.schema;
-                const rootKey = schema?.key || bookRef.replace(/_/g, ' ');
-                const nodes = schema?.nodes || [];
+                const nodes = data?.schema?.nodes || [];
+                const rootKey = data?.schema?.key || bookRef;
 
-                const flat = flattenNodes(nodes, rootKey);
-                setSections(flat);
+                const flatten = (nodes, keyPath = '') => {
+                    let out = [];
+                    for (const n of nodes) {
+                        const key = n.key || n.title;
+                        const full = keyPath ? `${keyPath}, ${key}` : key;
 
-                setLoading(false);
-            })
-            .catch(() => {
-                setError(true);
-                setLoading(false);
+                        if (n.nodes) {
+                            out.push(...flatten(n.nodes, full));
+                        } else {
+                            out.push({ label: n.title, ref: full });
+                        }
+                    }
+                    return out;
+                };
+
+                setSections(flatten(nodes, rootKey));
             });
     }, [bookRef]);
 
-    /* WINDOWED LOADING (±2 only) */
+    /* REAL FETCH */
     useEffect(() => {
-        if (activeIndex == null || !sections.length) return;
-
-        const range = 2;
-
-        const start = Math.max(0, activeIndex - range);
-        const end = Math.min(sections.length - 1, activeIndex + range);
+        const { start, end } = visible;
 
         for (let i = start; i <= end; i++) {
-            fetchSection(sections[i].ref).then((data) => {
+            const sec = sections[i];
+            if (!sec) continue;
+
+            fetchSection(sec.ref).then(data => {
                 setTextMap(prev => ({ ...prev, [i]: data }));
             });
         }
-    }, [activeIndex, sections]);
+    }, [visible, sections]);
 
-    const jumpTo = (index) => {
-        setActiveIndex(index);
+    /* REAL HEIGHT TRACKING */
+    const setHeight = (i, h) => {
+        heights.current[i] = h;
+    };
+
+    /* REAL SCROLL CALC (NO APPROX) */
+    useEffect(() => {
+        const el = containerRef.current;
+        if (!el) return;
+
+        const onScroll = () => {
+            const scrollTop = el.scrollTop;
+
+            let total = 0;
+            let start = 0;
+
+            for (let i = 0; i < sections.length; i++) {
+                const h = heights.current[i] || 200;
+
+                if (total <= scrollTop) start = i;
+                total += h;
+
+                if (total > scrollTop + el.clientHeight) {
+                    setVisible({
+                        start: Math.max(0, start - 2),
+                        end: Math.min(sections.length - 1, i + 2)
+                    });
+                    break;
+                }
+            }
+        };
+
+        el.addEventListener('scroll', onScroll);
+        return () => el.removeEventListener('scroll', onScroll);
+    }, [sections]);
+
+    const jumpTo = (i) => {
         setPage('reader');
 
+        let y = 0;
+        for (let k = 0; k < i; k++) {
+            y += heights.current[k] || 200;
+        }
+
         requestAnimationFrame(() => {
-            rowRefs.current[index]?.scrollIntoView({
-                behavior: 'smooth',
-                block: 'start'
+            containerRef.current?.scrollTo({
+                top: y,
+                behavior: 'smooth'
             });
         });
     };
 
     return (
-        <div className="h-screen flex flex-col bg-slate-50 dark:bg-slate-950 overflow-hidden">
+        <div className="h-screen flex flex-col overflow-hidden">
 
             {/* TOP BAR */}
-            <div className="sticky top-0 z-50 bg-white dark:bg-slate-950 border-b">
-
-                <div className="flex items-center justify-between px-4 pt-4 pb-2">
-                    <div className="flex items-center gap-2">
+            <div className="border-b bg-white dark:bg-slate-900">
+                <div className="flex justify-between p-3">
+                    <div className="flex gap-2 items-center">
                         <NavMenu />
                         <div>
-                            <h1 className="text-lg font-bold">{title}</h1>
-                            <p className="text-xs text-slate-500">{subtitle}</p>
+                            <div className="font-bold">{title}</div>
+                            <div className="text-xs text-gray-500">{subtitle}</div>
                         </div>
                     </div>
 
-                    <a href={sefariaUrl} target="_blank">
+                    <a href={sefariaUrl}>
                         <Button size="sm" variant="outline">
-                            <ExternalLink className="w-4 h-4" />
+                            <ExternalLink />
                         </Button>
                     </a>
-                </div>
-
-                <div className="px-4 flex gap-2 py-2">
-                    <Button onClick={() => setLangMode('en')} size="sm" variant={langMode === 'en' ? "default" : "outline"}>EN</Button>
-                    <Button onClick={() => setLangMode('he')} size="sm" variant={langMode === 'he' ? "default" : "outline"}>HB</Button>
-                    <Button onClick={() => setLangMode('both')} size="sm" variant={langMode === 'both' ? "default" : "outline"}>BOTH</Button>
-
-                    {page === 'reader' && (
-                        <Button onClick={() => setPage('toc')} size="sm" variant="outline">
-                            <ArrowLeft className="w-4 h-4 mr-1" />
-                            TOC
-                        </Button>
-                    )}
                 </div>
             </div>
 
@@ -240,35 +234,41 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
             <div className="flex-1 overflow-hidden">
 
                 {page === 'toc' && (
-                    <div className="h-full overflow-y-auto px-4">
-                        {loading && <div className="py-10">Loading…</div>}
-                        {error && <AlertCircle />}
-
-                        {sections.map((sec, i) => (
+                    <div className="h-full overflow-y-auto p-3">
+                        {sections.map((s, i) => (
                             <button
                                 key={i}
                                 onClick={() => jumpTo(i)}
-                                className="w-full text-left py-3 border-b"
+                                className="block w-full text-left p-2 border-b"
                             >
-                                {sec.label}
+                                {s.label}
                             </button>
                         ))}
                     </div>
                 )}
 
                 {page === 'reader' && (
-                    <div className="h-full overflow-y-auto px-4 pb-10">
-                        {sections.map((sec, i) => (
-                            <Section
-                                key={i}
-                                sec={sec}
-                                data={textMap[i]}
-                                langMode={langMode}
-                                rowRef={(el) => {
-                                    if (el) rowRefs.current[i] = el;
-                                }}
-                            />
-                        ))}
+                    <div
+                        ref={containerRef}
+                        className="h-full overflow-y-auto p-4"
+                    >
+                        {sections.map((sec, i) => {
+                            if (i < visible.start || i > visible.end) {
+                                return <div key={i} style={{ height: 20 }} />;
+                            }
+
+                            return (
+                                <Section
+                                    key={i}
+                                    index={i}
+                                    sec={sec}
+                                    data={textMap[i]}
+                                    langMode={langMode}
+                                    setHeight={setHeight}
+                                    rowRef={(el) => (rowRefs.current[i] = el)}
+                                />
+                            );
+                        })}
                     </div>
                 )}
 
