@@ -3,14 +3,12 @@ import { Loader2, ArrowLeft, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import NavMenu from '@/components/NavMenu';
 
-/* ---------------- SCROLL LOCK (OUTER ONLY) ---------------- */
 if (typeof document !== 'undefined') {
     document.documentElement.style.height = '100%';
     document.body.style.height = '100%';
     document.body.style.overflow = 'hidden';
 }
 
-/* ---------------- FLATTEN SIDDUR TREE ---------------- */
 function flattenNodes(nodes, keyPath = '') {
     const out = [];
 
@@ -32,7 +30,6 @@ function flattenNodes(nodes, keyPath = '') {
     return out;
 }
 
-/* ---------------- TEXT RENDER ---------------- */
 function SectionText({ he, text }) {
     const heArr = Array.isArray(he) ? he : he ? [he] : [];
     const enArr = Array.isArray(text) ? text : text ? [text] : [];
@@ -44,16 +41,12 @@ function SectionText({ he, text }) {
             {Array.from({ length: max }).map((_, i) => (
                 <div key={i} className="space-y-2">
                     {heArr[i] && (
-                        <p
-                            dir="rtl"
-                            className="text-right text-lg font-serif"
-                            dangerouslySetInnerHTML={{ __html: heArr[i] }}
-                        />
+                        <p dir="rtl" className="text-right text-lg font-serif"
+                            dangerouslySetInnerHTML={{ __html: heArr[i] }} />
                     )}
                     {enArr[i] && (
                         <p className="text-sm text-slate-500"
-                            dangerouslySetInnerHTML={{ __html: enArr[i] }}
-                        />
+                            dangerouslySetInnerHTML={{ __html: enArr[i] }} />
                     )}
                 </div>
             ))}
@@ -61,7 +54,6 @@ function SectionText({ he, text }) {
     );
 }
 
-/* ---------------- MAIN COMPONENT ---------------- */
 export default function SiddurView({ title, subtitle, bookRef }) {
     const containerRef = useRef(null);
 
@@ -70,9 +62,9 @@ export default function SiddurView({ title, subtitle, bookRef }) {
     const [activeIndex, setActiveIndex] = useState(0);
     const [startIndex, setStartIndex] = useState(null);
 
-    const WINDOW = 1; // previous + next only (ultra stable)
+    const RENDER_WINDOW = 1;
+    const OBSERVE_WINDOW = 5;
 
-    /* ---------------- LOAD INDEX ---------------- */
     useEffect(() => {
         fetch(`https://www.sefaria.org/api/index/${bookRef}`)
             .then(r => r.json())
@@ -83,7 +75,6 @@ export default function SiddurView({ title, subtitle, bookRef }) {
             });
     }, [bookRef]);
 
-    /* ---------------- FETCH TEXT ---------------- */
     const load = async (i) => {
         if (loaded[i] || !sections[i]) return;
 
@@ -96,17 +87,16 @@ export default function SiddurView({ title, subtitle, bookRef }) {
         setLoaded(prev => ({ ...prev, [i]: data }));
     };
 
-    /* ---------------- ENTER READER ---------------- */
     const openAt = async (i) => {
         setStartIndex(i);
         setActiveIndex(i);
 
-        for (let x = i - WINDOW; x <= i + WINDOW; x++) {
+        for (let x = i - OBSERVE_WINDOW; x <= i + OBSERVE_WINDOW; x++) {
             if (x >= 0 && x < sections.length) load(x);
         }
     };
 
-    /* ---------------- OBSERVER (ONLY FOR ACTIVE TRACKING) ---------------- */
+    /* ---------------- OBSERVER FIX ---------------- */
     useEffect(() => {
         if (startIndex === null) return;
 
@@ -114,20 +104,21 @@ export default function SiddurView({ title, subtitle, bookRef }) {
 
         const observer = new IntersectionObserver(
             (entries) => {
-                for (const entry of entries) {
-                    if (!entry.isIntersecting) continue;
+                for (const e of entries) {
+                    if (!e.isIntersecting) continue;
 
-                    const i = Number(entry.target.dataset.index);
+                    const i = Number(e.target.dataset.index);
+
                     setActiveIndex(i);
 
-                    for (let x = i - WINDOW; x <= i + WINDOW; x++) {
+                    for (let x = i - OBSERVE_WINDOW; x <= i + OBSERVE_WINDOW; x++) {
                         if (x >= 0 && x < sections.length) load(x);
                     }
                 }
             },
             {
                 root,
-                threshold: 0.6
+                threshold: 0.4
             }
         );
 
@@ -137,16 +128,14 @@ export default function SiddurView({ title, subtitle, bookRef }) {
         return () => observer.disconnect();
     }, [startIndex, sections]);
 
-    /* ---------------- VISIBLE RANGE ---------------- */
-    const start = Math.max(0, activeIndex - WINDOW);
-    const end = Math.min(sections.length - 1, activeIndex + WINDOW);
+    const start = Math.max(0, activeIndex - RENDER_WINDOW);
+    const end = Math.min(sections.length - 1, activeIndex + RENDER_WINDOW);
 
     const visible = sections.slice(start, end + 1);
 
     return (
         <div className="h-screen flex flex-col overflow-hidden bg-slate-50 dark:bg-slate-950">
 
-            {/* HEADER */}
             <div className="px-4 pt-4 pb-2 flex justify-between">
                 <div>
                     <NavMenu />
@@ -155,46 +144,43 @@ export default function SiddurView({ title, subtitle, bookRef }) {
                 </div>
 
                 <Button variant="ghost" onClick={() => setStartIndex(null)}>
-                    <ArrowLeft className="w-4 h-4" />
+                    <ArrowLeft />
                 </Button>
             </div>
 
-            {/* SCROLL AREA */}
             <div
                 ref={containerRef}
                 className="flex-1 overflow-y-auto mx-4 mb-4 bg-white dark:bg-slate-900 rounded-xl"
             >
 
-                {/* TOC */}
                 {startIndex === null && (
                     <div>
-                        {sections.map((sec, i) => (
+                        {sections.map((s, i) => (
                             <button
                                 key={i}
                                 onClick={() => openAt(i)}
                                 className="w-full flex justify-between p-3 border-b"
                             >
-                                {sec.label}
+                                {s.label}
                                 <ChevronRight />
                             </button>
                         ))}
                     </div>
                 )}
 
-                {/* READER (ONLY 3 SECTIONS EXIST AT ONCE) */}
                 {startIndex !== null && (
                     <div className="p-4 space-y-12">
 
                         {visible.map((sec, idx) => {
-                            const realIndex = start + idx;
-                            const data = loaded[realIndex];
+                            const real = start + idx;
+                            const data = loaded[real];
 
-                            if (!data) load(realIndex);
+                            if (!data) load(real);
 
                             return (
                                 <div
-                                    key={realIndex}
-                                    data-index={realIndex}
+                                    key={real}
+                                    data-index={real}
                                     className="space-y-3"
                                 >
                                     <div className="sticky top-0 bg-white dark:bg-slate-900 py-2 font-semibold">
@@ -204,9 +190,7 @@ export default function SiddurView({ title, subtitle, bookRef }) {
                                     {data ? (
                                         <SectionText he={data.he} text={data.text} />
                                     ) : (
-                                        <div className="py-6 flex justify-center">
-                                            <Loader2 className="animate-spin" />
-                                        </div>
+                                        <Loader2 className="animate-spin" />
                                     )}
                                 </div>
                             );
