@@ -34,6 +34,8 @@ function flattenNodes(nodes, keyPath = '', labelPath = '') {
   return result;
 }
 
+const rowRefs = useRef({});
+
 const isEnglishLine = (t) => {
   if (!t) return false;
   const plain = t.replace(/<[^>]*>/g, '').trim();
@@ -73,7 +75,10 @@ function Section({ sec, data, rowRef, langMode }) {
   const maxLen = Math.max(heArr.length, enArr.length);
 
   return (
-    <div ref={rowRef} className="space-y-4 scroll-mt-24">
+    <div
+    id={`section-${sec.ref}`}
+    className="space-y-4 scroll-mt-24"
+    >
       <div className="sticky top-0 bg-white dark:bg-slate-900 py-2 z-10 border-b">
         <p className="font-semibold">{sec.label}</p>
       </div>
@@ -113,7 +118,6 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
 
   const langMode = language || 'both';
 
-  const rowRefs = useRef({});
   const observerRef = useRef(null);
 
   const [sections, setSections] = useState([]);
@@ -216,6 +220,13 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
 
   const openSection = (i) => {
     navigate(`/SephardicSiddur/section/${i}/both`);
+
+    requestAnimationFrame(() => {
+      rowRefs.current[i]?.scrollIntoView({
+        behavior: 'smooth',
+        block: 'start'
+      });
+    });
   };
 
   /* ---------------- RENDER ---------------- */
@@ -265,20 +276,22 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
           <div className="overflow-y-auto h-full px-4" onScroll={onScroll}>
 
             {sections.slice(range.start, range.end + 1).map((sec, i) => {
-              const index = range.start + i;
+            const index = range.start + i;
 
-              return (
+            return (
+                <div
+                key={index}
+                ref={(el) => {
+                    if (el) rowRefs.current[index] = el;
+                }}
+                >
                 <Section
-                  key={index}
-                  sec={sec}
-                  data={textMap[index]}
-                  langMode={langMode}
-                  rowRef={(el) => {
-                    rowRefs.current[index] = el;
-                    if (el) el.dataset.index = index;
-                  }}
+                    sec={sec}
+                    data={textMap[index]}
+                    langMode={langMode}
                 />
-              );
+                </div>
+            );
             })}
 
           </div>
