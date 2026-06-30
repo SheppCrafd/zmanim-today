@@ -23,6 +23,7 @@ function flattenNodes(nodes, keyPath = '', labelPath = '') {
       result.push(...flattenNodes(node.nodes, fullKeyPath, fullLabelPath));
     } else {
       result.push({
+        index: result.length,
         label: node.title,
         heLabel: node.heTitle,
         breadcrumb: fullLabelPath,
@@ -78,7 +79,12 @@ function Section({ sec, data, rowRef, langMode }) {
     className="space-y-4 scroll-mt-24"
     >
       <div className="sticky top-0 bg-white dark:bg-slate-900 py-2 z-10 border-b">
-        <p className="font-semibold">{sec.label}</p>
+        <p
+        id={`sec-${sec.index}`}
+         className="font-semibold"
+        >
+        {sec.label}
+        </p>
       </div>
 
       <div className="space-y-6">
@@ -258,8 +264,14 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
 
             {sections.map((sec, i) => (
             <button
-                key={i}
-                onClick={() => openSection(i)}
+            id={`toc-${i}`}
+            key={i}
+            onClick={() => {
+                document.getElementById(`sec-${i}`)?.scrollIntoView({
+                behavior: 'smooth',
+                block: 'start'
+                });
+            }}
                 className="w-full text-left py-3 border-b"
             >
                 {sec.label}
