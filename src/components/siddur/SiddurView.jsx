@@ -262,16 +262,16 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
             const target = el.offsetTop;
             const current = container.scrollTop;
 
-            const progress = Math.min((now - startTime) / duration, 1);
+            const progressRaw = (now - startTime) / duration;
+            const progress = Math.min(progressRaw, 0.985); // 👈 key fix
 
-            // ease-out (fast start, slow finish)
             const ease = 1 - Math.pow(1 - progress, 3);
 
             const next = current + (target - current) * ease;
 
             container.scrollTop = next;
 
-            if (progress < 1) {
+            if (progressRaw < 1) {
                 requestAnimationFrame(animate);
             }
         };
