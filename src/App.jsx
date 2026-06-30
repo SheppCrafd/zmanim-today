@@ -9,6 +9,7 @@ import PageNotFound from './lib/PageNotFound'
 import { AuthProvider, useAuth } from '@/lib/AuthContext'
 import { ThemeProvider } from '@/lib/ThemeContext'
 import UserNotRegisteredError from '@/components/UserNotRegisteredError'
+import { Navigate } from 'react-router-dom';
 
 import Home from './pages/Home'
 import Zmanim from './pages/Zmanim'
@@ -55,7 +56,22 @@ const AuthenticatedApp = () => {
       <Route path="/ChabadSiddur/section/:sectionId/:language" element={<ChabadSiddur />} />
 
       <Route path="*" element={<PageNotFound />} />
-    </Routes>
+
+      <Route
+      path="/SephardicSiddur"
+      element={<Navigate to="/SephardicSiddur/toc" replace />}
+      />
+
+      <Route
+      path="/AshkenaziSiddur"
+      element={<Navigate to="/AshkenaziSiddur/toc" replace />}
+      />
+
+      <Route
+      path="/ChabadSiddur"
+      element={<Navigate to="/ChabadSiddur/toc" replace />}
+      />
+      </Routes>
   );
 };
 
