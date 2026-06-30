@@ -239,45 +239,53 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
 
     /* ---------------- FIXED JUMP ---------------- */
 
-const jumpTo = (i) => {
-    setPage('reader');
+    const jumpTo = (i) => {
+        setPage('reader');
 
-    setRange({
-        start: Math.max(0, i - 2),
-        end: i + 5
-    });
+        setRange({
+            start: Math.max(0, i - 2),
+            end: i + 5
+        });
 
-    const startTime = performance.now();
-    const duration = 900; // ~1 sec max
-
-    const animate = (now) => {
-        const el = rowRefs.current[i];
         const container = document.querySelector('.h-full.overflow-y-auto');
 
-        if (!el || !container) {
-            requestAnimationFrame(animate);
-            return;
-        }
+        const start = container.scrollTop;
 
-        const target = el.offsetTop;
-        const current = container.scrollTop;
+        const getTarget = () => {
+            const el = rowRefs.current[i];
+            if (!el) return null;
 
-        const progress = Math.min((now - startTime) / duration, 1);
+            // IMPORTANT: relative to scroll container, not page
+            return el.offsetTop - container.offsetTop;
+        };
 
-        // ease-out (fast start, slow finish)
-        const ease = 1 - Math.pow(1 - progress, 3);
+        const startTime = performance.now();
+        const duration = 900;
 
-        const next = current + (target - current) * ease;
+        const animate = (now) => {
+            const target = getTarget();
 
-        container.scrollTop = next;
+            if (target == null) {
+                requestAnimationFrame(animate);
+                return;
+            }
 
-        if (progress < 1) {
-            requestAnimationFrame(animate);
-        }
+            const t = Math.min((now - startTime) / duration, 1);
+
+            // smooth ease-out but stable (no drift)
+            const ease = 1 - Math.pow(1 - t, 3);
+
+            container.scrollTop = start + (target - start) * ease;
+
+            if (t < 1) {
+                requestAnimationFrame(animate);
+            } else {
+                container.scrollTop = target; // hard clamp final position
+            }
+        };
+
+        requestAnimationFrame(animate);
     };
-
-    requestAnimationFrame(animate);
-};
 
     /* ---------------- RENDER ---------------- */
 
