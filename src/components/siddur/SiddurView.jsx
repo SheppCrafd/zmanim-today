@@ -8,6 +8,7 @@ import {
 import { Button } from '@/components/ui/button';
 import NavMenu from '@/components/NavMenu';
 import { useNavigate, useParams } from 'react-router-dom';
+import { franc } from 'franc';
 
 /* ---------------- TOC FLATTEN ---------------- */
 
@@ -38,30 +39,22 @@ const isEnglishLine = (t) => {
     if (!t) return false;
 
     const plain = t.replace(/<[^>]*>/g, '').trim();
-    if (plain.length < 2) return false;
+    if (plain.length < 3) return false;
 
     const latin = plain.match(/[A-Za-z]/g) || [];
     const hebrew = plain.match(/[\u0590-\u05FF]/g) || [];
 
-    const total = latin.length + hebrew.length;
-    if (total === 0) return false;
+    // keep your Hebrew rule EXACTLY as-is
+    if (hebrew.length > 0 && latin.length === 0) return true;
 
-    const latinRatio = latin.length / total;
+    // must have Latin to even consider English
+    if (latin.length < 3) return false;
 
-    // must look mostly Latin
-    if (!(latin.length > 5 && latinRatio > 0.75)) return false;
+    // 🔥 real language detection
+    const lang = franc(plain);
 
-    // 🚨 reject "fake English" (Portuguese / Spanish / etc)
-    const accents = (plain.match(/[áéíóúãõçñèêîôûàù]/gi) || []).length;
-    const words = plain.split(/\s+/).length;
-    const accentRatio = words ? accents / words : 0;
-
-    // common non-English Latin leakage patterns
-    const foreignPatterns =
-        /ção|não|para|este|esta|que|de la|por la|los |las |con |el |una |uno /i;
-
-    // if it smells foreign, reject it so processLine can translate it
-    if (foreignPatterns.test(plain) || accentRatio > 0.08) return false;
+    // franc returns 'eng' for English
+    if (lang !== 'eng') return false;
 
     return true;
 };
