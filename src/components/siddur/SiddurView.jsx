@@ -263,7 +263,7 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
             const current = container.scrollTop;
 
             const progressRaw = (now - startTime) / duration;
-            const progress = Math.min(progressRaw, 0.985); // 👈 key fix
+            const progress = Math.min(progressRaw, 5); // 👈 key fix
 
             const ease = 1 - Math.pow(1 - progress, 3);
 
