@@ -239,45 +239,45 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
 
     /* ---------------- FIXED JUMP ---------------- */
 
-    const jumpTo = (i) => {
-        setPage('reader');
+const jumpTo = (i) => {
+    setPage('reader');
 
-        setRange({
-            start: Math.max(0, i - 2),
-            end: i + 5
-        });
+    setRange({
+        start: Math.max(0, i - 2),
+        end: i + 5
+    });
 
+    const startTime = performance.now();
+    const duration = 900; // ~1 sec max
+
+    const animate = (now) => {
+        const el = rowRefs.current[i];
         const container = document.querySelector('.h-full.overflow-y-auto');
-        const startTime = performance.now();
-        const duration = 900;
 
-        const animate = (now) => {
-            const el = rowRefs.current[i];
-            if (!el || !container) {
-                requestAnimationFrame(animate);
-                return;
-            }
+        if (!el || !container) {
+            requestAnimationFrame(animate);
+            return;
+        }
 
-            const target = el.offsetTop;
-            const current = container.scrollTop;
+        const target = el.offsetTop;
+        const current = container.scrollTop;
 
-            const progress = Math.min((now - startTime) / duration, 1);
+        const progress = Math.min((now - startTime) / duration, 1);
 
-            // linear movement (no easing)
-            const next = current + (target - current) * progress;
+        // ease-out (fast start, slow finish)
+        const ease = 1 - Math.pow(1 - progress, 3);
 
-            container.scrollTop = next;
+        const next = current + (target - current) * ease;
 
-            // stop immediately when time is up OR we're basically there
-            if (progress < 1 && Math.abs(target - container.scrollTop) > 1) {
-                requestAnimationFrame(animate);
-            } else {
-                container.scrollTop = target; // hard snap finish
-            }
-        };
+        container.scrollTop = next;
 
-        requestAnimationFrame(animate);
+        if (progress < 1) {
+            requestAnimationFrame(animate);
+        }
     };
+
+    requestAnimationFrame(animate);
+};
 
     /* ---------------- RENDER ---------------- */
 
