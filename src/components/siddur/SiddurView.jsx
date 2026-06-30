@@ -51,7 +51,7 @@ const isEnglishLine = (t) => {
 function Section({ sec, data, id, langMode }) {
     if (!data) {
         return (
-            <div className="py-10 flex justify-center" id={`sec-${id}`}>
+            <div id={`section-${id}`} className="py-10 flex justify-center">
                 <Loader2 className="animate-spin text-blue-500" />
             </div>
         );
@@ -59,7 +59,7 @@ function Section({ sec, data, id, langMode }) {
 
     if (data.error) {
         return (
-            <div id={`sec-${id}`} className="text-center text-sm text-red-500 py-6">
+            <div id={`section-${id}`} className="text-center text-sm text-red-500">
                 Failed to load section
             </div>
         );
@@ -75,7 +75,7 @@ function Section({ sec, data, id, langMode }) {
     const maxLen = Math.max(heArr.length, enArr.length);
 
     return (
-        <div id={`sec-${id}`} className="space-y-4 scroll-mt-24">
+        <div id={`section-${id}`} className="space-y-4 scroll-mt-24">
 
             <div className="sticky top-0 bg-white dark:bg-slate-900 py-2 z-10 border-b">
                 <p className="font-semibold text-slate-700 dark:text-slate-100">
@@ -120,7 +120,7 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
     const [sections, setSections] = useState([]);
     const [textMap, setTextMap] = useState({});
     const [range, setRange] = useState({ start: 0, end: 5 });
-    const containerRef = useRef(null);
+    const scrollRef = useRef(null);
 
     /* ---------------- LOAD TOC ---------------- */
 
@@ -182,14 +182,14 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
         }
     };
 
-    /* ---------------- JUMP (FIXED) ---------------- */
+    /* ---------------- FIXED JUMP ---------------- */
 
     const jumpTo = (i) => {
         navigate(`/SephardicSiddur/section/${i}/${langMode}`);
 
         requestAnimationFrame(() => {
-            const el = document.getElementById(`sec-${i}`);
-            if (el) {
+            const el = document.getElementById(`section-${i}`);
+            if (el && scrollRef.current) {
                 el.scrollIntoView({
                     behavior: 'smooth',
                     block: 'start'
@@ -236,21 +236,43 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
             </div>
 
             {/* BODY */}
-            <div className="flex-1 overflow-y-auto px-4" onScroll={onScroll} ref={containerRef}>
+            <div
+                ref={scrollRef}
+                className="flex-1 overflow-y-auto px-4"
+                onScroll={onScroll}
+            >
 
-                {sections.slice(range.start, range.end + 1).map((sec, i) => {
-                    const index = range.start + i;
+                {!sectionId && (
+                    <div className="py-2">
+                        {sections.map((sec, i) => (
+                            <button
+                                key={i}
+                                onClick={() => jumpTo(i)}
+                                className="w-full text-left py-3 border-b"
+                            >
+                                {sec.label}
+                            </button>
+                        ))}
+                    </div>
+                )}
 
-                    return (
-                        <Section
-                            key={index}
-                            id={index}
-                            sec={sec}
-                            data={textMap[index]}
-                            langMode={langMode}
-                        />
-                    );
-                })}
+                {sectionId && (
+                    <div>
+                        {sections.slice(range.start, range.end + 1).map((sec, i) => {
+                            const index = range.start + i;
+
+                            return (
+                                <Section
+                                    key={index}
+                                    id={index}
+                                    sec={sec}
+                                    data={textMap[index]}
+                                    langMode={langMode}
+                                />
+                            );
+                        })}
+                    </div>
+                )}
 
             </div>
         </div>
