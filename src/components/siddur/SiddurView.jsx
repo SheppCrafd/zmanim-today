@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
     ExternalLink,
     Loader2,
@@ -34,6 +34,8 @@ function flattenNodes(nodes, keyPath = '', labelPath = '') {
     return result;
 }
 
+/* ---------------- EN FILTER ---------------- */
+
 const isEnglishLine = (t) => {
     if (!t) return false;
 
@@ -53,7 +55,7 @@ const isEnglishLine = (t) => {
 
 /* ---------------- SECTION ---------------- */
 
-function Section({ sec, data, langMode, rowRef, index }) {
+function Section({ sec, data, langMode, index }) {
     if (!data) {
         return (
             <div className="py-10 flex justify-center">
@@ -81,8 +83,7 @@ function Section({ sec, data, langMode, rowRef, index }) {
 
     return (
         <div
-            ref={rowRef}
-            data-index={index}
+            id={`section-${index}`}
             className="space-y-4 scroll-mt-24"
         >
             <div className="sticky top-0 bg-white dark:bg-slate-900 py-2 z-10 border-b">
@@ -121,36 +122,31 @@ function Section({ sec, data, langMode, rowRef, index }) {
 
 export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
     const navigate = useNavigate();
+    const { sectionId, language } = useParams();
 
-    const rowRefs = useRef({});
-    const observerRef = useRef(null);
+    const langMode = language || 'both';
 
     const [sections, setSections] = useState([]);
     const [textMap, setTextMap] = useState({});
-    const [range, setRange] = useState({ start: 0, end: 5 });
-
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(false);
 
     const [page, setPage] = useState('toc');
-    const [langMode, setLangMode] = useState('both');
-
-    const currentSection = useRef(0);
 
     /* ---------------- LOAD TOC ---------------- */
 
     useEffect(() => {
+        setLoading(true);
+
         fetch(`https://www.sefaria.org/api/index/${bookRef}`)
             .then(r => r.json())
             .then(data => {
-                const nodes = data?.schema?.nodes || [];
-                const rootKey = data?.schema?.key || bookRef.replace(/_/g, ' ');
+                const schema = data?.schema;
+                const rootKey = schema?.key || bookRef.replace(/_/g, ' ');
+                const nodes = schema?.nodes || [];
 
-                const flat = flattenNodes(nodes, rootKey);
-
-                setSections(flat);
+                setSections(flattenNodes(nodes, rootKey));
                 setLoading(false);
-                setRange({ start: 0, end: 5 });
             })
             .catch(() => {
                 setError(true);
@@ -158,106 +154,63 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
             });
     }, [bookRef]);
 
-    /* ---------------- WINDOW LOADING ---------------- */
+    /* ---------------- LOAD ALL TEXT (simple + stable) ---------------- */
 
     useEffect(() => {
         if (!sections.length) return;
 
-        const load = async () => {
-            for (let i = range.start; i <= range.end; i++) {
-                if (!sections[i] || textMap[i]) continue;
+        let cancelled = false;
 
+        const load = async () => {
+            for (let i = 0; i < sections.length; i++) {
                 try {
                     const res = await fetch(
                         `https://www.sefaria.org/api/texts/${encodeURIComponent(sections[i].ref)}?lang=bi`
                     );
                     const data = await res.json();
 
-                    setTextMap(prev => ({ ...prev, [i]: data }));
+                    if (!cancelled) {
+                        setTextMap(prev => ({ ...prev, [i]: data }));
+                    }
                 } catch {
-                    setTextMap(prev => ({ ...prev, [i]: { error: true } }));
+                    if (!cancelled) {
+                        setTextMap(prev => ({ ...prev, [i]: { error: true } }));
+                    }
                 }
             }
         };
 
         load();
-    }, [range, sections]);
+        return () => { cancelled = true; };
+    }, [sections]);
 
-    /* ---------------- OBSERVER (CURRENT SECTION) ---------------- */
+    /* ---------------- SCROLL TO SECTION ON ROUTE CHANGE ---------------- */
 
     useEffect(() => {
-        if (!sections.length) return;
+        if (!sectionId) return;
 
-        if (observerRef.current) observerRef.current.disconnect();
+        const id = `section-${sectionId}`;
+        const el = document.getElementById(id);
 
-        observerRef.current = new IntersectionObserver(
-            (entries) => {
-                for (const entry of entries) {
-                    if (!entry.isIntersecting) continue;
-
-                    const index = Number(entry.target.dataset.index);
-                    if (Number.isNaN(index)) continue;
-
-                    currentSection.current = index;
-
-                    navigate(
-                        `/SephardicSiddur/section/${index}/${langMode}`,
-                        { replace: true }
-                    );
-                }
-            },
-            {
-                rootMargin: '-45% 0px -45% 0px'
-            }
-        );
-
-        Object.values(rowRefs.current).forEach(el => {
-            if (el) observerRef.current.observe(el);
-        });
-
-    }, [sections, langMode]);
-
-    /* ---------------- SCROLL WINDOW ---------------- */
-
-    const onScroll = (e) => {
-        const el = e.target;
-
-        if (el.scrollTop + el.clientHeight > el.scrollHeight - 800) {
-            setRange(r => ({
-                start: r.start,
-                end: Math.min(sections.length - 1, r.end + 2)
-            }));
-        }
-
-        if (el.scrollTop < 800) {
-            setRange(r => ({
-                start: Math.max(0, r.start - 2),
-                end: r.end
-            }));
-        }
-    };
-
-    /* ---------------- FIXED JUMP ---------------- */
-
-    const jumpTo = (i) => {
-        setPage('reader');
-
-        setRange({
-            start: Math.max(0, i - 2),
-            end: i + 5
-        });
-
-        requestAnimationFrame(() => {
-            setTimeout(() => {
-                rowRefs.current[i]?.scrollIntoView({
-                    behavior: 'smooth',
+        if (el) {
+            requestAnimationFrame(() => {
+                el.scrollIntoView({
+                    behavior: 'auto',
                     block: 'start'
                 });
-            }, 50);
-        });
+            });
+        }
+
+        setPage('reader');
+    }, [sectionId, sections]);
+
+    /* ---------------- TOC CLICK ---------------- */
+
+    const openSection = (i) => {
+        navigate(`/SephardicSiddur/section/${i}/${langMode}`);
     };
 
-    /* ---------------- RENDER ---------------- */
+    /* ---------------- UI ---------------- */
 
     return (
         <div className="h-screen flex flex-col bg-slate-50 dark:bg-slate-950 overflow-hidden">
@@ -282,9 +235,17 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
                 </div>
 
                 <div className="px-4 flex gap-2 py-2">
-                    <Button size="sm" variant={langMode === 'en' ? "default" : "outline"} onClick={() => setLangMode('en')}>EN</Button>
-                    <Button size="sm" variant={langMode === 'he' ? "default" : "outline"} onClick={() => setLangMode('he')}>HB</Button>
-                    <Button size="sm" variant={langMode === 'both' ? "default" : "outline"} onClick={() => setLangMode('both')}>BOTH</Button>
+                    <Button size="sm" variant={langMode === 'en' ? "default" : "outline"} onClick={() => navigate(`/SephardicSiddur/section/${sectionId || 0}/en`)}>
+                        EN
+                    </Button>
+
+                    <Button size="sm" variant={langMode === 'he' ? "default" : "outline"} onClick={() => navigate(`/SephardicSiddur/section/${sectionId || 0}/he`)}>
+                        HB
+                    </Button>
+
+                    <Button size="sm" variant={langMode === 'both' ? "default" : "outline"} onClick={() => navigate(`/SephardicSiddur/section/${sectionId || 0}/both`)}>
+                        BOTH
+                    </Button>
 
                     {page === 'reader' && (
                         <Button size="sm" variant="outline" onClick={() => setPage('toc')}>
@@ -296,44 +257,37 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
             </div>
 
             {/* BODY */}
-            <div className="flex-1 overflow-hidden">
+            <div className="flex-1 overflow-y-auto px-4 pb-10">
 
                 {page === 'toc' && (
-                    <div className="h-full overflow-y-auto px-4">
+                    <>
                         {loading && <Loader2 className="animate-spin" />}
                         {error && <AlertCircle />}
 
                         {sections.map((sec, i) => (
                             <button
                                 key={i}
-                                onClick={() => jumpTo(i)}
+                                onClick={() => openSection(i)}
                                 className="w-full text-left py-3 border-b"
                             >
                                 {sec.label}
                             </button>
                         ))}
-                    </div>
+                    </>
                 )}
 
                 {page === 'reader' && (
-                    <div className="h-full overflow-y-auto px-4 pb-10" onScroll={onScroll}>
-                        {sections.slice(range.start, range.end + 1).map((sec, i) => {
-                            const index = range.start + i;
-
-                            return (
-                                <Section
-                                    key={index}
-                                    index={index}
-                                    sec={sec}
-                                    data={textMap[index]}
-                                    langMode={langMode}
-                                    rowRef={(el) => {
-                                        rowRefs.current[index] = el;
-                                    }}
-                                />
-                            );
-                        })}
-                    </div>
+                    <>
+                        {sections.map((sec, i) => (
+                            <Section
+                                key={i}
+                                index={i}
+                                sec={sec}
+                                data={textMap[i]}
+                                langMode={langMode}
+                            />
+                        ))}
+                    </>
                 )}
 
             </div>
