@@ -34,22 +34,42 @@ function flattenNodes(nodes, keyPath = '', labelPath = '') {
     return result;
 }
 
-const isEnglishLine = (t) => {
-    if (!t) return false;
+import { franc } from 'franc';
+import translate from 'translate';
 
-    const plain = t.replace(/<[^>]*>/g, '').trim();
-    if (plain.length < 2) return false;
+translate.engine = 'google'; // or whatever engine you use
 
-    const latin = plain.match(/[A-Za-z]/g) || [];
-    const hebrew = plain.match(/[\u0590-\u05FF]/g) || [];
+function stripHtml(text) {
+    return text.replace(/<[^>]*>/g, '').trim();
+}
 
-    const total = latin.length + hebrew.length;
-    if (total === 0) return false;
+function shouldTranslate(line) {
+    const plain = stripHtml(line);
 
-    const latinRatio = latin.length / total;
+    // Too short = unreliable detection
+    if (plain.length < 20) return false;
 
-    return latin.length > 5 && latinRatio > 0.75;
-};
+    const lang = franc(plain);
+
+    return lang === 'por' || lang === 'spa';
+}
+
+async function normalizeEnglishLine(line) {
+    if (!line) return line;
+
+    if (!shouldTranslate(line)) {
+        return line;
+    }
+
+    try {
+        return await translate(line, {
+            to: 'en'
+        });
+    } catch {
+        // Fail safely
+        return line;
+    }
+}
 
 /* ---------------- SECTION ---------------- */
 
@@ -71,9 +91,9 @@ function Section({ sec, data, langMode, rowRef, index }) {
     }
 
     const heArr = Array.isArray(data.he) ? data.he : (data.he ? [data.he] : []);
-    const enRaw = Array.isArray(data.text) ? data.text : (data.text ? [data.text] : []);
-    const enArr = enRaw.filter(isEnglishLine);
-
+    const enArr = Array.isArray(data.text)
+        ? data.text
+        : (data.text ? [data.text] : []);
     const showEN = langMode !== 'he';
     const showHB = langMode !== 'en';
 
@@ -173,7 +193,21 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
                     );
                     const data = await res.json();
 
-                    setTextMap(prev => ({ ...prev, [i]: data }));
+                    const rawText = Array.isArray(data.text)
+                        ? data.text
+                        : (data.text ? [data.text] : []);
+
+                    const normalizedText = await Promise.all(
+                        rawText.map(normalizeEnglishLine)
+                    );
+
+                    setTextMap(prev => ({
+                        ...prev,
+                        [i]: {
+                            ...data,
+                            text: normalizedText
+                        }
+                    }));
                 } catch {
                     setTextMap(prev => ({ ...prev, [i]: { error: true } }));
                 }
