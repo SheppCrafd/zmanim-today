@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
     ExternalLink,
     Loader2,
@@ -7,7 +7,7 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import NavMenu from '@/components/NavMenu';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 
 /* ---------------- TOC FLATTEN ---------------- */
 
@@ -34,73 +34,21 @@ function flattenNodes(nodes, keyPath = '', labelPath = '') {
     return result;
 }
 
-/* ---------------- TEXT QUALITY ---------------- */
+const isEnglishLine = (t) => {
+    if (!t) return false;
 
-const isHebrew = (t) => /[\u0590-\u05FF]/.test(t || '');
-const hasLatin = (t) => /[A-Za-z]/.test(t || '');
+    const plain = t.replace(/<[^>]*>/g, '').trim();
+    if (plain.length < 2) return false;
 
-const isBadEnglish = (t) => {
-    if (!t) return true;
+    const latin = plain.match(/[A-Za-z]/g) || [];
+    const hebrew = plain.match(/[\u0590-\u05FF]/g) || [];
 
-    const text = t.replace(/<[^>]*>/g, '').trim();
+    const total = latin.length + hebrew.length;
+    if (total === 0) return false;
 
-    const accents = (text.match(/[áéíóúãõçñ]/gi) || []).length;
-    const words = text.split(/\s+/).length;
+    const latinRatio = latin.length / total;
 
-    const foreignHints =
-        /ção|não|para|este|esta|que|de la|por la|el |los |con /i.test(text);
-
-    const accentRatio = words ? accents / words : 0;
-
-    return foreignHints || accentRatio > 0.08;
-};
-
-/* fake English → translate */
-const translateToEnglish = async (text) => {
-    try {
-        const res = await fetch('https://libretranslate.de/translate', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                q: text,
-                source: 'auto',
-                target: 'en',
-                format: 'text'
-            })
-        });
-
-        const data = await res.json();
-        return data?.translatedText || null;
-    } catch {
-        return null;
-    }
-};
-
-/* ---------------- PROCESS LINE ---------------- */
-
-const processLine = async (line) => {
-    if (!line) return null;
-
-    const plain = line.replace(/<[^>]*>/g, '').trim();
-    if (plain.length < 2) return null;
-
-    const hebrew = isHebrew(plain);
-    const latin = hasLatin(plain);
-
-    // NEVER touch Hebrew-only content
-    if (hebrew && !latin) return line;
-
-    // if no Latin at all → drop
-    if (!latin) return null;
-
-    // Latin text that is NOT real English → fix it
-    if (isBadEnglish(plain)) {
-        const translated = await translateToEnglish(plain);
-        return translated || null;
-    }
-
-    // good English → keep
-    return line;
+    return latin.length > 5 && latinRatio > 0.75;
 };
 
 /* ---------------- SECTION ---------------- */
@@ -123,7 +71,8 @@ function Section({ sec, data, langMode, rowRef, index }) {
     }
 
     const heArr = Array.isArray(data.he) ? data.he : (data.he ? [data.he] : []);
-    const enArr = Array.isArray(data.text) ? data.text : (data.text ? [data.text] : []);
+    const enRaw = Array.isArray(data.text) ? data.text : (data.text ? [data.text] : []);
+    const enArr = enRaw.filter(isEnglishLine);
 
     const showEN = langMode !== 'he';
     const showHB = langMode !== 'en';
@@ -131,8 +80,11 @@ function Section({ sec, data, langMode, rowRef, index }) {
     const maxLen = Math.max(heArr.length, enArr.length);
 
     return (
-        <div ref={rowRef} data-index={index} className="space-y-4 scroll-mt-24">
-
+        <div
+            ref={rowRef}
+            data-index={index}
+            className="space-y-4 scroll-mt-24"
+        >
             <div className="sticky top-0 bg-white dark:bg-slate-900 py-2 z-10 border-b">
                 <p className="font-semibold text-slate-700 dark:text-slate-100">
                     {sec.label}
@@ -192,7 +144,9 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
             .then(r => r.json())
             .then(data => {
                 const nodes = data?.schema?.nodes || [];
-                const flat = flattenNodes(nodes, data?.schema?.key || bookRef);
+                const rootKey = data?.schema?.key || bookRef.replace(/_/g, ' ');
+
+                const flat = flattenNodes(nodes, rootKey);
 
                 setSections(flat);
                 setLoading(false);
@@ -204,7 +158,7 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
             });
     }, [bookRef]);
 
-    /* ---------------- LOAD TEXT (CLEAN PIPELINE) ---------------- */
+    /* ---------------- WINDOW LOADING ---------------- */
 
     useEffect(() => {
         if (!sections.length) return;
@@ -219,25 +173,7 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
                     );
                     const data = await res.json();
 
-                    const rawEN = Array.isArray(data.text)
-                        ? data.text
-                        : (data.text ? [data.text] : []);
-
-                    const cleaned = [];
-
-                    for (const line of rawEN) {
-                        const processed = await processLine(line);
-                        if (processed) cleaned.push(processed);
-                    }
-
-                    setTextMap(prev => ({
-                        ...prev,
-                        [i]: {
-                            ...data,
-                            text: cleaned
-                        }
-                    }));
-
+                    setTextMap(prev => ({ ...prev, [i]: data }));
                 } catch {
                     setTextMap(prev => ({ ...prev, [i]: { error: true } }));
                 }
@@ -247,7 +183,41 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
         load();
     }, [range, sections]);
 
-    /* ---------------- SCROLL ---------------- */
+    /* ---------------- OBSERVER (CURRENT SECTION) ---------------- */
+
+    useEffect(() => {
+        if (!sections.length) return;
+
+        if (observerRef.current) observerRef.current.disconnect();
+
+        observerRef.current = new IntersectionObserver(
+            (entries) => {
+                for (const entry of entries) {
+                    if (!entry.isIntersecting) continue;
+
+                    const index = Number(entry.target.dataset.index);
+                    if (Number.isNaN(index)) continue;
+
+                    currentSection.current = index;
+
+                    navigate(
+                        `/SephardicSiddur/section/${index}/${langMode}`,
+                        { replace: true }
+                    );
+                }
+            },
+            {
+                rootMargin: '-45% 0px -45% 0px'
+            }
+        );
+
+        Object.values(rowRefs.current).forEach(el => {
+            if (el) observerRef.current.observe(el);
+        });
+
+    }, [sections, langMode]);
+
+    /* ---------------- SCROLL WINDOW ---------------- */
 
     const onScroll = (e) => {
         const el = e.target;
@@ -267,11 +237,54 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
         }
     };
 
+    /* ---------------- FIXED JUMP ---------------- */
+
+    const jumpTo = (i) => {
+        setPage('reader');
+
+        setRange({
+            start: Math.max(0, i - 2),
+            end: i + 5
+        });
+
+        const startTime = performance.now();
+        const duration = 900; // ~1 sec max
+
+        const animate = (now) => {
+            const el = rowRefs.current[i];
+            const container = document.querySelector('.h-full.overflow-y-auto');
+
+            if (!el || !container) {
+                requestAnimationFrame(animate);
+                return;
+            }
+
+            const target = el.offsetTop;
+            const current = container.scrollTop;
+
+            const progressRaw = (now - startTime) / duration;
+            const progress = Math.min(progressRaw, 5000); // 👈 key fix
+
+            const ease = 1 - Math.pow(1 - progress, 3);
+
+            const next = current + (target - current) * ease;
+
+            container.scrollTop = next;
+
+            if (progressRaw < 1) {
+                requestAnimationFrame(animate);
+            }
+        };
+
+        requestAnimationFrame(animate);
+    };
+
     /* ---------------- RENDER ---------------- */
 
     return (
         <div className="h-screen flex flex-col bg-slate-50 dark:bg-slate-950 overflow-hidden">
 
+            {/* TOP BAR (UNCHANGED VISUALS) */}
             <div className="sticky top-0 z-50 bg-white dark:bg-slate-950 border-b">
 
                 <div className="flex items-center justify-between px-4 pt-4 pb-2">
@@ -283,7 +296,7 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
                         </div>
                     </div>
 
-                    <a href={sefariaUrl} target="_blank" rel="noreferrer">
+                    <a href={sefariaUrl} target="_blank" className="relative z-50">
                         <Button size="sm" variant="outline">
                             <ExternalLink className="w-4 h-4" />
                         </Button>
@@ -304,6 +317,7 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
                 </div>
             </div>
 
+            {/* BODY */}
             <div className="flex-1 overflow-hidden">
 
                 {page === 'toc' && (
@@ -314,7 +328,7 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
                         {sections.map((sec, i) => (
                             <button
                                 key={i}
-                                onClick={() => setPage('reader')}
+                                onClick={() => jumpTo(i)}
                                 className="w-full text-left py-3 border-b"
                             >
                                 {sec.label}
