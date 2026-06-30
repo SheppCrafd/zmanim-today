@@ -8,7 +8,6 @@ import {
 import { Button } from '@/components/ui/button';
 import NavMenu from '@/components/NavMenu';
 import { useNavigate, useParams } from 'react-router-dom';
-import { franc } from 'franc';
 
 /* ---------------- TOC FLATTEN ---------------- */
 
@@ -38,23 +37,34 @@ function flattenNodes(nodes, keyPath = '', labelPath = '') {
 const isEnglishLine = (t) => {
     if (!t) return false;
 
-    const plain = t.replace(/<[^>]*>/g, '').trim();
-    if (plain.length < 3) return false;
+    const text = t.replace(/<[^>]*>/g, '').trim();
+    if (text.length < 3) return false;
 
-    const latin = plain.match(/[A-Za-z]/g) || [];
-    const hebrew = plain.match(/[\u0590-\u05FF]/g) || [];
+    const letters = text.match(/[A-Za-z]/g) || [];
+    const hebrew = text.match(/[\u0590-\u05FF]/g) || [];
 
-    // keep your Hebrew rule EXACTLY as-is
-    if (hebrew.length > 0 && latin.length === 0) return true;
+    // must be mostly Latin
+    const total = letters.length + hebrew.length;
+    if (total === 0) return false;
 
-    // must have Latin to even consider English
-    if (latin.length < 3) return false;
+    const latinRatio = letters.length / total;
+    if (letters.length < 5 || latinRatio < 0.75) return false;
 
-    // 🔥 real language detection
-    const lang = franc(plain);
+    const lower = text.toLowerCase();
 
-    // franc returns 'eng' for English
-    if (lang !== 'eng') return false;
+    // strong “this is NOT English” signals
+    const foreignSignals = [
+        " para ", " que ", " dos ", " das ", " não ",
+        " con ", " los ", " las ", " del ", " este ", " esta "
+    ];
+
+    let hits = 0;
+    for (const s of foreignSignals) {
+        if (lower.includes(s)) hits++;
+    }
+
+    // if too many Romance-language markers → reject
+    if (hits >= 2) return false;
 
     return true;
 };
