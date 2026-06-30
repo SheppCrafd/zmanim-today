@@ -34,8 +34,6 @@ function flattenNodes(nodes, keyPath = '', labelPath = '') {
   return result;
 }
 
-const rowRefs = useRef({});
-
 const isEnglishLine = (t) => {
   if (!t) return false;
   const plain = t.replace(/<[^>]*>/g, '').trim();
@@ -119,6 +117,7 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
   const langMode = language || 'both';
 
   const observerRef = useRef(null);
+  const rowRefs = useRef({});
 
   const [sections, setSections] = useState([]);
   const [textMap, setTextMap] = useState({});
@@ -221,14 +220,13 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
   const openSection = (i) => {
     navigate(`/SephardicSiddur/section/${i}/both`);
 
-    requestAnimationFrame(() => {
+    setTimeout(() => {
       rowRefs.current[i]?.scrollIntoView({
         behavior: 'smooth',
         block: 'start'
       });
-    });
+    }, 50);
   };
-
   /* ---------------- RENDER ---------------- */
 
   return (
@@ -271,31 +269,32 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
         </div>
         )}
 
-        {/* READER */}
-        {sectionId && (
-          <div className="overflow-y-auto h-full px-4" onScroll={onScroll}>
+    {/* READER */}
+    {sectionId && (
+    <div className="overflow-y-auto h-full px-4" onScroll={onScroll}>
 
-            {sections.slice(range.start, range.end + 1).map((sec, i) => {
-            const index = range.start + i;
+        {sections.slice(range.start, range.end + 1).map((sec, i) => {
+        const index = range.start + i;
 
-            return (
-                <div
-                key={index}
-                ref={(el) => {
-                    if (el) rowRefs.current[index] = el;
-                }}
-                >
-                <Section
-                    sec={sec}
-                    data={textMap[index]}
-                    langMode={langMode}
-                />
-                </div>
-            );
-            })}
+        return (
+            <div
+            key={index}
+            data-index={index}
+            ref={(el) => {
+                if (el) rowRefs.current[index] = el;
+            }}
+            >
+            <Section
+                sec={sec}
+                data={textMap[index]}
+                langMode={langMode}
+            />
+            </div>
+        );
+        })}
 
-          </div>
-        )}
+    </div>
+    )}
 
       </div>
     </div>
