@@ -4,19 +4,19 @@ import { QueryClientProvider } from '@tanstack/react-query'
 import { queryClientInstance } from '@/lib/query-client'
 import VisualEditAgent from '@/lib/VisualEditAgent'
 import NavigationTracker from '@/lib/NavigationTracker'
-import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
-import PageNotFound from './lib/PageNotFound';
-import { AuthProvider, useAuth } from '@/lib/AuthContext';
-import { ThemeProvider } from '@/lib/ThemeContext';
-import UserNotRegisteredError from '@/components/UserNotRegisteredError';
+import { BrowserRouter as Router, Route, Routes } from 'react-router-dom'
+import PageNotFound from './lib/PageNotFound'
+import { AuthProvider, useAuth } from '@/lib/AuthContext'
+import { ThemeProvider } from '@/lib/ThemeContext'
+import UserNotRegisteredError from '@/components/UserNotRegisteredError'
 
-import Home from './pages/Home';
-import Zmanim from './pages/Zmanim';
-import SephardicSiddur from './pages/SephardicSiddur';
-import AshkenaziSiddur from './pages/AshkenaziSiddur';
-import ChabadSiddur from './pages/ChabadSiddur';
-import Compass from './pages/Compass';
-import Settings from './pages/Settings';
+import Home from './pages/Home'
+import Zmanim from './pages/Zmanim'
+import SephardicSiddur from './pages/SephardicSiddur'
+import AshkenaziSiddur from './pages/AshkenaziSiddur'
+import ChabadSiddur from './pages/ChabadSiddur'
+import Compass from './pages/Compass'
+import Settings from './pages/Settings'
 
 const AuthenticatedApp = () => {
   const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
@@ -31,22 +31,31 @@ const AuthenticatedApp = () => {
 
   if (authError) {
     if (authError.type === 'user_not_registered') return <UserNotRegisteredError />;
-    if (authError.type === 'auth_required') { navigateToLogin(); return null; }
+    if (authError.type === 'auth_required') {
+      navigateToLogin();
+      return null;
+    }
   }
 
   return (
-    <>
-      <Routes>
-        <Route path="/" element={<Home />} />
-        <Route path="/Zmanim" element={<Zmanim />} />
-        <Route path="/Compass" element={<Compass />} />
-        <Route path="/Settings" element={<Settings />} />
-        <Route path="/SephardicSiddur" element={<SephardicSiddur />} />
-        <Route path="/AshkenaziSiddur" element={<AshkenaziSiddur />} />
-        <Route path="/ChabadSiddur" element={<ChabadSiddur />} />
-        <Route path="*" element={<PageNotFound />} />
-      </Routes>
-    </>
+    <Routes>
+      <Route path="/" element={<Home />} />
+      <Route path="/Zmanim" element={<Zmanim />} />
+      <Route path="/Compass" element={<Compass />} />
+      <Route path="/Settings" element={<Settings />} />
+
+      {/* SIDDUR ROUTES (NEW ARCHITECTURE) */}
+      <Route path="/SephardicSiddur/toc" element={<SephardicSiddur />} />
+      <Route path="/SephardicSiddur/section/:sectionId/:language" element={<SephardicSiddur />} />
+
+      <Route path="/AshkenaziSiddur/toc" element={<AshkenaziSiddur />} />
+      <Route path="/AshkenaziSiddur/section/:sectionId/:language" element={<AshkenaziSiddur />} />
+
+      <Route path="/ChabadSiddur/toc" element={<ChabadSiddur />} />
+      <Route path="/ChabadSiddur/section/:sectionId/:language" element={<ChabadSiddur />} />
+
+      <Route path="*" element={<PageNotFound />} />
+    </Routes>
   );
 };
 
