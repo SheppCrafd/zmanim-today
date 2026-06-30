@@ -247,28 +247,36 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
             end: i + 5
         });
 
-        const tryScroll = () => {
-            const el = rowRefs.current[i];
-            const container = document.querySelector('.h-full.overflow-y-auto');
+        const container = document.querySelector('.h-full.overflow-y-auto');
+        const startTime = performance.now();
+        const duration = 900;
 
+        const animate = (now) => {
+            const el = rowRefs.current[i];
             if (!el || !container) {
-                requestAnimationFrame(tryScroll);
+                requestAnimationFrame(animate);
                 return;
             }
 
-            const targetY = el.offsetTop;
+            const target = el.offsetTop;
             const current = container.scrollTop;
 
-            const diff = targetY - current;
+            const progress = Math.min((now - startTime) / duration, 1);
 
-            if (Math.abs(diff) < 2) return;
+            // linear movement (no easing)
+            const next = current + (target - current) * progress;
 
-            container.scrollTop += diff * 0.2; // easing (smooth follow)
+            container.scrollTop = next;
 
-            requestAnimationFrame(tryScroll);
+            // stop immediately when time is up OR we're basically there
+            if (progress < 1 && Math.abs(target - container.scrollTop) > 1) {
+                requestAnimationFrame(animate);
+            } else {
+                container.scrollTop = target; // hard snap finish
+            }
         };
 
-        requestAnimationFrame(tryScroll);
+        requestAnimationFrame(animate);
     };
 
     /* ---------------- RENDER ---------------- */
