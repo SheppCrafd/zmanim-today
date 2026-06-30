@@ -242,15 +242,23 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
       <div className="flex-1 overflow-hidden">
 
         {/* TOC */}
-        {!sectionId && (
-          <div className="overflow-y-auto h-full px-4">
-            {loading && <Loader2 className="animate-spin" />}
-            {sections.map((s, i) => (
-              <button key={i} onClick={() => openSection(i)}>
-                {s.label}
-              </button>
+        {page === 'toc' && (
+        <div className="h-full overflow-y-auto px-4">
+
+            {loading && <div className="py-10">Loading…</div>}
+            {error && <AlertCircle />}
+
+            {sections.map((sec, i) => (
+            <button
+                key={i}
+                onClick={() => jumpTo(i)}
+                className="w-full text-left py-3 border-b"
+            >
+                {sec.label}
+            </button>
             ))}
-          </div>
+            
+        </div>
         )}
 
         {/* READER */}
