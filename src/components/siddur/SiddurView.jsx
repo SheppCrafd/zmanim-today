@@ -247,17 +247,20 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
             end: i + 5
         });
 
-        requestAnimationFrame(() => {
-            setTimeout(() => {
-                const el = document.querySelector(`[data-index="${i}"]`);
-                if (!el) return;
+        const attemptScroll = () => {
+            const el = rowRefs.current[i];
+            if (!el) {
+                requestAnimationFrame(attemptScroll);
+                return;
+            }
 
-                el.scrollIntoView({
-                    behavior: 'smooth',
-                    block: 'start'
-                });
-            }, 50);
-        });
+            el.scrollIntoView({
+                behavior: 'smooth',
+                block: 'start'
+            });
+        };
+
+        requestAnimationFrame(attemptScroll);
     };
 
     /* ---------------- RENDER ---------------- */
