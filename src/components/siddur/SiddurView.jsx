@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
     ExternalLink,
     Loader2,
@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import NavMenu from '@/components/NavMenu';
 import { useNavigate, useParams } from 'react-router-dom';
 
-/* ---------------- TOC FLATTEN ---------------- */
+/* ---------------- FLATTEN ---------------- */
 
 function flattenNodes(nodes, keyPath = '', labelPath = '') {
     const result = [];
@@ -34,29 +34,24 @@ function flattenNodes(nodes, keyPath = '', labelPath = '') {
     return result;
 }
 
+/* ---------------- FILTER ---------------- */
+
 const isEnglishLine = (t) => {
     if (!t) return false;
-
     const plain = t.replace(/<[^>]*>/g, '').trim();
-    if (plain.length < 2) return false;
-
     const latin = plain.match(/[A-Za-z]/g) || [];
     const hebrew = plain.match(/[\u0590-\u05FF]/g) || [];
-
     const total = latin.length + hebrew.length;
-    if (total === 0) return false;
-
-    const latinRatio = latin.length / total;
-
-    return latin.length > 5 && latinRatio > 0.75;
+    if (!total) return false;
+    return latin.length > 5 && (latin.length / total) > 0.75;
 };
 
 /* ---------------- SECTION ---------------- */
 
-function Section({ sec, data, langMode, rowRef, index }) {
+function Section({ sec, data, id, langMode }) {
     if (!data) {
         return (
-            <div className="py-10 flex justify-center">
+            <div className="py-10 flex justify-center" id={`sec-${id}`}>
                 <Loader2 className="animate-spin text-blue-500" />
             </div>
         );
@@ -64,7 +59,7 @@ function Section({ sec, data, langMode, rowRef, index }) {
 
     if (data.error) {
         return (
-            <div className="text-center text-sm text-red-500">
+            <div id={`sec-${id}`} className="text-center text-sm text-red-500 py-6">
                 Failed to load section
             </div>
         );
@@ -80,11 +75,8 @@ function Section({ sec, data, langMode, rowRef, index }) {
     const maxLen = Math.max(heArr.length, enArr.length);
 
     return (
-        <div
-            ref={rowRef}
-            data-index={index}
-            className="space-y-4 scroll-mt-24"
-        >
+        <div id={`sec-${id}`} className="space-y-4 scroll-mt-24">
+
             <div className="sticky top-0 bg-white dark:bg-slate-900 py-2 z-10 border-b">
                 <p className="font-semibold text-slate-700 dark:text-slate-100">
                     {sec.label}
@@ -121,21 +113,14 @@ function Section({ sec, data, langMode, rowRef, index }) {
 
 export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
     const navigate = useNavigate();
+    const { sectionId, language } = useParams();
 
-    const rowRefs = useRef({});
-    const observerRef = useRef(null);
+    const langMode = language || 'both';
 
     const [sections, setSections] = useState([]);
     const [textMap, setTextMap] = useState({});
     const [range, setRange] = useState({ start: 0, end: 5 });
-
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState(false);
-
-    const [page, setPage] = useState('toc');
-    const [langMode, setLangMode] = useState('both');
-
-    const currentSection = useRef(0);
+    const containerRef = useRef(null);
 
     /* ---------------- LOAD TOC ---------------- */
 
@@ -145,27 +130,21 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
             .then(data => {
                 const nodes = data?.schema?.nodes || [];
                 const rootKey = data?.schema?.key || bookRef.replace(/_/g, ' ');
-
                 const flat = flattenNodes(nodes, rootKey);
 
                 setSections(flat);
-                setLoading(false);
-                setRange({ start: 0, end: 5 });
-            })
-            .catch(() => {
-                setError(true);
-                setLoading(false);
+                setRange({ start: 0, end: Math.min(5, flat.length - 1) });
             });
     }, [bookRef]);
 
-    /* ---------------- WINDOW LOADING ---------------- */
+    /* ---------------- LOAD WINDOW ---------------- */
 
     useEffect(() => {
         if (!sections.length) return;
 
         const load = async () => {
             for (let i = range.start; i <= range.end; i++) {
-                if (!sections[i] || textMap[i]) continue;
+                if (textMap[i]) continue;
 
                 try {
                     const res = await fetch(
@@ -183,53 +162,19 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
         load();
     }, [range, sections]);
 
-    /* ---------------- OBSERVER (CURRENT SECTION) ---------------- */
-
-    useEffect(() => {
-        if (!sections.length) return;
-
-        if (observerRef.current) observerRef.current.disconnect();
-
-        observerRef.current = new IntersectionObserver(
-            (entries) => {
-                for (const entry of entries) {
-                    if (!entry.isIntersecting) continue;
-
-                    const index = Number(entry.target.dataset.index);
-                    if (Number.isNaN(index)) continue;
-
-                    currentSection.current = index;
-
-                    navigate(
-                        `/SephardicSiddur/section/${index}/${langMode}`,
-                        { replace: true }
-                    );
-                }
-            },
-            {
-                rootMargin: '-45% 0px -45% 0px'
-            }
-        );
-
-        Object.values(rowRefs.current).forEach(el => {
-            if (el) observerRef.current.observe(el);
-        });
-
-    }, [sections, langMode]);
-
     /* ---------------- SCROLL WINDOW ---------------- */
 
     const onScroll = (e) => {
         const el = e.target;
 
-        if (el.scrollTop + el.clientHeight > el.scrollHeight - 800) {
+        if (el.scrollTop + el.clientHeight > el.scrollHeight - 700) {
             setRange(r => ({
                 start: r.start,
                 end: Math.min(sections.length - 1, r.end + 2)
             }));
         }
 
-        if (el.scrollTop < 800) {
+        if (el.scrollTop < 700) {
             setRange(r => ({
                 start: Math.max(0, r.start - 2),
                 end: r.end
@@ -237,23 +182,19 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
         }
     };
 
-    /* ---------------- FIXED JUMP ---------------- */
+    /* ---------------- JUMP (FIXED) ---------------- */
 
     const jumpTo = (i) => {
-        setPage('reader');
-
-        setRange({
-            start: Math.max(0, i - 2),
-            end: i + 5
-        });
+        navigate(`/SephardicSiddur/section/${i}/${langMode}`);
 
         requestAnimationFrame(() => {
-            setTimeout(() => {
-                rowRefs.current[i]?.scrollIntoView({
+            const el = document.getElementById(`sec-${i}`);
+            if (el) {
+                el.scrollIntoView({
                     behavior: 'smooth',
                     block: 'start'
                 });
-            }, 50);
+            }
         });
     };
 
@@ -266,7 +207,7 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
             <div className="sticky top-0 z-50 bg-white dark:bg-slate-950 border-b">
 
                 <div className="flex items-center justify-between px-4 pt-4 pb-2">
-                    <div className="flex items-center gap-2 relative z-50">
+                    <div className="flex items-center gap-2">
                         <NavMenu />
                         <div>
                             <h1 className="text-lg font-bold">{title}</h1>
@@ -274,7 +215,7 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
                         </div>
                     </div>
 
-                    <a href={sefariaUrl} target="_blank" className="relative z-50">
+                    <a href={sefariaUrl} target="_blank">
                         <Button size="sm" variant="outline">
                             <ExternalLink className="w-4 h-4" />
                         </Button>
@@ -282,59 +223,34 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
                 </div>
 
                 <div className="px-4 flex gap-2 py-2">
-                    <Button size="sm" variant={langMode === 'en' ? "default" : "outline"} onClick={() => setLangMode('en')}>EN</Button>
-                    <Button size="sm" variant={langMode === 'he' ? "default" : "outline"} onClick={() => setLangMode('he')}>HB</Button>
-                    <Button size="sm" variant={langMode === 'both' ? "default" : "outline"} onClick={() => setLangMode('both')}>BOTH</Button>
-
-                    {page === 'reader' && (
-                        <Button size="sm" variant="outline" onClick={() => setPage('toc')}>
-                            <ArrowLeft className="w-4 h-4 mr-1" />
-                            TOC
-                        </Button>
-                    )}
+                    <Button size="sm" variant={langMode === 'en' ? 'default' : 'outline'}>
+                        EN
+                    </Button>
+                    <Button size="sm" variant={langMode === 'he' ? 'default' : 'outline'}>
+                        HB
+                    </Button>
+                    <Button size="sm" variant={langMode === 'both' ? 'default' : 'outline'}>
+                        BOTH
+                    </Button>
                 </div>
             </div>
 
             {/* BODY */}
-            <div className="flex-1 overflow-hidden">
+            <div className="flex-1 overflow-y-auto px-4" onScroll={onScroll} ref={containerRef}>
 
-                {page === 'toc' && (
-                    <div className="h-full overflow-y-auto px-4">
-                        {loading && <Loader2 className="animate-spin" />}
-                        {error && <AlertCircle />}
+                {sections.slice(range.start, range.end + 1).map((sec, i) => {
+                    const index = range.start + i;
 
-                        {sections.map((sec, i) => (
-                            <button
-                                key={i}
-                                onClick={() => jumpTo(i)}
-                                className="w-full text-left py-3 border-b"
-                            >
-                                {sec.label}
-                            </button>
-                        ))}
-                    </div>
-                )}
-
-                {page === 'reader' && (
-                    <div className="h-full overflow-y-auto px-4 pb-10" onScroll={onScroll}>
-                        {sections.slice(range.start, range.end + 1).map((sec, i) => {
-                            const index = range.start + i;
-
-                            return (
-                                <Section
-                                    key={index}
-                                    index={index}
-                                    sec={sec}
-                                    data={textMap[index]}
-                                    langMode={langMode}
-                                    rowRef={(el) => {
-                                        rowRefs.current[index] = el;
-                                    }}
-                                />
-                            );
-                        })}
-                    </div>
-                )}
+                    return (
+                        <Section
+                            key={index}
+                            id={index}
+                            sec={sec}
+                            data={textMap[index]}
+                            langMode={langMode}
+                        />
+                    );
+                })}
 
             </div>
         </div>
