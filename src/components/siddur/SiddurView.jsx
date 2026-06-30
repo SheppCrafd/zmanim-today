@@ -48,7 +48,22 @@ const isEnglishLine = (t) => {
 
     const latinRatio = latin.length / total;
 
-    return latin.length > 5 && latinRatio > 0.75;
+    // must look mostly Latin
+    if (!(latin.length > 5 && latinRatio > 0.75)) return false;
+
+    // 🚨 reject "fake English" (Portuguese / Spanish / etc)
+    const accents = (plain.match(/[áéíóúãõçñèêîôûàù]/gi) || []).length;
+    const words = plain.split(/\s+/).length;
+    const accentRatio = words ? accents / words : 0;
+
+    // common non-English Latin leakage patterns
+    const foreignPatterns =
+        /ção|não|para|este|esta|que|de la|por la|los |las |con |el |una |uno /i;
+
+    // if it smells foreign, reject it so processLine can translate it
+    if (foreignPatterns.test(plain) || accentRatio > 0.08) return false;
+
+    return true;
 };
 
 /* ---------------- SECTION ---------------- */
