@@ -1,436 +1,357 @@
-import React, { useState, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { MapPin, Calendar as CalendarIcon, Loader2, RefreshCw, Search, ChevronLeft, ChevronRight, Printer } from 'lucide-react';
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Calendar } from "@/components/ui/calendar";
-import { format } from 'date-fns';
-import { base44 } from '@/api/base44Client';
-import ZmanimCard from '../components/zmanim/ZmanimCard';
-import LocationDisplay from '../components/zmanim/LocationDisplay';
-import { getHebrewDate } from '../lib/hebrewDate';
-import { useSavedLocation } from '@/hooks/useLocation';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
+import {
+    ExternalLink,
+    Loader2,
+    AlertCircle,
+    ArrowLeft
+} from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import NavMenu from '@/components/NavMenu';
-import { printZmanim } from '@/lib/printZmanim';
-import { useDashboardPrefs } from '@/hooks/useDashboardPrefs';
-import { ZMANIM_GROUPS, getGroupEntries } from '@/lib/zmanimSchema';
+import { useNavigate, useParams } from 'react-router-dom';
 
+/* ---------------- TOC FLATTEN ---------------- */
 
-export default function Zmanim() {
-    const { location, loading: gpsLoading, error: gpsError, detectGPS, searchLocation: searchSavedLocation, clearLocation } = useSavedLocation();
-    const { prefs } = useDashboardPrefs();
-    const [loading, setLoading] = useState(false);
-    const [calculating, setCalculating] = useState(false);
-    const [zmanim, setZmanim] = useState(null);
-    const [error, setError] = useState(null);
-    const [currentDate, setCurrentDate] = useState(new Date());
-    const [manualLocation, setManualLocation] = useState('');
-    const [searchingLocation, setSearchingLocation] = useState(false);
-    const [hebrewInfo, setHebrewInfo] = useState(null);
+function flattenNodes(nodes, keyPath = '', labelPath = '') {
+    const result = [];
 
+    for (const node of nodes) {
+        const key = node.key || node.title;
+        const fullKeyPath = keyPath ? `${keyPath}, ${key}` : key;
+        const fullLabelPath = labelPath ? `${labelPath} > ${node.title}` : node.title;
 
-
-    useEffect(() => {
-        if (location) {
-            calculateZmanim();
-        }
-    }, [location, currentDate]);
-
-    useEffect(() => {
-        getHebrewDate(currentDate)
-            .then(setHebrewInfo)
-            .catch(() => setHebrewInfo(null));
-    }, [currentDate]);
-
-    const getLocation = () => {
-        detectGPS();
-    };
-
-    const calculateZmanim = async () => {
-        setCalculating(true);
-        setError(null);
-
-        try {
-            const dateStr = format(currentDate, 'yyyy-MM-dd');
-            const result = await base44.integrations.Core.InvokeLLM({
-                prompt: `Calculate accurate Jewish zmanim for ${dateStr} at coordinates: ${location.latitude}, ${location.longitude}
-
-CRITICAL INSTRUCTIONS:
-1. Search hebcal.com API or website specifically for these exact coordinates and date
-2. Use this URL pattern: https://www.hebcal.com/zmanim?cfg=json&latitude=${location.latitude}&longitude=${location.longitude}&date=${dateStr}
-3. Verify times match astronomical reality for this location
-
-Required zmanim (return in 12-hour format with AM/PM):
-
-DAWN & MORNING:
-- alot_hashachar: Dawn (72 minutes before sunrise OR when sun is 16.1° below horizon)
-- misheyakir: When one can recognize someone from 6 feet (sun 11° below horizon)
-- sunrise: Top of sun visible at horizon
-- sof_zman_shma_gra: Latest Shema (3 halachic hours after sunrise using GRA method: divide sunrise to sunset into 12 parts)
-- sof_zman_shma_mga: Latest Shema (3 halachic hours after dawn using MGA method: divide dawn to nightfall into 12 parts)
-- sof_zman_tefillah_gra: Latest Shemoneh Esrei (4 halachic hours after sunrise, GRA)
-- sof_zman_tefillah_mga: Latest Shemoneh Esrei (4 halachic hours after dawn, MGA)
-
-MIDDAY & AFTERNOON:
-- chatzot: Halachic noon (exact midpoint between sunrise and sunset)
-- mincha_gedola: 30 minutes after chatzot
-- mincha_ketana: 2.5 halachic hours before sunset
-- plag_hamincha: 1.25 halachic hours before sunset (midpoint between mincha ketana and sunset)
-
-EVENING & NIGHT:
-- candle_lighting: 18 minutes before sunset (for Shabbat/Yom Tov)
-- sunset: When sun disappears below horizon
-- tzait_hakochavim: Nightfall - 3 medium stars visible (sun 8.5° below horizon OR 42-50 minutes after sunset)
-- tzait_72: Nightfall per Rabbeinu Tam (72 minutes after sunset)
-- chatzot_laila: Halachic midnight (midpoint between sunset and next sunrise)
-
-LOCATION INFO:
-- location_name: City name for these coordinates
-- timezone: Local timezone
-
-Use actual astronomical calculations. Verify data is correct.`,
-                add_context_from_internet: true,
-                response_json_schema: {
-                    type: "object",
-                    properties: {
-                        location_name: { type: "string" },
-                        timezone: { type: "string" },
-                        zmanim: {
-                            type: "object",
-                            properties: {
-                                alot_hashachar: { type: "string" },
-                                misheyakir: { type: "string" },
-                                sunrise: { type: "string" },
-                                sof_zman_shma_gra: { type: "string" },
-                                sof_zman_shma_mga: { type: "string" },
-                                sof_zman_tefillah_gra: { type: "string" },
-                                sof_zman_tefillah_mga: { type: "string" },
-                                chatzot: { type: "string" },
-                                mincha_gedola: { type: "string" },
-                                mincha_ketana: { type: "string" },
-                                plag_hamincha: { type: "string" },
-                                candle_lighting: { type: "string" },
-                                sunset: { type: "string" },
-                                tzait_hakochavim: { type: "string" },
-                                tzait_72: { type: "string" },
-                                chatzot_laila: { type: "string" }
-                            }
-                        }
-                    }
-                }
+        if (node.nodes) {
+            result.push(...flattenNodes(node.nodes, fullKeyPath, fullLabelPath));
+        } else {
+            result.push({
+                label: node.title,
+                heLabel: node.heTitle,
+                breadcrumb: fullLabelPath,
+                ref: fullKeyPath
             });
-
-            setZmanim(result);
-        } catch (err) {
-            setError('Failed to calculate zmanim. Please try again.');
-        } finally {
-            setCalculating(false);
         }
-    };
+    }
 
-    const handleManualLocation = async (e) => {
-        e.preventDefault();
-        if (!manualLocation.trim()) return;
-        setSearchingLocation(true);
-        await searchSavedLocation(manualLocation);
-        setManualLocation('');
-        setSearchingLocation(false);
-    };
+    return result;
+}
 
-    const handleRefresh = () => {
-        setCurrentDate(new Date());
-        if (location) {
-            calculateZmanim();
-        }
-    };
+const isEnglishLine = (t) => {
+    if (!t) return false;
+
+    const plain = t.replace(/<[^>]*>/g, '').trim();
+    if (plain.length < 2) return false;
+
+    const latin = plain.match(/[A-Za-z]/g) || [];
+    const hebrew = plain.match(/[\u0590-\u05FF]/g) || [];
+
+    const total = latin.length + hebrew.length;
+    if (total === 0) return false;
+
+    const latinRatio = latin.length / total;
+
+    return latin.length > 5 && latinRatio > 0.75;
+};
+
+/* ---------------- SECTION ---------------- */
+
+function Section({ sec, data, langMode, rowRef, index }) {
+    if (!data) {
+        return (
+            <div className="py-10 flex justify-center">
+                <Loader2 className="animate-spin text-blue-500" />
+            </div>
+        );
+    }
+
+    if (data.error) {
+        return (
+            <div className="text-center text-sm text-red-500">
+                Failed to load section
+            </div>
+        );
+    }
+
+    const heArr = Array.isArray(data.he) ? data.he : (data.he ? [data.he] : []);
+    const enRaw = Array.isArray(data.text) ? data.text : (data.text ? [data.text] : []);
+    const enArr = enRaw.filter(isEnglishLine);
+
+    const showEN = langMode !== 'he';
+    const showHB = langMode !== 'en';
+
+    const maxLen = Math.max(heArr.length, enArr.length);
 
     return (
-        <div className="min-h-screen bg-background pb-24">
-            <div className="max-w-4xl mx-auto px-4 pt-4 pb-8 md:px-8">
-                {/* Header */}
-                <div className="flex items-center mb-8 min-h-[72px]">
-                    <div className="shrink-0"><NavMenu /></div>
-                    <div className="flex-1 text-center px-2">
-                        <h1 className="text-4xl md:text-5xl font-bold text-slate-800 mb-2 tracking-tight">Zmanim</h1>
-                        <p className="text-slate-600 text-lg">זמני היום</p>
+        <div
+            ref={rowRef}
+            data-index={index}
+            className="space-y-4 scroll-mt-24"
+        >
+            <div className="sticky top-0 bg-white dark:bg-slate-900 py-2 z-10 border-b">
+                <p className="font-semibold text-slate-700 dark:text-slate-100">
+                    {sec.label}
+                </p>
+            </div>
+
+            <div className="space-y-6">
+                {Array.from({ length: maxLen }).map((_, i) => (
+                    <div key={i} className="space-y-2">
+
+                        {showHB && heArr[i] && (
+                            <p
+                                className="text-right text-lg leading-loose text-slate-800 dark:text-slate-100 font-serif"
+                                dir="rtl"
+                                dangerouslySetInnerHTML={{ __html: heArr[i] }}
+                            />
+                        )}
+
+                        {showEN && enArr[i] && (
+                            <p
+                                className="text-left text-sm leading-relaxed text-slate-500 dark:text-slate-400"
+                                dangerouslySetInnerHTML={{ __html: enArr[i] }}
+                            />
+                        )}
+
                     </div>
-                    <div className="shrink-0 w-9"></div>
+                ))}
+            </div>
+        </div>
+    );
+}
+
+/* ---------------- MAIN ---------------- */
+
+export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
+    const navigate = useNavigate();
+    const pendingJump = useRef(null);
+    const rowRefs = useRef({});
+    const observerRef = useRef(null);
+
+    const [sections, setSections] = useState([]);
+    const [textMap, setTextMap] = useState({});
+    const [range, setRange] = useState({ start: 0, end: 5 });
+
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(false);
+
+    const [page, setPage] = useState('toc');
+    const [langMode, setLangMode] = useState('both');
+
+    const currentSection = useRef(0);
+
+    useEffect(() => {
+        if (pendingJump.current === null) return;
+
+        const i = pendingJump.current;
+
+        const tryScroll = () => {
+            const el = rowRefs.current[i];
+            if (!el) {
+                requestAnimationFrame(tryScroll);
+                return;
+            }
+
+            el.scrollIntoView({
+                behavior: 'smooth',
+                block: 'start'
+            });
+
+            pendingJump.current = null;
+        };
+
+        requestAnimationFrame(tryScroll);
+    }, [range, page, sections]);
+
+    /* ---------------- LOAD TOC ---------------- */
+
+    useEffect(() => {
+        fetch(`https://www.sefaria.org/api/index/${bookRef}`)
+            .then(r => r.json())
+            .then(data => {
+                const nodes = data?.schema?.nodes || [];
+                const rootKey = data?.schema?.key || bookRef.replace(/_/g, ' ');
+
+                const flat = flattenNodes(nodes, rootKey);
+
+                setSections(flat);
+                setLoading(false);
+                setRange({ start: 0, end: 5 });
+            })
+            .catch(() => {
+                setError(true);
+                setLoading(false);
+            });
+    }, [bookRef]);
+
+    /* ---------------- WINDOW LOADING ---------------- */
+
+    useEffect(() => {
+        if (!sections.length) return;
+
+        const load = async () => {
+            for (let i = range.start; i <= range.end; i++) {
+                if (!sections[i] || textMap[i]) continue;
+
+                try {
+                    const res = await fetch(
+                        `https://www.sefaria.org/api/texts/${encodeURIComponent(sections[i].ref)}?lang=bi`
+                    );
+                    const data = await res.json();
+
+                    setTextMap(prev => ({ ...prev, [i]: data }));
+                } catch {
+                    setTextMap(prev => ({ ...prev, [i]: { error: true } }));
+                }
+            }
+        };
+
+        load();
+    }, [range, sections]);
+
+    /* ---------------- OBSERVER (CURRENT SECTION) ---------------- */
+
+    useEffect(() => {
+        if (!sections.length) return;
+
+        if (observerRef.current) observerRef.current.disconnect();
+
+        observerRef.current = new IntersectionObserver(
+            (entries) => {
+                for (const entry of entries) {
+                    if (!entry.isIntersecting) continue;
+
+                    const index = Number(entry.target.dataset.index);
+                    if (Number.isNaN(index)) continue;
+
+                    currentSection.current = index;
+
+                    navigate(
+                        `/SephardicSiddur/section/${index}/${langMode}`,
+                        { replace: true }
+                    );
+                }
+            },
+            {
+                rootMargin: '-45% 0px -45% 0px'
+            }
+        );
+
+        Object.values(rowRefs.current).forEach(el => {
+            if (el) observerRef.current.observe(el);
+        });
+
+    }, [sections, langMode]);
+
+    /* ---------------- SCROLL WINDOW ---------------- */
+
+    const onScroll = (e) => {
+        const el = e.target;
+
+        if (el.scrollTop + el.clientHeight > el.scrollHeight - 800) {
+            setRange(r => ({
+                start: r.start,
+                end: Math.min(sections.length - 1, r.end + 2)
+            }));
+        }
+
+        if (el.scrollTop < 800) {
+            setRange(r => ({
+                start: Math.max(0, r.start - 2),
+                end: r.end
+            }));
+        }
+    };
+
+    /* ---------------- FIXED JUMP ---------------- */
+
+    const jumpTo = (i) => {
+        setPage('reader');
+
+        setRange({
+            start: Math.max(0, i - 2),
+            end: i + 5
+        });
+
+        pendingJump.current = i;
+    };
+
+    /* ---------------- RENDER ---------------- */
+
+    return (
+        <div className="h-screen flex flex-col bg-slate-50 dark:bg-slate-950 overflow-hidden">
+
+            {/* TOP BAR (UNCHANGED VISUALS) */}
+            <div className="sticky top-0 z-50 bg-white dark:bg-slate-950 border-b">
+
+                <div className="flex items-center justify-between px-4 pt-4 pb-2">
+                    <div className="flex items-center gap-2 relative z-50">
+                        <NavMenu />
+                        <div>
+                            <h1 className="text-lg font-bold">{title}</h1>
+                            <p className="text-xs text-slate-500">{subtitle}</p>
+                        </div>
+                    </div>
+
+                    <a href={sefariaUrl} target="_blank" className="relative z-50">
+                        <Button size="sm" variant="outline">
+                            <ExternalLink className="w-4 h-4" />
+                        </Button>
+                    </a>
                 </div>
 
-                {/* Location Search */}
-                {!location && (
-                    <Card className="mb-6 shadow-lg border-0 bg-white/80 backdrop-blur-sm">
-                        <CardContent className="p-6">
-                            <form onSubmit={handleManualLocation} className="space-y-4">
-                                <div>
-                                    <label className="block text-sm font-medium text-slate-700 mb-2">
-                                        Enter Your Location
-                                    </label>
-                                    <div className="flex gap-2">
-                                        <Input
-                                            type="text"
-                                            placeholder="e.g., 'Jerusalem', 'New York, NY', 'London'..."
-                                            value={manualLocation}
-                                            onChange={(e) => setManualLocation(e.target.value)}
-                                            className="flex-1"
-                                            disabled={searchingLocation}
-                                        />
-                                        <Button 
-                                            type="submit"
-                                            disabled={searchingLocation || !manualLocation.trim()}
-                                            className="bg-blue-600 hover:bg-blue-700"
-                                        >
-                                            {searchingLocation ? (
-                                                <Loader2 className="w-4 h-4 animate-spin" />
-                                            ) : (
-                                                <Search className="w-4 h-4" />
-                                            )}
-                                        </Button>
-                                    </div>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                    <div className="flex-1 border-t border-slate-300"></div>
-                                    <span className="text-sm text-slate-500">or</span>
-                                    <div className="flex-1 border-t border-slate-300"></div>
-                                </div>
-                                <Button
-                                    type="button"
-                                    variant="outline"
-                                    onClick={getLocation}
-                                    disabled={gpsLoading}
-                                    className="w-full"
-                                >
-                                    {gpsLoading ? (
-                                        <>
-                                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                                            Detecting Location...
-                                        </>
-                                    ) : (
-                                        <>
-                                            <MapPin className="w-4 h-4 mr-2" />
-                                            Use My GPS Location
-                                        </>
-                                    )}
-                                </Button>
-                            </form>
-                            {error && (
-                                <p className="text-sm text-red-600 mt-3 text-center">{error}</p>
-                            )}
-                        </CardContent>
-                    </Card>
-                )}
+                <div className="px-4 flex gap-2 py-2">
+                    <Button size="sm" variant={langMode === 'en' ? "default" : "outline"} onClick={() => setLangMode('en')}>EN</Button>
+                    <Button size="sm" variant={langMode === 'he' ? "default" : "outline"} onClick={() => setLangMode('he')}>HB</Button>
+                    <Button size="sm" variant={langMode === 'both' ? "default" : "outline"} onClick={() => setLangMode('both')}>BOTH</Button>
 
-                {!location && (
-                    <div className="text-center text-slate-500 text-sm mt-8">
-                        Enter a city or address to get accurate zmanim for your location
+                    {page === 'reader' && (
+                        <Button size="sm" variant="outline" onClick={() => setPage('toc')}>
+                            <ArrowLeft className="w-4 h-4 mr-1" />
+                            TOC
+                        </Button>
+                    )}
+                </div>
+            </div>
+
+            {/* BODY */}
+            <div className="flex-1 overflow-hidden">
+
+                {page === 'toc' && (
+                    <div className="h-full overflow-y-auto px-4">
+                        {loading && <Loader2 className="animate-spin" />}
+                        {error && <AlertCircle />}
+
+                        {sections.map((sec, i) => (
+                            <button
+                                key={i}
+                                onClick={() => jumpTo(i)}
+                                className="w-full text-left py-3 border-b"
+                            >
+                                {sec.label}
+                            </button>
+                        ))}
                     </div>
                 )}
 
-                {/* Location & Date Card */}
-                {location && (
-                    <Card className="mb-6 shadow-lg border-0 bg-white/80 backdrop-blur-sm">
-                        <CardContent className="p-6">
-                            <div className="flex items-start justify-between">
-                                <LocationDisplay location={location} />
-                                <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() => {
-                                        clearLocation();
-                                        setZmanim(null);
-                                        setManualLocation('');
-                                    }}
-                                    className="text-slate-500 hover:text-slate-700"
-                                >
-                                    Change
-                                </Button>
-                            </div>
-                        
-                        <div className="mt-4 pt-4 border-t border-slate-200">
-                            <div className="flex items-center justify-between mb-3">
-                                <div className="flex items-center gap-3">
-                                    <CalendarIcon className="w-5 h-5 text-amber-600" />
-                                    <p className="text-sm font-medium text-slate-600">Select Date</p>
-                                </div>
-                                <div className="flex gap-2">
-                                    <Button 
-                                        variant="outline" 
-                                        size="sm"
-                                        onClick={() => setCurrentDate(new Date())}
-                                        disabled={calculating}
-                                        className="border-slate-300 hover:bg-slate-50"
-                                    >
-                                        Today
-                                    </Button>
-                                    {zmanim && !calculating && (
-                                        <Button
-                                            variant="outline"
-                                            size="sm"
-                                            onClick={() => {
-                                                const locLabel = location ? [location.city, location.state, location.country].filter(Boolean).join(', ') || `${location.latitude?.toFixed(3)}°, ${location.longitude?.toFixed(3)}°` : '';
-                                                printZmanim({ zmanimData: zmanim, date: currentDate, locationLabel: locLabel, hebrewInfo, timezone: zmanim.timezone });
-                                            }}
-                                            className="border-slate-300 hover:bg-slate-50"
-                                            title="Print zmanim"
-                                        >
-                                            <Printer className="w-4 h-4" />
-                                        </Button>
-                                    )}
-                                    <Button 
-                                        variant="outline" 
-                                        size="sm"
-                                        onClick={handleRefresh}
-                                        disabled={calculating}
-                                        className="border-slate-300 hover:bg-slate-50"
-                                    >
-                                        <RefreshCw className={`w-4 h-4 ${calculating ? 'animate-spin' : ''}`} />
-                                    </Button>
-                                </div>
-                            </div>
-                            <div className="flex items-center gap-2">
-                                <Button
-                                    variant="outline"
-                                    size="icon"
-                                    onClick={() => {
-                                        const newDate = new Date(currentDate);
-                                        newDate.setDate(newDate.getDate() - 1);
-                                        setCurrentDate(newDate);
-                                    }}
-                                    disabled={calculating}
-                                    className="h-10 w-10"
-                                >
-                                    <ChevronLeft className="h-4 w-4" />
-                                </Button>
-                                <Popover>
-                                    <PopoverTrigger asChild>
-                                        <Button
-                                            variant="outline"
-                                            className="flex-1 justify-start text-left font-semibold"
-                                            disabled={calculating}
-                                        >
-                                            <CalendarIcon className="mr-2 h-4 w-4" />
-                                            {format(currentDate, 'EEEE, MMMM d, yyyy')}
-                                        </Button>
-                                    </PopoverTrigger>
-                                    <PopoverContent className="w-auto p-0" align="start">
-                                        <Calendar
-                                            mode="single"
-                                            selected={currentDate}
-                                            onSelect={(date) => date && setCurrentDate(date)}
-                                            initialFocus
-                                        />
-                                    </PopoverContent>
-                                </Popover>
-                                <Button
-                                    variant="outline"
-                                    size="icon"
-                                    onClick={() => {
-                                        const newDate = new Date(currentDate);
-                                        newDate.setDate(newDate.getDate() + 1);
-                                        setCurrentDate(newDate);
-                                    }}
-                                    disabled={calculating}
-                                    className="h-10 w-10"
-                                >
-                                    <ChevronRight className="h-4 w-4" />
-                                </Button>
-                            </div>
-                        </div>
+                {page === 'reader' && (
+                    <div className="h-full overflow-y-auto px-4 pb-10" onScroll={onScroll}>
+                        {sections.slice(range.start, range.end + 1).map((sec, i) => {
+                            const index = range.start + i;
 
-                        {hebrewInfo && (
-                            <div className="mt-4 pt-4 border-t border-slate-200 space-y-2">
-                                <div className="flex justify-between items-start gap-4">
-                                    <span className="text-sm text-slate-600 shrink-0">Hebrew Date</span>
-                                    <div className="text-right">
-                                        <div className="font-semibold text-slate-800 text-lg leading-tight" dir="rtl">{hebrewInfo.hebrew_date}</div>
-                                        <div className="text-sm text-slate-500">{hebrewInfo.hebrew_date_transliterated}</div>
-                                    </div>
-                                </div>
-                                <div className="flex justify-between items-start gap-4">
-                                    <span className="text-sm text-slate-600 shrink-0">Day</span>
-                                    <div className="text-right">
-                                        <div className="font-semibold text-slate-800" dir="rtl">{hebrewInfo.day_of_week_hebrew}</div>
-                                        <div className="text-sm text-slate-500">{hebrewInfo.day_of_week_transliterated}</div>
-                                    </div>
-                                </div>
-                                {hebrewInfo.parsha && (
-                                    <div className="flex justify-between items-start gap-4">
-                                        <span className="text-sm text-slate-600 shrink-0">Parsha</span>
-                                        <div className="text-right">
-                                            {hebrewInfo.parsha_hebrew && (
-                                                <div className="font-semibold text-blue-700" dir="rtl">{hebrewInfo.parsha_hebrew}</div>
-                                            )}
-                                            <div className="text-sm text-blue-600">{hebrewInfo.parsha}</div>
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
-                        )}
-                        </CardContent>
-                    </Card>
-                )}
-
-                {/* Calculating State */}
-                {calculating && (
-                    <Card className="shadow-lg border-0 bg-white/80 backdrop-blur-sm">
-                        <CardContent className="flex flex-col items-center justify-center py-12">
-                            <Loader2 className="w-10 h-10 text-blue-600 animate-spin mb-4" />
-                            <p className="text-slate-700">Calculating zmanim...</p>
-                        </CardContent>
-                    </Card>
-                )}
-
-                {/* Error State */}
-                {error && location && (
-                    <Card className="shadow-lg border-0 bg-red-50">
-                        <CardContent className="py-6 text-center">
-                            <p className="text-red-700">{error}</p>
-                            <Button 
-                                onClick={handleRefresh}
-                                className="mt-4 bg-red-600 hover:bg-red-700"
-                            >
-                                Try Again
-                            </Button>
-                        </CardContent>
-                    </Card>
-                )}
-
-                {/* Zmanim Display */}
-                {zmanim && !calculating && (
-                    <div className="space-y-4">
-                        {ZMANIM_GROUPS.map(group => {
-                            const entries = getGroupEntries(group.id, zmanim.zmanim, currentDate.getDay());
-                            if (!entries.length) return null;
                             return (
-                                <ZmanimCard
-                                    key={group.id}
-                                    title={group.title}
-                                    icon={group.icon}
-                                    color={group.color}
-                                    use24Hour={prefs.use24Hour}
-                                    times={entries.map(e => ({
-                                        label: e.label,
-                                        value: e.value,
-                                        description: e.description,
-                                        highlight: e.highlight,
-                                    }))}
+                                <Section
+                                    key={index}
+                                    index={index}
+                                    sec={sec}
+                                    data={textMap[index]}
+                                    langMode={langMode}
+                                    rowRef={(el) => {
+                                        rowRefs.current[index] = el;
+                                    }}
                                 />
                             );
                         })}
                     </div>
                 )}
 
-                {/* Footer */}
-                <div className="text-center mt-8 text-sm text-slate-500">
-                    <p>Times calculated based on your GPS location</p>
-                    {zmanim?.timezone && (
-                        <p className="mt-1">Timezone: {zmanim.timezone}</p>
-                    )}
-                    <p className="mt-2">
-                        Based on <a href="https://outorah.org/p/41921/" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">https://outorah.org/p/41921/</a>
-                    </p>
-                </div>
             </div>
         </div>
     );
