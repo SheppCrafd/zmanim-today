@@ -1,3 +1,120 @@
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import {
+  ExternalLink,
+  Loader2,
+  AlertCircle,
+  ArrowLeft
+} from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import NavMenu from '@/components/NavMenu';
+import { useNavigate, useParams, useLocation } from 'react-router-dom';
+
+/* ---------------- HELPERS ---------------- */
+
+function flattenNodes(nodes, keyPath = '', labelPath = '') {
+  const result = [];
+
+  for (const node of nodes) {
+    const key = node.key || node.title;
+    const fullKeyPath = keyPath ? `${keyPath}, ${key}` : key;
+    const fullLabelPath = labelPath ? `${labelPath} > ${node.title}` : node.title;
+
+    if (node.nodes) {
+      result.push(...flattenNodes(node.nodes, fullKeyPath, fullLabelPath));
+    } else {
+      result.push({
+        index: result.length,
+        label: node.title,
+        heLabel: node.heTitle,
+        breadcrumb: fullLabelPath,
+        ref: fullKeyPath
+      });
+    }
+  }
+
+  return result;
+}
+
+const isEnglishLine = (t) => {
+  if (!t) return false;
+  const plain = t.replace(/<[^>]*>/g, '').trim();
+  const latin = plain.match(/[A-Za-z]/g) || [];
+  const hebrew = plain.match(/[\u0590-\u05FF]/g) || [];
+  const total = latin.length + hebrew.length;
+  if (total === 0) return false;
+  return latin.length > 5 && (latin.length / total) > 0.75;
+};
+
+/* ---------------- SECTION ---------------- */
+
+function Section({ sec, data, rowRef, langMode }) {
+  if (!data) {
+    return (
+      <div className="py-10 flex justify-center">
+        <Loader2 className="animate-spin text-blue-500" />
+      </div>
+    );
+  }
+
+  if (data.error) {
+    return (
+      <div className="text-center text-sm text-red-500">
+        Failed to load section
+      </div>
+    );
+  }
+
+  const heArr = Array.isArray(data.he) ? data.he : (data.he ? [data.he] : []);
+  const enRaw = Array.isArray(data.text) ? data.text : (data.text ? [data.text] : []);
+  const enArr = enRaw.filter(isEnglishLine);
+
+  const showEN = langMode !== 'he';
+  const showHB = langMode !== 'en';
+
+  const maxLen = Math.max(heArr.length, enArr.length);
+
+  return (
+    <div
+    id={`section-${sec.ref}`}
+    className="space-y-4 scroll-mt-24"
+    >
+      <div className="sticky top-0 bg-white dark:bg-slate-900 py-2 z-10 border-b">
+        <p
+        id={`sec-${sec.index}`}
+         className="font-semibold"
+        >
+        {sec.label}
+        </p>
+      </div>
+
+      <div className="space-y-6">
+        {Array.from({ length: maxLen }).map((_, i) => (
+          <div key={i} className="space-y-2">
+
+            {showHB && heArr[i] && (
+              <p
+                className="text-right text-lg font-serif"
+                dir="rtl"
+                dangerouslySetInnerHTML={{ __html: heArr[i] }}
+              />
+            )}
+
+            {showEN && enArr[i] && (
+              <p
+                className="text-sm text-slate-500"
+                dangerouslySetInnerHTML={{ __html: enArr[i] }}
+              />
+            )}
+
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/* ---------------- MAIN ---------------- */
+
 export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
     const rowRefs = useRef({});
     const observerRef = useRef(null);
