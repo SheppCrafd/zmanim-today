@@ -1,314 +1,226 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
-import {
-  ExternalLink,
-  Loader2,
-  AlertCircle,
-  ArrowLeft
-} from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import NavMenu from '@/components/NavMenu';
-import { useNavigate, useParams, useLocation } from 'react-router-dom';
-
-/* ---------------- HELPERS ---------------- */
-
-function flattenNodes(nodes, keyPath = '', labelPath = '') {
-  const result = [];
-
-  for (const node of nodes) {
-    const key = node.key || node.title;
-    const fullKeyPath = keyPath ? `${keyPath}, ${key}` : key;
-    const fullLabelPath = labelPath ? `${labelPath} > ${node.title}` : node.title;
-
-    if (node.nodes) {
-      result.push(...flattenNodes(node.nodes, fullKeyPath, fullLabelPath));
-    } else {
-      result.push({
-        index: result.length,
-        label: node.title,
-        heLabel: node.heTitle,
-        breadcrumb: fullLabelPath,
-        ref: fullKeyPath
-      });
-    }
-  }
-
-  return result;
-}
-
-const isEnglishLine = (t) => {
-  if (!t) return false;
-  const plain = t.replace(/<[^>]*>/g, '').trim();
-  const latin = plain.match(/[A-Za-z]/g) || [];
-  const hebrew = plain.match(/[\u0590-\u05FF]/g) || [];
-  const total = latin.length + hebrew.length;
-  if (total === 0) return false;
-  return latin.length > 5 && (latin.length / total) > 0.75;
-};
-
-/* ---------------- SECTION ---------------- */
-
-function Section({ sec, data, rowRef, langMode }) {
-  if (!data) {
-    return (
-      <div className="py-10 flex justify-center">
-        <Loader2 className="animate-spin text-blue-500" />
-      </div>
-    );
-  }
-
-  if (data.error) {
-    return (
-      <div className="text-center text-sm text-red-500">
-        Failed to load section
-      </div>
-    );
-  }
-
-  const heArr = Array.isArray(data.he) ? data.he : (data.he ? [data.he] : []);
-  const enRaw = Array.isArray(data.text) ? data.text : (data.text ? [data.text] : []);
-  const enArr = enRaw.filter(isEnglishLine);
-
-  const showEN = langMode !== 'he';
-  const showHB = langMode !== 'en';
-
-  const maxLen = Math.max(heArr.length, enArr.length);
-
-  return (
-    <div
-    id={`section-${sec.ref}`}
-    className="space-y-4 scroll-mt-24"
-    >
-      <div className="sticky top-0 bg-white dark:bg-slate-900 py-2 z-10 border-b">
-        <p
-        id={`sec-${sec.index}`}
-         className="font-semibold"
-        >
-        {sec.label}
-        </p>
-      </div>
-
-      <div className="space-y-6">
-        {Array.from({ length: maxLen }).map((_, i) => (
-          <div key={i} className="space-y-2">
-
-            {showHB && heArr[i] && (
-              <p
-                className="text-right text-lg font-serif"
-                dir="rtl"
-                dangerouslySetInnerHTML={{ __html: heArr[i] }}
-              />
-            )}
-
-            {showEN && enArr[i] && (
-              <p
-                className="text-sm text-slate-500"
-                dangerouslySetInnerHTML={{ __html: enArr[i] }}
-              />
-            )}
-
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-/* ---------------- MAIN ---------------- */
-
 export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
-  const navigate = useNavigate();
-  const { sectionId, language } = useParams();
-  const location = useLocation();
+    const rowRefs = useRef({});
+    const observerRef = useRef(null);
 
-  const langMode = language || 'both';
+    const [sections, setSections] = useState([]);
+    const [textMap, setTextMap] = useState({});
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(false);
 
-  const observerRef = useRef(null);
-  const rowRefs = useRef({});
+    const [page, setPage] = useState('toc');
+    const [langMode, setLangMode] = useState('both');
 
-  const [sections, setSections] = useState([]);
-  const [textMap, setTextMap] = useState({});
-  const [range, setRange] = useState({ start: 0, end: 4 });
-  const [loading, setLoading] = useState(true);
+    const [currentSection, setCurrentSection] = useState(0);
+    const [range, setRange] = useState({ start: 0, end: 4 });
 
-  const currentSection = sectionId ? parseInt(sectionId) : null;
+    const navigate = useNavigate();
+    const { sectionId } = useParams();
 
-  /* ---------------- LOAD TOC ---------------- */
+    /* ---------------- LOAD TOC (UNCHANGED) ---------------- */
 
-  useEffect(() => {
-    fetch(`https://www.sefaria.org/api/index/${bookRef}`)
-      .then(r => r.json())
-      .then(data => {
-        const nodes = data?.schema?.nodes || [];
-        const rootKey = data?.schema?.key || bookRef.replace(/_/g, ' ');
-        const flat = flattenNodes(nodes, rootKey);
-        setSections(flat);
-        setLoading(false);
+    useEffect(() => {
+        setLoading(true);
 
-        setRange({ start: 0, end: Math.min(4, flat.length - 1) });
-      });
-  }, [bookRef]);
+        fetch(`https://www.sefaria.org/api/index/${bookRef}`)
+            .then(r => r.json())
+            .then(data => {
+                const schema = data?.schema;
+                const rootKey = schema?.key || bookRef.replace(/_/g, ' ');
+                const nodes = schema?.nodes || [];
 
-  /* ---------------- LOAD WINDOWED TEXT ---------------- */
+                const flat = flattenNodes(nodes, rootKey);
 
-  useEffect(() => {
-    const load = async () => {
-      const slice = sections.slice(range.start, range.end + 1);
+                setSections(flat);
+                setLoading(false);
 
-      for (let i = range.start; i <= range.end; i++) {
-        if (textMap[i]) continue;
+                setRange({ start: 0, end: Math.min(4, flat.length - 1) });
+            })
+            .catch(() => {
+                setError(true);
+                setLoading(false);
+            });
+    }, [bookRef]);
 
-        try {
-          const res = await fetch(
-            `https://www.sefaria.org/api/texts/${encodeURIComponent(sections[i].ref)}?lang=bi`
-          );
-          const data = await res.json();
+    /* ---------------- WINDOWED TEXT LOAD ---------------- */
 
-          setTextMap(prev => ({ ...prev, [i]: data }));
-        } catch {
-          setTextMap(prev => ({ ...prev, [i]: { error: true } }));
-        }
-      }
-    };
+    useEffect(() => {
+        if (!sections.length) return;
 
-    if (sections.length) load();
-  }, [range, sections]);
+        const load = async () => {
+            for (let i = range.start; i <= range.end; i++) {
+                if (textMap[i]) continue;
 
-  /* ---------------- INTERSECTION OBSERVER ---------------- */
+                try {
+                    const res = await fetch(
+                        `https://www.sefaria.org/api/texts/${encodeURIComponent(sections[i].ref)}?lang=bi`
+                    );
+                    const data = await res.json();
 
-  useEffect(() => {
-    if (!sections.length) return;
+                    setTextMap(prev => ({ ...prev, [i]: data }));
+                } catch {
+                    setTextMap(prev => ({ ...prev, [i]: { error: true } }));
+                }
+            }
+        };
 
-    if (observerRef.current) observerRef.current.disconnect();
+        load();
+    }, [range, sections]);
 
-    observerRef.current = new IntersectionObserver(
-      (entries) => {
-        entries.forEach(entry => {
-          if (!entry.isIntersecting) return;
+    /* ---------------- OBSERVER BRAIN (NEW CORE) ---------------- */
 
-          const index = Number(entry.target.dataset.index);
+    useEffect(() => {
+        if (!sections.length) return;
 
-          const newUrl = `/SephardicSiddur/section/${index}/${langMode}`;
+        if (observerRef.current) observerRef.current.disconnect();
 
-          navigate(newUrl, { replace: true });
+        observerRef.current = new IntersectionObserver(
+            (entries) => {
+                let best = null;
+
+                for (const entry of entries) {
+                    if (!entry.isIntersecting) continue;
+
+                    const idx = Number(entry.target.dataset.index);
+
+                    if (best === null || idx > best) best = idx;
+                }
+
+                if (best === null || best === currentSection) return;
+
+                setCurrentSection(best);
+
+                const lang = langMode;
+
+                navigate(
+                    `/SephardicSiddur/section/${best}/${lang}`,
+                    { replace: true }
+                );
+            },
+            {
+                rootMargin: '-40% 0px -40% 0px'
+            }
+        );
+
+        Object.values(rowRefs.current).forEach(el => {
+            if (el) observerRef.current.observe(el);
         });
-      },
-      { rootMargin: '-40% 0px -40% 0px' }
-    );
 
-    Object.values(rowRefs.current).forEach(el => {
-      if (el) observerRef.current.observe(el);
-    });
+    }, [sections, langMode, currentSection]);
 
-  }, [sections, langMode]);
+    /* ---------------- VIRTUAL WINDOW (INVISIBLE) ---------------- */
 
-  /* ---------------- WINDOW SCROLLING ---------------- */
+    useEffect(() => {
+        const buffer = 2;
 
-  const onScroll = (e) => {
-    const el = e.target;
+        setRange({
+            start: Math.max(0, currentSection - buffer),
+            end: Math.min(sections.length - 1, currentSection + buffer)
+        });
+    }, [currentSection, sections.length]);
 
-    if (el.scrollTop + el.clientHeight > el.scrollHeight - 800) {
-      setRange(r => ({
-        start: r.start,
-        end: Math.min(sections.length - 1, r.end + 2)
-      }));
-    }
+    /* ---------------- TOC JUMP (UNCHANGED VISUAL) ---------------- */
 
-    if (el.scrollTop < 800) {
-      setRange(r => ({
-        start: Math.max(0, r.start - 2),
-        end: r.end
-      }));
-    }
-  };
+    const jumpTo = (index) => {
+        setPage('reader');
+        setCurrentSection(index);
 
-  /* ---------------- TOC ---------------- */
+        navigate(`/SephardicSiddur/section/${index}/both`, {
+            replace: true
+        });
 
-  const openSection = (i) => {
-    navigate(`/SephardicSiddur/section/${i}/both`);
-
-    setTimeout(() => {
-      rowRefs.current[i]?.scrollIntoView({
-        behavior: 'smooth',
-        block: 'start'
-      });
-    }, 50);
-  };
-  /* ---------------- RENDER ---------------- */
-
-  return (
-    <div className="h-screen flex flex-col overflow-hidden">
-
-      {/* TOP BAR */}
-      <div className="sticky top-0 z-50 bg-white border-b px-4 py-2 flex justify-between">
-        <div>
-          <NavMenu />
-          <div>
-            <h1 className="font-bold">{title}</h1>
-            <p className="text-xs">{subtitle}</p>
-          </div>
-        </div>
-
-        <a href={sefariaUrl} target="_blank">
-          <Button>Open</Button>
-        </a>
-      </div>
-
-      {/* BODY */}
-      <div className="flex-1 overflow-hidden">
-
-        {/* TOC */}
-        {!sectionId && (
-        <div className="h-full overflow-y-auto px-4">
-
-            {loading && <div className="py-10">Loading…</div>}
-
-            {sections.map((sec, i) => (
-            <button
-            id={`toc-${i}`}
-            key={i}
-            onClick={() => {
-                document.getElementById(`sec-${i}`)?.scrollIntoView({
+        requestAnimationFrame(() => {
+            rowRefs.current[index]?.scrollIntoView({
                 behavior: 'smooth',
                 block: 'start'
-                });
-            }}
-                className="w-full text-left py-3 border-b"
-            >
-                {sec.label}
-            </button>
-            ))}
-            
-        </div>
-        )}
+            });
+        });
+    };
 
-    {/* READER */}
-    {sectionId && (
-    <div className="overflow-y-auto h-full px-4" onScroll={onScroll}>
+    /* ---------------- RENDER (UNCHANGED VISUAL STRUCTURE) ---------------- */
 
-        {sections.slice(range.start, range.end + 1).map((sec, i) => {
-        const index = range.start + i;
+    return (
+        <div className="h-screen flex flex-col bg-slate-50 dark:bg-slate-950 overflow-hidden">
 
-        return (
-            <div
-            key={index}
-            data-index={index}
-            ref={(el) => {
-                if (el) rowRefs.current[index] = el;
-            }}
-            >
-            <Section
-                sec={sec}
-                data={textMap[index]}
-                langMode={langMode}
-            />
+            <div className="sticky top-0 z-50 bg-white dark:bg-slate-950 border-b">
+
+                <div className="flex items-center justify-between px-4 pt-4 pb-2">
+                    <div className="flex items-center gap-2 relative z-50">
+                        <NavMenu />
+                        <div>
+                            <h1 className="text-lg font-bold">{title}</h1>
+                            <p className="text-xs text-slate-500">{subtitle}</p>
+                        </div>
+                    </div>
+
+                    <a href={sefariaUrl} target="_blank" className="relative z-50">
+                        <Button size="sm" variant="outline">
+                            <ExternalLink className="w-4 h-4" />
+                        </Button>
+                    </a>
+                </div>
+
+                <div className="px-4 flex gap-2 py-2">
+                    <Button size="sm" variant={langMode === 'en' ? "default" : "outline"} onClick={() => setLangMode('en')}>EN</Button>
+                    <Button size="sm" variant={langMode === 'he' ? "default" : "outline"} onClick={() => setLangMode('he')}>HB</Button>
+                    <Button size="sm" variant={langMode === 'both' ? "default" : "outline"} onClick={() => setLangMode('both')}>BOTH</Button>
+
+                    {page === 'reader' && (
+                        <Button size="sm" variant="outline" onClick={() => setPage('toc')}>
+                            <ArrowLeft className="w-4 h-4 mr-1" />
+                            TOC
+                        </Button>
+                    )}
+                </div>
+
             </div>
-        );
-        })}
 
-    </div>
-    )}
+            <div className="flex-1 overflow-hidden">
 
-      </div>
-    </div>
-  );
+                {page === 'toc' && (
+                    <div className="h-full overflow-y-auto px-4">
+                        {loading && <div className="py-10">Loading…</div>}
+                        {error && <AlertCircle />}
+
+                        {sections.map((sec, i) => (
+                            <button
+                                key={i}
+                                onClick={() => jumpTo(i)}
+                                className="w-full text-left py-3 border-b"
+                            >
+                                {sec.label}
+                            </button>
+                        ))}
+                    </div>
+                )}
+
+                {page === 'reader' && (
+                    <div className="h-full overflow-y-auto px-4 pb-10">
+
+                        {sections.slice(range.start, range.end + 1).map((sec, i) => {
+                            const index = range.start + i;
+
+                            return (
+                                <div
+                                    key={index}
+                                    data-index={index}
+                                    ref={(el) => {
+                                        rowRefs.current[index] = el;
+                                    }}
+                                >
+                                    <Section
+                                        sec={sec}
+                                        data={textMap[index]}
+                                        langMode={langMode}
+                                    />
+                                </div>
+                            );
+                        })}
+
+                    </div>
+                )}
+
+            </div>
+
+        </div>
+    );
 }
