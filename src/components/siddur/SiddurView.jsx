@@ -157,43 +157,40 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
                 try {
                     const ref = encodeURIComponent(sections[i].ref);
 
-                    const res = await fetch(
-                        `https://www.sefaria.org/api/texts/${ref}?context=0`
+                    // 1. Hebrew ONLY (safe)
+                    const heRes = await fetch(
+                        `https://www.sefaria.org/api/texts/${ref}?lang=he&context=0`
                     );
+                    const heData = await heRes.json();
 
-                    const data = await res.json();
-
-                    // 🔥 pick ONLY clean English version
-                    const englishVersion =
-                        data.versions?.find(v =>
-                            v.language === 'en' &&
-                            !v.versionTitle.toLowerCase().includes('[pt]') &&
-                            v.versionTitle.toLowerCase().includes('sefaria')
-                        );
-
-                    if (!englishVersion) {
-                        setTextMap(prev => ({
-                            ...prev,
-                            [i]: {
-                                he: data.he,
-                                enText: []
-                            }
-                        }));
-                        continue;
-                    }
-
-                    // fetch that exact version
-                    const cleanRes = await fetch(
-                        `https://www.sefaria.org/api/texts/${ref}?version=${encodeURIComponent(englishVersion.versionTitle)}&context=0`
+                    // 2. English ONLY (force clean Sefaria translation layer)
+                    const enRes = await fetch(
+                        `https://www.sefaria.org/api/texts/${ref}?lang=en&context=0`
                     );
+                    const enData = await enRes.json();
 
-                    const cleanData = await cleanRes.json();
+                    // 🚨 HARD FILTER: strip anything non-English at source level
+                    const cleanEnglish = (enData.text || []).filter(line => {
+                        const t = (line || "").toLowerCase();
+
+                        // kill obvious Portuguese markers
+                        if (
+                            t.includes("oração") ||
+                            t.includes("yehova") && t.includes("nos ordenou") ||
+                            t.includes("dos") ||
+                            t.includes("das") ||
+                            t.includes("não") ||
+                            t.includes("em nome da")
+                        ) return false;
+
+                        return true;
+                    });
 
                     setTextMap(prev => ({
                         ...prev,
                         [i]: {
-                            he: data.he,
-                            enText: cleanData.text
+                            he: heData.he,
+                            enText: cleanEnglish
                         }
                     }));
 
