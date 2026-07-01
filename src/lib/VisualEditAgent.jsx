@@ -411,12 +411,12 @@ export default function VisualEditAgent() {
 			}
 		};
 
+		// Strict allowlist of trusted parent origins (Base44 builder/dashboard only)
+		const ALLOWED_ORIGIN_PATTERN = /^https:\/\/([a-z0-9-]+\.)*base44\.(com|app)$/i;
+
 		const handleMessage = (event) => {
-			// Only accept messages from the actual parent frame's origin
-			if (document.referrer) {
-				const parentOrigin = new URL(document.referrer).origin;
-				if (event.origin !== parentOrigin) return;
-			}
+			// Only accept messages from a trusted Base44 origin
+			if (!ALLOWED_ORIGIN_PATTERN.test(event.origin)) return;
 
 			const message = event.data;
 
