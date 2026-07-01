@@ -157,40 +157,19 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
                 try {
                     const ref = encodeURIComponent(sections[i].ref);
 
-                    // 1. Hebrew ONLY (safe)
-                    const heRes = await fetch(
-                        `https://www.sefaria.org/api/texts/${ref}?lang=he&context=0`
-                    );
+                    const [heRes, enRes] = await Promise.all([
+                        fetch(`https://www.sefaria.org/api/v3/texts/${ref}?version=source&context=0`),
+                        fetch(`https://www.sefaria.org/api/v3/texts/${ref}?version=english|Sefaria Community Translation&context=0`)
+                    ]);
+
                     const heData = await heRes.json();
-
-                    // 2. English ONLY (force clean Sefaria translation layer)
-                    const enRes = await fetch(
-                        `https://www.sefaria.org/api/texts/${ref}?lang=en&context=0`
-                    );
                     const enData = await enRes.json();
-
-                    // 🚨 HARD FILTER: strip anything non-English at source level
-                    const cleanEnglish = (enData.text || []).filter(line => {
-                        const t = (line || "").toLowerCase();
-
-                        // kill obvious Portuguese markers
-                        if (
-                            t.includes("oração") ||
-                            t.includes("yehova") && t.includes("nos ordenou") ||
-                            t.includes("dos") ||
-                            t.includes("das") ||
-                            t.includes("não") ||
-                            t.includes("em nome da")
-                        ) return false;
-
-                        return true;
-                    });
 
                     setTextMap(prev => ({
                         ...prev,
                         [i]: {
-                            he: heData.he,
-                            enText: cleanEnglish
+                            he: heData.he || [],
+                            enText: enData.text || []
                         }
                     }));
 
