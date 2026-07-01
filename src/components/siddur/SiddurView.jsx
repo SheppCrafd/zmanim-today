@@ -133,6 +133,8 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
 
     const [page, setPage] = useState('toc');
 
+    const readerRef = useRef(null);
+
     /* ---------------- LOAD TOC ---------------- */
 
     useEffect(() => {
@@ -154,7 +156,7 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
             });
     }, [bookRef]);
 
-    /* ---------------- LOAD ALL TEXT (simple + stable) ---------------- */
+    /* ---------------- LOAD ALL TEXT ---------------- */
 
     useEffect(() => {
         if (!sections.length) return;
@@ -184,24 +186,21 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
         return () => { cancelled = true; };
     }, [sections]);
 
-    /* ---------------- SCROLL TO SECTION ON ROUTE CHANGE ---------------- */
+    /* ---------------- FIXED SCROLL LOGIC ---------------- */
 
     useEffect(() => {
         if (!sectionId) return;
 
-        const id = `section-${sectionId}`;
-        const el = document.getElementById(id);
-
-        if (el) {
-            requestAnimationFrame(() => {
-                el.scrollIntoView({
-                    behavior: 'auto',
-                    block: 'start'
-                });
-            });
-        }
-
         setPage('reader');
+
+        requestAnimationFrame(() => {
+            const container = readerRef.current;
+            const el = document.getElementById(`section-${sectionId}`);
+
+            if (!container || !el) return;
+
+            container.scrollTop = el.offsetTop;
+        });
     }, [sectionId, sections]);
 
     /* ---------------- TOC CLICK ---------------- */
@@ -215,7 +214,7 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
     return (
         <div className="h-screen flex flex-col bg-slate-50 dark:bg-slate-950 overflow-hidden">
 
-            {/* TOP BAR (UNCHANGED VISUALS) */}
+            {/* TOP BAR */}
             <div className="sticky top-0 z-50 bg-white dark:bg-slate-950 border-b">
 
                 <div className="flex items-center justify-between px-4 pt-4 pb-2">
@@ -235,15 +234,18 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
                 </div>
 
                 <div className="px-4 flex gap-2 py-2">
-                    <Button size="sm" variant={langMode === 'en' ? "default" : "outline"} onClick={() => navigate(`/SephardicSiddur/section/${sectionId || 0}/en`)}>
+                    <Button size="sm" variant={langMode === 'en' ? "default" : "outline"}
+                        onClick={() => navigate(`/SephardicSiddur/section/${sectionId || 0}/en`)}>
                         EN
                     </Button>
 
-                    <Button size="sm" variant={langMode === 'he' ? "default" : "outline"} onClick={() => navigate(`/SephardicSiddur/section/${sectionId || 0}/he`)}>
+                    <Button size="sm" variant={langMode === 'he' ? "default" : "outline"}
+                        onClick={() => navigate(`/SephardicSiddur/section/${sectionId || 0}/he`)}>
                         HB
                     </Button>
 
-                    <Button size="sm" variant={langMode === 'both' ? "default" : "outline"} onClick={() => navigate(`/SephardicSiddur/section/${sectionId || 0}/both`)}>
+                    <Button size="sm" variant={langMode === 'both' ? "default" : "outline"}
+                        onClick={() => navigate(`/SephardicSiddur/section/${sectionId || 0}/both`)}>
                         BOTH
                     </Button>
 
@@ -257,7 +259,10 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
             </div>
 
             {/* BODY */}
-            <div className="flex-1 overflow-y-auto px-4 pb-10">
+            <div
+                ref={readerRef}
+                className="flex-1 overflow-y-auto px-4 pb-10"
+            >
 
                 {page === 'toc' && (
                     <>
