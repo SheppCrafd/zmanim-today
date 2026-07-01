@@ -34,41 +34,6 @@ function flattenNodes(nodes, keyPath = '', labelPath = '') {
     return result;
 }
 
-const isEnglishLine = (t) => {
-    if (!t) return false;
-
-    const text = t.replace(/<[^>]*>/g, '').trim();
-    if (text.length < 3) return false;
-
-    const letters = text.match(/[A-Za-z]/g) || [];
-    const hebrew = text.match(/[\u0590-\u05FF]/g) || [];
-
-    // must be mostly Latin
-    const total = letters.length + hebrew.length;
-    if (total === 0) return false;
-
-    const latinRatio = letters.length / total;
-    if (letters.length < 5 || latinRatio < 0.75) return false;
-
-    const lower = text.toLowerCase();
-
-    // strong “this is NOT English” signals
-    const foreignSignals = [
-        " para ", " que ", " dos ", " das ", " não ",
-        " con ", " los ", " las ", " del ", " este ", " esta "
-    ];
-
-    let hits = 0;
-    for (const s of foreignSignals) {
-        if (lower.includes(s)) hits++;
-    }
-
-    // if too many Romance-language markers → reject
-    if (hits >= 2) return false;
-
-    return true;
-};
-
 /* ---------------- SECTION ---------------- */
 
 function Section({ sec, data, langMode, rowRef, index }) {
@@ -88,9 +53,13 @@ function Section({ sec, data, langMode, rowRef, index }) {
         );
     }
 
-    const heArr = Array.isArray(data.he) ? data.he : (data.he ? [data.he] : []);
-    const enRaw = Array.isArray(data.text) ? data.text : (data.text ? [data.text] : []);
-    const enArr = enRaw.filter(isEnglishLine);
+    const heArr = Array.isArray(data.he)
+    ? data.he
+    : (data.he ? [data.he] : []);
+
+    const enArr = Array.isArray(data.enText)
+    ? data.enText
+    : (data.enText ? [data.enText] : []);
 
     const showEN = langMode !== 'he';
     const showHB = langMode !== 'en';
@@ -186,25 +155,32 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
                 if (!sections[i] || textMap[i]) continue;
 
                 try {
-                    const res = await fetch(
-                        `https://www.sefaria.org/api/texts/${encodeURIComponent(sections[i].ref)}?lang=bi`
-                    );
-                    const data = await res.json();
+                    const ref = encodeURIComponent(sections[i].ref);
 
-                    alert(
-                    JSON.stringify(
-                        data.versions?.map(v => ({
-                        language: v.language,
-                        versionTitle: v.versionTitle
-                        })),
-                        null,
-                        2
-                    )
+                    // Hebrew
+                    const heRes = await fetch(
+                        `https://www.sefaria.org/api/texts/${ref}?lang=he`
                     );
+                    const heData = await heRes.json();
 
-                    setTextMap(prev => ({ ...prev, [i]: data }));
+                    // English Community Translation ONLY
+                    const enRes = await fetch(
+                        `https://www.sefaria.org/api/texts/${ref}?lang=en&version=english/Sefaria%20Community%20Translation`
+                    );
+                    const enData = await enRes.json();
+
+                    setTextMap(prev => ({
+                        ...prev,
+                        [i]: {
+                            he: heData.he,
+                            enText: enData.text
+                        }
+                    }));
                 } catch {
-                    setTextMap(prev => ({ ...prev, [i]: { error: true } }));
+                    setTextMap(prev => ({
+                        ...prev,
+                        [i]: { error: true }
+                    }));
                 }
             }
         };
