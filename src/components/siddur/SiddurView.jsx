@@ -34,6 +34,30 @@ function flattenNodes(nodes, keyPath = '', labelPath = '') {
   return result;
 }
 
+/* ---------------- NATIVE SANITIZER ---------------- */
+function sanitizeHTML(htmlString) {
+  if (!htmlString) return '';
+  
+  // Use the browser's native parser
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(htmlString, 'text/html');
+  
+  // 1. Destroy dangerous tags completely
+  const badTags = doc.querySelectorAll('script, iframe, object, embed, style, link, meta, base');
+  badTags.forEach(el => el.remove());
+  
+  // 2. Strip ALL attributes from remaining tags to kill inline event handlers (e.g., onerror, onclick, href="javascript:")
+  const allElements = doc.querySelectorAll('*');
+  allElements.forEach(el => {
+    // Collect all attribute names
+    const attrs = Array.from(el.attributes).map(attr => attr.name);
+    // Remove them all
+    attrs.forEach(attrName => el.removeAttribute(attrName));
+  });
+  
+  return doc.body.innerHTML;
+}
+
 /* ---------------- SECTION ---------------- */
 
 function Section({ sec, data, langMode, rowRef, index }) {
@@ -80,14 +104,14 @@ function Section({ sec, data, langMode, rowRef, index }) {
               <p
                 className="text-right text-lg leading-loose text-slate-800 dark:text-slate-100 font-serif"
                 dir="rtl"
-                dangerouslySetInnerHTML={{ __html: heArr[i] }}
+                dangerouslySetInnerHTML={{ __html: sanitizeHTML(heArr[i]) }}
               />
             )}
 
             {showEN && enArr[i] && (
               <p
                 className="text-left text-sm leading-relaxed text-slate-500 dark:text-slate-400"
-                dangerouslySetInnerHTML={{ __html: enArr[i] }}
+                dangerouslySetInnerHTML={{ __html: sanitizeHTML(enArr[i]) }}
               />
             )}
           </div>
