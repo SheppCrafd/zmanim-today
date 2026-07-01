@@ -105,6 +105,7 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
   const scrollRef = useRef(null);
   const rowRefs = useRef({});
   const observerRef = useRef(null);
+  const [pendingJump, setPendingJump] = useState(null);
 
   const [sections, setSections] = useState([]);
   const [textMap, setTextMap] = useState({});
@@ -139,7 +140,7 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
       });
   }, [bookRef]);
 
-  /* ---------------- TEXT WINDOW LOADING ---------------- */
+/* ---------------- TEXT WINDOW LOADING ---------------- */
 
   useEffect(() => {
     if (!sections.length) return;
@@ -163,9 +164,15 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
           );
           const engData = await engResp.json();
 
-          // Normalize to arrays
-          const heArr = Array.isArray(hebData.he) ? hebData.he : (hebData.he ? [hebData.he] : []);
-          const enArr = Array.isArray(engData.text) ? engData.text : (engData.text ? [engData.text] : []);
+          // In Sefaria v3, the text is nested under versions[0].text
+          const extractText = (data) => {
+            const textContent = data?.versions?.[0]?.text;
+            if (!textContent) return [];
+            return Array.isArray(textContent) ? textContent : [textContent];
+          };
+
+          const heArr = extractText(hebData);
+          const enArr = extractText(engData);
 
           setTextMap(prev => ({ 
             ...prev, 
@@ -234,51 +241,45 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
     }
   };
 
-  /* ---------------- FIXED JUMP ---------------- */
+/* ---------------- FIXED JUMP ---------------- */
 
   const jumpTo = (i) => {
     setPage('reader');
-
     setRange({
       start: Math.max(0, i - 2),
       end: i + 6
     });
-
-    const tryAlign = () => {
-      const container = scrollRef.current;
-      const el = rowRefs.current[i];
-
-      if (!container || !el) return false;
-
-      const containerRect = container.getBoundingClientRect();
-      const elRect = el.getBoundingClientRect();
-
-      const targetTop = elRect.top - containerRect.top;
-
-      const tolerance = 1; // pixel-perfect threshold
-
-      if (Math.abs(targetTop) <= tolerance) return true;
-
-      container.scrollTop += targetTop;
-
-      return false;
-    };
-
-    requestAnimationFrame(() => {
-      let attempts = 0;
-
-      const loop = () => {
-        attempts++;
-        const done = tryAlign();
-
-        if (!done && attempts < 10) {
-          requestAnimationFrame(loop);
-        }
-      };
-
-      loop();
-    });
+    setPendingJump(i); // Mark this index as our target
   };
+
+  useEffect(() => {
+    if (pendingJump === null || page !== 'reader') return;
+
+    // Check if the target section AND the padding sections above it have loaded.
+    // (If the sections above it haven't loaded, they will shift the DOM down when they do).
+    const startIdx = Math.max(0, pendingJump - 2);
+    let allReady = true;
+    for (let j = startIdx; j <= pendingJump; j++) {
+      if (!textMap[j]) {
+        allReady = false;
+        break;
+      }
+    }
+
+    if (allReady) {
+      // Data is here! Give React a tiny fraction of a second to render the text into the DOM.
+      requestAnimationFrame(() => {
+        setTimeout(() => {
+          const el = rowRefs.current[pendingJump];
+          if (el) {
+            // Natively perfectly align the element to the top of the scrolling container
+            el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          }
+          setPendingJump(null); // Clear the jump queue
+        }, 50); 
+      });
+    }
+  }, [textMap, pendingJump, page]);
 
   /* ---------------- RENDER ---------------- */
 
