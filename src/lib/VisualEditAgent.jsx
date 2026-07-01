@@ -412,8 +412,11 @@ export default function VisualEditAgent() {
 		};
 
 		const handleMessage = (event) => {
-			// Check origin if desired
-			//if (event.origin !== 'parent-origin') return;
+			// Only accept messages from the actual parent frame's origin
+			if (document.referrer) {
+				const parentOrigin = new URL(document.referrer).origin;
+				if (event.origin !== parentOrigin) return;
+			}
 
 			const message = event.data;
 
