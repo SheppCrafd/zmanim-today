@@ -12,10 +12,13 @@ export default function NavigationTracker() {
 
     // Post navigation changes to parent window
     useEffect(() => {
-        window.parent?.postMessage({
-            type: "app_changed_url",
-            url: window.location.href
-        }, '*');
+        if (window.parent && window.parent !== window && document.referrer) {
+            const parentOrigin = new URL(document.referrer).origin;
+            window.parent.postMessage({
+                type: "app_changed_url",
+                url: window.location.href
+            }, parentOrigin);
+        }
     }, [location]);
 
     // Log user activity when navigating to a page
