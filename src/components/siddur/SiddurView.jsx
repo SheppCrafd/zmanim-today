@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
     ExternalLink,
     Loader2,
@@ -7,7 +7,7 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import NavMenu from '@/components/NavMenu';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 
 /* ---------------- TOC FLATTEN ---------------- */
 
@@ -94,7 +94,6 @@ function Section({ sec, data, langMode, rowRef, index }) {
             <div className="space-y-6">
                 {Array.from({ length: maxLen }).map((_, i) => (
                     <div key={i} className="space-y-2">
-
                         {showHB && heArr[i] && (
                             <p
                                 className="text-right text-lg leading-loose text-slate-800 dark:text-slate-100 font-serif"
@@ -109,7 +108,6 @@ function Section({ sec, data, langMode, rowRef, index }) {
                                 dangerouslySetInnerHTML={{ __html: enArr[i] }}
                             />
                         )}
-
                     </div>
                 ))}
             </div>
@@ -122,6 +120,7 @@ function Section({ sec, data, langMode, rowRef, index }) {
 export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
     const navigate = useNavigate();
 
+    const scrollRef = useRef(null);
     const rowRefs = useRef({});
     const observerRef = useRef(null);
 
@@ -158,7 +157,7 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
             });
     }, [bookRef]);
 
-    /* ---------------- WINDOW LOADING ---------------- */
+    /* ---------------- TEXT WINDOW LOADING ---------------- */
 
     useEffect(() => {
         if (!sections.length) return;
@@ -183,7 +182,7 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
         load();
     }, [range, sections]);
 
-    /* ---------------- OBSERVER (CURRENT SECTION) ---------------- */
+    /* ---------------- OBSERVER ---------------- */
 
     useEffect(() => {
         if (!sections.length) return;
@@ -237,23 +236,36 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
         }
     };
 
-    /* ---------------- FIXED JUMP ---------------- */
+    /* ---------------- FIXED JUMP (REAL BUG FIX) ---------------- */
 
     const jumpTo = (i) => {
         setPage('reader');
 
         setRange({
             start: Math.max(0, i - 2),
-            end: i + 5
+            end: i + 6
         });
 
         requestAnimationFrame(() => {
-            setTimeout(() => {
-                rowRefs.current[i]?.scrollIntoView({
-                    behavior: 'smooth',
-                    block: 'start'
+            requestAnimationFrame(() => {
+                const container = scrollRef.current;
+                const el = rowRefs.current[i];
+
+                if (!container || !el) return;
+
+                const containerRect = container.getBoundingClientRect();
+                const elRect = el.getBoundingClientRect();
+
+                const offset =
+                    elRect.top -
+                    containerRect.top +
+                    container.scrollTop;
+
+                container.scrollTo({
+                    top: offset,
+                    behavior: 'smooth'
                 });
-            }, 50);
+            });
         });
     };
 
@@ -262,11 +274,11 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
     return (
         <div className="h-screen flex flex-col bg-slate-50 dark:bg-slate-950 overflow-hidden">
 
-            {/* TOP BAR (UNCHANGED VISUALS) */}
+            {/* TOP BAR */}
             <div className="sticky top-0 z-50 bg-white dark:bg-slate-950 border-b">
 
                 <div className="flex items-center justify-between px-4 pt-4 pb-2">
-                    <div className="flex items-center gap-2 relative z-50">
+                    <div className="flex items-center gap-2">
                         <NavMenu />
                         <div>
                             <h1 className="text-lg font-bold">{title}</h1>
@@ -274,7 +286,7 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
                         </div>
                     </div>
 
-                    <a href={sefariaUrl} target="_blank" className="relative z-50">
+                    <a href={sefariaUrl} target="_blank">
                         <Button size="sm" variant="outline">
                             <ExternalLink className="w-4 h-4" />
                         </Button>
@@ -316,7 +328,11 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
                 )}
 
                 {page === 'reader' && (
-                    <div className="h-full overflow-y-auto px-4 pb-10" onScroll={onScroll}>
+                    <div
+                        className="h-full overflow-y-auto px-4 pb-10"
+                        onScroll={onScroll}
+                        ref={scrollRef}
+                    >
                         {sections.slice(range.start, range.end + 1).map((sec, i) => {
                             const index = range.start + i;
 
