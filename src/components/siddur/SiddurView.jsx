@@ -34,23 +34,6 @@ function flattenNodes(nodes, keyPath = '', labelPath = '') {
     return result;
 }
 
-const isEnglishLine = (t) => {
-    if (!t) return false;
-
-    const plain = t.replace(/<[^>]*>/g, '').trim();
-    if (plain.length < 2) return false;
-
-    const latin = plain.match(/[A-Za-z]/g) || [];
-    const hebrew = plain.match(/[\u0590-\u05FF]/g) || [];
-
-    const total = latin.length + hebrew.length;
-    if (total === 0) return false;
-
-    const latinRatio = latin.length / total;
-
-    return latin.length > 5 && latinRatio > 0.75;
-};
-
 /* ---------------- SECTION ---------------- */
 
 function Section({ sec, data, langMode, rowRef, index }) {
@@ -70,9 +53,10 @@ function Section({ sec, data, langMode, rowRef, index }) {
         );
     }
 
-    const heArr = Array.isArray(data.he) ? data.he : (data.he ? [data.he] : []);
-    const enRaw = Array.isArray(data.text) ? data.text : (data.text ? [data.text] : []);
-    const enArr = enRaw.filter(isEnglishLine);
+    // Values are now clean arrays fetched straight from Sefaria v3 API 
+    // No more need for the isEnglishLine hack!
+    const heArr = data.he || [];
+    const enArr = data.en || [];
 
     const showEN = langMode !== 'he';
     const showHB = langMode !== 'en';
@@ -86,8 +70,13 @@ function Section({ sec, data, langMode, rowRef, index }) {
             className="space-y-4 scroll-mt-24"
         >
             <div className="sticky top-0 bg-white dark:bg-slate-900 py-2 z-10 border-b">
-                <p className="font-semibold text-slate-700 dark:text-slate-100">
-                    {sec.label}
+                <p className="font-semibold text-slate-700 dark:text-slate-100 flex justify-between items-center">
+                    <span>{sec.label}</span>
+                    {sec.heLabel && (
+                        <span className="text-sm font-normal text-slate-400 font-serif" dir="rtl">
+                            {sec.heLabel}
+                        </span>
+                    )}
                 </p>
             </div>
 
@@ -139,7 +128,8 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
     /* ---------------- LOAD TOC ---------------- */
 
     useEffect(() => {
-        fetch(`https://www.sefaria.org/api/index/${bookRef}`)
+        // Upgraded to v2 API index
+        fetch(`https://www.sefaria.org/api/v2/index/${bookRef}`)
             .then(r => r.json())
             .then(data => {
                 const nodes = data?.schema?.nodes || [];
@@ -157,7 +147,7 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
             });
     }, [bookRef]);
 
-    /* ---------------- TEXT WINDOW LOADING ---------------- */
+    /* ---------------- TEXT WINDOW LOADING (PARALLEL v3 API) ---------------- */
 
     useEffect(() => {
         if (!sections.length) return;
@@ -166,13 +156,27 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
             for (let i = range.start; i <= range.end; i++) {
                 if (!sections[i] || textMap[i]) continue;
 
-                try {
-                    const res = await fetch(
-                        `https://www.sefaria.org/api/texts/${encodeURIComponent(sections[i].ref)}?lang=bi`
-                    );
-                    const data = await res.json();
+                const ref = encodeURIComponent(sections[i].ref);
+                const hebURL = `https://www.sefaria.org/api/v3/texts/${ref}?version=source&context=0`;
+                const engURL = `https://www.sefaria.org/api/v3/texts/${ref}?version=english|Sefaria%20Community%20Translation&context=0`;
 
-                    setTextMap(prev => ({ ...prev, [i]: data }));
+                try {
+                    // Fetch distinct language versions in parallel
+                    const [hebResp, engResp] = await Promise.all([
+                        fetch(hebURL),
+                        fetch(engURL)
+                    ]);
+
+                    const hebData = await hebResp.json();
+                    const engData = await engResp.json();
+
+                    const heArr = Array.isArray(hebData.he) ? hebData.he : (hebData.he ? [hebData.he] : []);
+                    const enArr = Array.isArray(engData.text) ? engData.text : (engData.text ? [engData.text] : []);
+
+                    setTextMap(prev => ({ 
+                        ...prev, 
+                        [i]: { he: heArr, en: enArr } 
+                    }));
                 } catch {
                     setTextMap(prev => ({ ...prev, [i]: { error: true } }));
                 }
@@ -199,8 +203,9 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
 
                     currentSection.current = index;
 
+                    // Fixed hardcoded path to route dynamically via bookRef
                     navigate(
-                        `/SephardicSiddur/section/${index}/${langMode}`,
+                        `/${bookRef}/section/${index}/${langMode}`,
                         { replace: true }
                     );
                 }
@@ -214,7 +219,7 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
             if (el) observerRef.current.observe(el);
         });
 
-    }, [sections, langMode]);
+    }, [sections, langMode, bookRef, navigate]);
 
     /* ---------------- SCROLL WINDOW ---------------- */
 
@@ -291,7 +296,6 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
 
             {/* TOP BAR */}
             <div className="sticky top-0 z-50 bg-white dark:bg-slate-950 border-b">
-
                 <div className="flex items-center justify-between px-4 pt-4 pb-2">
                     <div className="flex items-center gap-2">
                         <NavMenu />
@@ -301,7 +305,7 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
                         </div>
                     </div>
 
-                    <a href={sefariaUrl} target="_blank">
+                    <a href={sefariaUrl} target="_blank" rel="noopener noreferrer">
                         <Button size="sm" variant="outline">
                             <ExternalLink className="w-4 h-4" />
                         </Button>
@@ -326,17 +330,18 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
             <div className="flex-1 overflow-hidden">
 
                 {page === 'toc' && (
-                    <div className="h-full overflow-y-auto px-4">
-                        {loading && <Loader2 className="animate-spin" />}
-                        {error && <AlertCircle />}
+                    <div className="h-full overflow-y-auto px-4 py-4 space-y-1">
+                        {loading && <Loader2 className="animate-spin mx-auto mt-10" />}
+                        {error && <AlertCircle className="mx-auto mt-10 text-red-500" />}
 
-                        {sections.map((sec, i) => (
+                        {!loading && !error && sections.map((sec, i) => (
                             <button
                                 key={i}
                                 onClick={() => jumpTo(i)}
-                                className="w-full text-left py-3 border-b"
+                                className="w-full flex justify-between items-center text-left py-3 px-2 border-b hover:bg-slate-100 dark:hover:bg-slate-900 transition-colors rounded"
                             >
-                                {sec.label}
+                                <span className="font-medium text-slate-700 dark:text-slate-300">{sec.label}</span>
+                                {sec.heLabel && <span className="text-xs text-slate-400 font-serif" dir="rtl">{sec.heLabel}</span>}
                             </button>
                         ))}
                     </div>
