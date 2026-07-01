@@ -191,6 +191,17 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
                     );
                     const data = await res.json();
 
+                    alert(
+                    JSON.stringify(
+                        data.versions?.map(v => ({
+                        language: v.language,
+                        versionTitle: v.versionTitle
+                        })),
+                        null,
+                        2
+                    )
+                    );
+
                     setTextMap(prev => ({ ...prev, [i]: data }));
                 } catch {
                     setTextMap(prev => ({ ...prev, [i]: { error: true } }));
