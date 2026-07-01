@@ -139,7 +139,7 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
       });
   }, [bookRef]);
 
-  /* ---------------- TEXT WINDOW LOADING ---------------- */
+/* ---------------- TEXT WINDOW LOADING ---------------- */
 
   useEffect(() => {
     if (!sections.length) return;
@@ -163,9 +163,15 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
           );
           const engData = await engResp.json();
 
-          // Normalize to arrays
-          const heArr = Array.isArray(hebData.he) ? hebData.he : (hebData.he ? [hebData.he] : []);
-          const enArr = Array.isArray(engData.text) ? engData.text : (engData.text ? [engData.text] : []);
+          // In Sefaria v3, the text is nested under versions[0].text
+          const extractText = (data) => {
+            const textContent = data?.versions?.[0]?.text;
+            if (!textContent) return [];
+            return Array.isArray(textContent) ? textContent : [textContent];
+          };
+
+          const heArr = extractText(hebData);
+          const enArr = extractText(engData);
 
           setTextMap(prev => ({ 
             ...prev, 
