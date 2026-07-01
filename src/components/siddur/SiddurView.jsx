@@ -246,26 +246,41 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
             end: i + 6
         });
 
+        const tryAlign = () => {
+            const container = scrollRef.current;
+            const el = rowRefs.current[i];
+
+            if (!container || !el) return false;
+
+            const containerRect = container.getBoundingClientRect();
+            const elRect = el.getBoundingClientRect();
+
+            const targetTop = elRect.top - containerRect.top;
+
+            const tolerance = 1; // pixel-perfect threshold
+
+            // already touching top → stop
+            if (Math.abs(targetTop) <= tolerance) return true;
+
+            container.scrollTop += targetTop;
+
+            return false;
+        };
+
         requestAnimationFrame(() => {
-            requestAnimationFrame(() => {
-                const container = scrollRef.current;
-                const el = rowRefs.current[i];
+            let attempts = 0;
 
-                if (!container || !el) return;
+            const loop = () => {
+                attempts++;
 
-                const containerRect = container.getBoundingClientRect();
-                const elRect = el.getBoundingClientRect();
+                const done = tryAlign();
 
-                const offset =
-                    elRect.top -
-                    containerRect.top +
-                    container.scrollTop;
+                if (!done && attempts < 10) {
+                    requestAnimationFrame(loop);
+                }
+            };
 
-                container.scrollTo({
-                    top: offset,
-                    behavior: 'smooth'
-                });
-            });
+            loop();
         });
     };
 
