@@ -157,26 +157,47 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
                 try {
                     const ref = encodeURIComponent(sections[i].ref);
 
-                    // Hebrew
-                    const heRes = await fetch(
-                        `https://www.sefaria.org/api/texts/${ref}?lang=he`
+                    const res = await fetch(
+                        `https://www.sefaria.org/api/texts/${ref}?context=0`
                     );
-                    const heData = await heRes.json();
 
-                    // English Community Translation ONLY
-                    const enRes = await fetch(
-                        `https://www.sefaria.org/api/texts/${ref}?lang=en&version=english/Sefaria%20Community%20Translation`
+                    const data = await res.json();
+
+                    // 🔥 pick ONLY clean English version
+                    const englishVersion =
+                        data.versions?.find(v =>
+                            v.language === 'en' &&
+                            !v.versionTitle.toLowerCase().includes('[pt]') &&
+                            v.versionTitle.toLowerCase().includes('sefaria')
+                        );
+
+                    if (!englishVersion) {
+                        setTextMap(prev => ({
+                            ...prev,
+                            [i]: {
+                                he: data.he,
+                                enText: []
+                            }
+                        }));
+                        continue;
+                    }
+
+                    // fetch that exact version
+                    const cleanRes = await fetch(
+                        `https://www.sefaria.org/api/texts/${ref}?version=${encodeURIComponent(englishVersion.versionTitle)}&context=0`
                     );
-                    const enData = await enRes.json();
+
+                    const cleanData = await cleanRes.json();
 
                     setTextMap(prev => ({
                         ...prev,
                         [i]: {
-                            he: heData.he,
-                            enText: enData.text
+                            he: data.he,
+                            enText: cleanData.text
                         }
                     }));
-                } catch {
+
+                } catch (e) {
                     setTextMap(prev => ({
                         ...prev,
                         [i]: { error: true }
