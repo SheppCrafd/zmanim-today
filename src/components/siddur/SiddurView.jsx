@@ -249,14 +249,13 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
       start: Math.max(0, i - 2),
       end: i + 6
     });
-    setPendingJump(i); // Mark this index as our target
+    setPendingJump(i);
   };
 
-  useEffect(() => {
+useEffect(() => {
     if (pendingJump === null || page !== 'reader') return;
 
-    // Check if the target section AND the padding sections above it have loaded.
-    // (If the sections above it haven't loaded, they will shift the DOM down when they do).
+    // 1. Wait for the text to actually fetch from Sefaria
     const startIdx = Math.max(0, pendingJump - 2);
     let allReady = true;
     for (let j = startIdx; j <= pendingJump; j++) {
@@ -266,19 +265,45 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
       }
     }
 
-    if (allReady) {
-      // Data is here! Give React a tiny fraction of a second to render the text into the DOM.
-      requestAnimationFrame(() => {
-        setTimeout(() => {
-          const el = rowRefs.current[pendingJump];
-          if (el) {
-            // Natively perfectly align the element to the top of the scrolling container
-            el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-          }
-          setPendingJump(null); // Clear the jump queue
-        }, 50); 
-      });
-    }
+    if (!allReady) return; // Data isn't here yet, keep waiting
+
+    // 2. Data is ready! Now we align mathematically instead of trusting the browser.
+    let attempts = 0;
+    
+    const tryAlign = () => {
+      const container = scrollRef.current;
+      const el = rowRefs.current[pendingJump];
+
+      if (!container || !el) return;
+
+      const containerRect = container.getBoundingClientRect();
+      const elRect = el.getBoundingClientRect();
+
+      // Calculate the exact distance to the target header
+      const targetTop = elRect.top - containerRect.top;
+
+      // Snap the scrollbar exactly to that pixel
+      if (Math.abs(targetTop) > 1) {
+        container.scrollTop += targetTop;
+      }
+    };
+
+    const loop = () => {
+      attempts++;
+      tryAlign();
+
+      // "Lock" the scroll in place for 15 frames (~250ms).
+      // As the heavy Hebrew/English text pops into the DOM and tries to shift the layout,
+      // this loop will aggressively pin the target header right to the top.
+      if (attempts < 15) {
+        requestAnimationFrame(loop);
+      } else {
+        setPendingJump(null); // We are stable, release the jump lock
+      }
+    };
+
+    requestAnimationFrame(loop);
+
   }, [textMap, pendingJump, page]);
 
   /* ---------------- RENDER ---------------- */
