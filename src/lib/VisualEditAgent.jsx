@@ -1,7 +1,34 @@
 import { useEffect, useRef, useState } from 'react';
 import { twMerge } from 'tailwind-merge'
 
+// Strict allowlist of trusted parent origins (Base44 builder/dashboard only)
+const ALLOWED_ORIGIN_PATTERN = /^https:\/\/([a-z0-9-]+\.)*base44\.(com|app)$/i;
+
+// Determine the trusted parent origin from document.referrer, validated against the allowlist.
+// Returns null if the referrer is missing or untrusted - in that case we simply don't post messages.
+function getTrustedParentOrigin() {
+	try {
+		if (document.referrer) {
+			const origin = new URL(document.referrer).origin;
+			if (ALLOWED_ORIGIN_PATTERN.test(origin)) return origin;
+		}
+	} catch (e) {
+		// ignore malformed referrer
+	}
+	return null;
+}
+
 export default function VisualEditAgent() {
+	// Resolved once per mount - the specific trusted origin to target with postMessage (never '*')
+	const trustedParentOriginRef = useRef(getTrustedParentOrigin());
+
+	// Send a message to the parent window, but only if we have a trusted target origin
+	const postToParent = (data) => {
+		if (trustedParentOriginRef.current) {
+			window.parent.postMessage(data, trustedParentOriginRef.current);
+		}
+	};
+
 	// this functions job is to receive first a message from the parent window, to set or unset visual edits mode. 
 	// once in visual edits mode, every hover over an elelmnt that has linenumbers should show an overlay, when clicked - it should stick the overlay and send a message to the parent window with the selected element
 	// then, the parent window will have an editor, allow for changes to the tailwind css classes of the selected element, and send the updated css classes back to the iframe. 
@@ -163,9 +190,9 @@ export default function VisualEditAgent() {
 			e.stopImmediatePropagation();
 
 			// Send message to parent to close all dropdowns
-			window.parent.postMessage({
+			postToParent({
 				type: 'close-dropdowns'
-			}, '*');
+			});
 			return;
 		}
 
@@ -239,7 +266,7 @@ export default function VisualEditAgent() {
 			filename: element.dataset.filename, // Keep for backward compatibility
 			position: elementPosition // Add position data for popover
 		};
-		window.parent.postMessage(elementData, '*');
+		postToParent(elementData);
 	};
 
 	// Unselect the current element
@@ -401,18 +428,15 @@ export default function VisualEditAgent() {
 						centerY: rect.top + rect.height / 2
 					};
 
-					window.parent.postMessage({
+					postToParent({
 						type: 'element-position-update',
 						position: elementPosition,
 						isInViewport: isInViewport,
 						visualSelectorId: selectedElementIdRef.current
-					}, '*');
+					});
 				}
 			}
 		};
-
-		// Strict allowlist of trusted parent origins (Base44 builder/dashboard only)
-		const ALLOWED_ORIGIN_PATTERN = /^https:\/\/([a-z0-9-]+\.)*base44\.(com|app)$/i;
 
 		const handleMessage = (event) => {
 			// Only accept messages from a trusted Base44 origin
@@ -488,12 +512,12 @@ export default function VisualEditAgent() {
 								centerY: rect.top + rect.height / 2
 							};
 
-							window.parent.postMessage({
+							postToParent({
 								type: 'element-position-update',
 								position: elementPosition,
 								isInViewport: isInViewport,
 								visualSelectorId: selectedElementIdRef.current
-							}, '*');
+							});
 						}
 					}
 					break;
@@ -534,7 +558,7 @@ export default function VisualEditAgent() {
 		document.addEventListener('scroll', handleScroll, true); // Also listen on document
 
 		// Send ready message to parent
-		window.parent.postMessage({ type: 'visual-edit-agent-ready' }, '*');
+		postToParent({ type: 'visual-edit-agent-ready' });
 
 		return () => {
 			window.removeEventListener('message', handleMessage);
