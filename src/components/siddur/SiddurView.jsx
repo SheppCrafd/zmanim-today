@@ -371,19 +371,41 @@ useEffect(() => {
       <div className="flex-1 overflow-hidden">
 
         {page === 'toc' && (
-          <div className="h-full overflow-y-auto px-4">
-            {loading && <Loader2 className="animate-spin" />}
-            {error && <AlertCircle />}
+          <div className="h-full overflow-y-auto px-4 pb-10">
+            {loading && (
+              <div className="py-10 flex justify-center">
+                <Loader2 className="animate-spin text-blue-500" />
+              </div>
+            )}
+            {error && (
+              <div className="py-10 flex justify-center text-red-500">
+                <AlertCircle className="w-8 h-8" />
+              </div>
+            )}
 
-            {sections.map((sec, i) => (
-              <button
-                key={i}
-                onClick={() => jumpTo(i)}
-                className="w-full text-left py-3 border-b"
-              >
-                {sec.label}
-              </button>
-            ))}
+            {!loading && !error && categoryOrder.map(category => {
+              const items = groupedSections[category];
+              if (!items || items.length === 0) return null;
+
+              return (
+                <div key={category} className="mb-8">
+                  <h2 className="font-bold text-xl text-slate-800 dark:text-slate-100 border-b-2 border-blue-500 pb-2 mb-2 mt-4 sticky top-0 bg-slate-50 dark:bg-slate-950">
+                    {category}
+                  </h2>
+                  <div className="flex flex-col">
+                    {items.map((sec) => (
+                      <button
+                        key={sec.originalIndex}
+                        onClick={() => jumpTo(sec.originalIndex)}
+                        className="w-full text-left py-3 border-b text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-800 px-2 rounded-sm transition-colors"
+                      >
+                        {sec.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
           </div>
         )}
 
@@ -415,4 +437,18 @@ useEffect(() => {
       </div>
     </div>
   );
+
+    /* ---------------- GROUP TOC ---------------- */
+  const groupedSections = sections.reduce((acc, sec, index) => {
+    // Group based on the breadcrumb text generated in flattenNodes
+    const category = getCategory(sec.breadcrumb);
+    if (!acc[category]) acc[category] = [];
+    
+    // Save the original index so jumpTo(i) targets the correct text chunk
+    acc[category].push({ ...sec, originalIndex: index });
+    return acc;
+  }, {});
+
+  const categoryOrder = ['Shacharit', 'Mussaf', 'Mincha', "Ma'ariv / Arbit", 'Other'];
+
 }
