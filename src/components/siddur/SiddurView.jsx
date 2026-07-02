@@ -219,15 +219,14 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
     load();
   }, [range, sections]);
 
-  /* ---------------- OBSERVER ---------------- */
+/* ---------------- OBSERVER ---------------- */
   useEffect(() => {
     if (!sections.length) return;
 
     if (observerRef.current) observerRef.current.disconnect();
 
-    // Dynamically grab the base path of whatever page we are currently on
-    // (This strips away "/section/..." if we are already reading)
-    const basePath = location.pathname.split('/section')[0];
+    // Extract ONLY the base book route (e.g., "/ChabadSiddur")
+    const basePath = '/' + location.pathname.split('/')[1];
 
     observerRef.current = new IntersectionObserver(
       (entries) => {
