@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -27,18 +27,14 @@ export default function Zmanim() {
     const [manualLocation, setManualLocation] = useState('');
     const [searchingLocation, setSearchingLocation] = useState(false);
     const [hebrewInfo, setHebrewInfo] = useState(null);
+    
+    // The request bouncer
+    const requestRef = useRef(0);
 
     useEffect(() => {
-        let isActive = true; // Prevents race conditions
-
         if (location) {
-            calculateZmanim(isActive);
+            calculateZmanim();
         }
-
-        // Cleanup function for when the date changes quickly or Strict Mode fires twice
-        return () => {
-            isActive = false;
-        };
     }, [location, currentDate]);
 
     useEffect(() => {
@@ -51,8 +47,11 @@ export default function Zmanim() {
         detectGPS();
     };
 
-    // Pass isActive to prevent setting state on unmounted or cancelled requests
-    const calculateZmanim = async (isActive = true) => {
+    const calculateZmanim = async () => {
+        // Stamp this specific request with a unique ID (timestamp)
+        const currentRequest = Date.now();
+        requestRef.current = currentRequest;
+
         setCalculating(true);
         setError(null);
 
@@ -126,19 +125,20 @@ Use actual astronomical calculations. Verify data is correct.`,
                 }
             });
 
-            // Only update state if this is the most recent request
-            if (isActive) {
+            // Only update if this request is STILL the most recent one
+            if (requestRef.current === currentRequest) {
                 setZmanim(result);
                 setError(null);
             }
 
         } catch (err) {
-            if (isActive) {
+            // Only show error and clear data if the failed request was the most recent one
+            if (requestRef.current === currentRequest) {
                 setError('Failed to calculate zmanim. Please try again.');
-                setZmanim(null); // CRITICAL: Clear the old zmanim
+                setZmanim(null);
             }
         } finally {
-            if (isActive) {
+            if (requestRef.current === currentRequest) {
                 setCalculating(false);
             }
         }
