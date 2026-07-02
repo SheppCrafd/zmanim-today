@@ -122,6 +122,12 @@ Use actual astronomical calculations. Verify data is correct.`,
             });
 
             setZmanim(result);
+
+            if (isActive) {
+                setZmanim(result);
+                setError(null); // <-- This wipes the error when the calculations succeed!
+            }
+
         } catch (err) {
             setError('Failed to calculate zmanim. Please try again.');
         } finally {
