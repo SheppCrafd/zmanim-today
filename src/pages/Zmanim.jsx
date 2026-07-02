@@ -48,101 +48,80 @@ export default function Zmanim() {
     };
 
     const calculateZmanim = async () => {
-        // Stamp this specific request with a unique ID (timestamp)
-        const currentRequest = Date.now();
-        requestRef.current = currentRequest;
+            // Keep our bouncer to prevent race conditions
+            const currentRequest = Date.now();
+            requestRef.current = currentRequest;
 
-        setCalculating(true);
-        setError(null);
+            setCalculating(true);
+            setError(null);
 
-        try {
-            const dateStr = format(currentDate, 'yyyy-MM-dd');
-            const result = await base44.integrations.Core.InvokeLLM({
-                prompt: `Calculate accurate Jewish zmanim for ${dateStr} at coordinates: ${location.latitude}, ${location.longitude}
+            try {
+                const dateStr = format(currentDate, 'yyyy-MM-dd');
+                
+                // 1. Make a direct HTTP request to Hebcal's API
+                const response = await fetch(
+                    `https://www.hebcal.com/zmanim?cfg=json&latitude=${location.latitude}&longitude=${location.longitude}&date=${dateStr}`
+                );
 
-CRITICAL INSTRUCTIONS:
-1. Search hebcal.com API or website specifically for these exact coordinates and date
-2. Use this URL pattern: https://www.hebcal.com/zmanim?cfg=json&latitude=${location.latitude}&longitude=${location.longitude}&date=${dateStr}
-3. Verify times match astronomical reality for this location
-
-Required zmanim (return in 12-hour format with AM/PM):
-
-DAWN & MORNING:
-- alot_hashachar: Dawn (72 minutes before sunrise OR when sun is 16.1° below horizon)
-- misheyakir: When one can recognize someone from 6 feet (sun 11° below horizon)
-- sunrise: Top of sun visible at horizon
-- sof_zman_shma_gra: Latest Shema (3 halachic hours after sunrise using GRA method: divide sunrise to sunset into 12 parts)
-- sof_zman_shma_mga: Latest Shema (3 halachic hours after dawn using MGA method: divide dawn to nightfall into 12 parts)
-- sof_zman_tefillah_gra: Latest Shemoneh Esrei (4 halachic hours after sunrise, GRA)
-- sof_zman_tefillah_mga: Latest Shemoneh Esrei (4 halachic hours after dawn, MGA)
-
-MIDDAY & AFTERNOON:
-- chatzot: Halachic noon (exact midpoint between sunrise and sunset)
-- mincha_gedola: 30 minutes after chatzot
-- mincha_ketana: 2.5 halachic hours before sunset
-- plag_hamincha: 1.25 halachic hours before sunset (midpoint between mincha ketana and sunset)
-
-EVENING & NIGHT:
-- candle_lighting: 18 minutes before sunset (for Shabbat/Yom Tov)
-- sunset: When sun disappears below horizon
-- tzait_hakochavim: Nightfall - 3 medium stars visible (sun 8.5° below horizon OR 42-50 minutes after sunset)
-- tzait_72: Nightfall per Rabbeinu Tam (72 minutes after sunset)
-- chatzot_laila: Halachic midnight (midpoint between sunset and next sunrise)
-
-LOCATION INFO:
-- location_name: City name for these coordinates
-- timezone: Local timezone
-
-Use actual astronomical calculations. Verify data is correct.`,
-                add_context_from_internet: true,
-                response_json_schema: {
-                    type: "object",
-                    properties: {
-                        location_name: { type: "string" },
-                        timezone: { type: "string" },
-                        zmanim: {
-                            type: "object",
-                            properties: {
-                                alot_hashachar: { type: "string" },
-                                misheyakir: { type: "string" },
-                                sunrise: { type: "string" },
-                                sof_zman_shma_gra: { type: "string" },
-                                sof_zman_shma_mga: { type: "string" },
-                                sof_zman_tefillah_gra: { type: "string" },
-                                sof_zman_tefillah_mga: { type: "string" },
-                                chatzot: { type: "string" },
-                                mincha_gedola: { type: "string" },
-                                mincha_ketana: { type: "string" },
-                                plag_hamincha: { type: "string" },
-                                candle_lighting: { type: "string" },
-                                sunset: { type: "string" },
-                                tzait_hakochavim: { type: "string" },
-                                tzait_72: { type: "string" },
-                                chatzot_laila: { type: "string" }
-                            }
-                        }
-                    }
+                if (!response.ok) {
+                    throw new Error('Failed to fetch data from Hebcal');
                 }
-            });
 
-            // Only update if this request is STILL the most recent one
-            if (requestRef.current === currentRequest) {
-                setZmanim(result);
-                setError(null);
-            }
+                const data = await response.json();
 
-        } catch (err) {
-            // Only show error and clear data if the failed request was the most recent one
-            if (requestRef.current === currentRequest) {
-                setError('Failed to calculate zmanim. Please try again.');
-                setZmanim(null);
+                // 2. Helper to format Hebcal's ISO strings into "h:mm A" (e.g., "6:30 PM")
+                const formatTime = (isoString) => {
+                    if (!isoString) return "";
+                    const d = new Date(isoString);
+                    // This automatically converts the UTC timestamp to the user's local browser timezone
+                    return d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+                };
+
+                // 3. Map Hebcal's exact data into your app's state structure
+                const result = {
+                    location_name: location.city || location.name || "Selected Location",
+                    timezone: data.location?.tzid || "Local Time",
+                    zmanim: {
+                        alot_hashachar: formatTime(data.times.alotHashachar),
+                        misheyakir: formatTime(data.times.misheyakir),
+                        sunrise: formatTime(data.times.sunrise),
+                        sof_zman_shma_gra: formatTime(data.times.sofZmanShma),
+                        sof_zman_shma_mga: formatTime(data.times.sofZmanShmaMGA),
+                        sof_zman_tefillah_gra: formatTime(data.times.sofZmanTfilla),
+                        sof_zman_tefillah_mga: formatTime(data.times.sofZmanTfillaMGA),
+                        chatzot: formatTime(data.times.chatzot),
+                        mincha_gedola: formatTime(data.times.minchaGedola),
+                        mincha_ketana: formatTime(data.times.minchaKetana),
+                        plag_hamincha: formatTime(data.times.plagHaMincha),
+                        // Hebcal doesn't always return candle lighting unless it's Friday/Erev Yom Tov
+                        candle_lighting: data.times.candleLighting ? formatTime(data.times.candleLighting) : "N/A", 
+                        sunset: formatTime(data.times.sunset),
+                        // Hebcal offers multiple Tzeit calculations. 8.5 degrees is standard for 3 stars
+                        tzait_hakochavim: formatTime(data.times.tzeit85deg), 
+                        tzait_72: formatTime(data.times.tzeit72min),
+                        chatzot_laila: formatTime(data.times.chatzotNight)
+                    }
+                };
+
+                // Only update if this request is STILL the most recent one
+                if (requestRef.current === currentRequest) {
+                    setZmanim(result);
+                    setError(null);
+                }
+
+            } catch (err) {
+                console.error("Zmanim Fetch Error:", err);
+                // Only show error and clear data if the failed request was the most recent one
+                if (requestRef.current === currentRequest) {
+                    setError('Failed to load zmanim data. Please try again.');
+                    setZmanim(null);
+                }
+            } finally {
+                if (requestRef.current === currentRequest) {
+                    setCalculating(false);
+                }
             }
-        } finally {
-            if (requestRef.current === currentRequest) {
-                setCalculating(false);
-            }
-        }
-    };
+        };
 
     const handleManualLocation = async (e) => {
         e.preventDefault();
