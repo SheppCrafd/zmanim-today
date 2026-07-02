@@ -376,7 +376,7 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
           {page === 'reader' && (
             <Button size="sm" variant="outline" onClick={() => setPage('toc')}>
               <ArrowLeft className="w-4 h-4 mr-1" />
-              TOC
+              Back
             </Button>
           )}
         </div>
