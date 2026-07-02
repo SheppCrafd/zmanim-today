@@ -196,15 +196,22 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
           );
           const engData = await engResp.json();
 
-          // In Sefaria v3, the text is nested under versions[0].text
-          const extractText = (data) => {
-            const textContent = data?.versions?.[0]?.text;
-            if (!textContent) return [];
-            return Array.isArray(textContent) ? textContent : [textContent];
+          // 1. Update the function to accept an expected language ('he' or 'en')
+          const extractText = (data, expectedLang) => {
+          if (!data?.versions || data.versions.length === 0) return [];
+
+          // Find the version that explicitly matches 'he' or 'en'
+          const version = data.versions.find(v => v.language === expectedLang);
+        
+          // If no version matches that language, return an empty array instead of a fallback
+          if (!version || !version.text) return [];
+
+          return Array.isArray(version.text) ? version.text : [version.text];
           };
 
-          const heArr = extractText(hebData);
-          const enArr = extractText(engData);
+          // 2. Pass the expected languages into the calls below it:
+          const heArr = extractText(hebData, 'he');
+          const enArr = extractText(engData, 'en');
 
           setTextMap(prev => ({ 
             ...prev, 
