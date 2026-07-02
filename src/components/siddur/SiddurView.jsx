@@ -371,7 +371,7 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
 
   /* ---------------- RENDER ---------------- */
   return (
-    <div className="h-screen flex flex-col bg-slate-50 dark:bg-slate-950 overflow-hidden">
+    <div className="h-dvh flex flex-col bg-slate-50 dark:bg-slate-950 overflow-hidden">
 
       {/* TOP BAR */}
       <div className="sticky top-0 z-50 bg-white dark:bg-slate-950 border-b">
