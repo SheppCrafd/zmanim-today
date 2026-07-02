@@ -16,7 +16,6 @@ import { printZmanim } from '@/lib/printZmanim';
 import { useDashboardPrefs } from '@/hooks/useDashboardPrefs';
 import { ZMANIM_GROUPS, getGroupEntries } from '@/lib/zmanimSchema';
 
-
 export default function Zmanim() {
     const { location, loading: gpsLoading, error: gpsError, detectGPS, searchLocation: searchSavedLocation, clearLocation } = useSavedLocation();
     const { prefs } = useDashboardPrefs();
@@ -29,12 +28,17 @@ export default function Zmanim() {
     const [searchingLocation, setSearchingLocation] = useState(false);
     const [hebrewInfo, setHebrewInfo] = useState(null);
 
-
-
     useEffect(() => {
+        let isActive = true; // Prevents race conditions
+
         if (location) {
-            calculateZmanim();
+            calculateZmanim(isActive);
         }
+
+        // Cleanup function for when the date changes quickly or Strict Mode fires twice
+        return () => {
+            isActive = false;
+        };
     }, [location, currentDate]);
 
     useEffect(() => {
@@ -47,7 +51,8 @@ export default function Zmanim() {
         detectGPS();
     };
 
-    const calculateZmanim = async () => {
+    // Pass isActive to prevent setting state on unmounted or cancelled requests
+    const calculateZmanim = async (isActive = true) => {
         setCalculating(true);
         setError(null);
 
@@ -121,17 +126,21 @@ Use actual astronomical calculations. Verify data is correct.`,
                 }
             });
 
-            setZmanim(result);
-
+            // Only update state if this is the most recent request
             if (isActive) {
                 setZmanim(result);
-                setError(null); // <-- This wipes the error when the calculations succeed!
+                setError(null);
             }
 
         } catch (err) {
-            setError('Failed to calculate zmanim. Please try again.');
+            if (isActive) {
+                setError('Failed to calculate zmanim. Please try again.');
+                setZmanim(null); // CRITICAL: Clear the old zmanim
+            }
         } finally {
-            setCalculating(false);
+            if (isActive) {
+                setCalculating(false);
+            }
         }
     };
 
