@@ -198,16 +198,27 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
 
           // 1. Update the function to accept an expected language ('he' or 'en')
           // Add an expectedLang parameter ('he' or 'en')
-          const extractText = (data, expectedLang) => {
-          if (!data?.versions || data.versions.length === 0) return [];  
+        const extractText = (data, expectedLang) => {
+            if (!data?.versions || data.versions.length === 0) return [];
 
-          // Explicitly find the version matching the language we want
-          const version = data.versions.find(v => v.language === expectedLang);
-        
-          // If that language version isn't there, return an empty array
-          if (!version || !version.text) return [];
+            const version = data.versions.find(v => v.language === expectedLang);
+            if (!version || !version.text) return [];
 
-          return Array.isArray(version.text) ? version.text : [version.text];
+            const rawArray = Array.isArray(version.text) ? version.text : [version.text];
+
+            // If we are processing the English side, let's aggressively filter out Hebrew
+            if (expectedLang === 'en') {
+              return rawArray.map(line => {
+                // Check if the string contains any Hebrew characters (Unicode range \u0590-\u05FF)
+                const containsHebrew = /[\u0590-\u05FF]/.test(line || '');
+                
+                // If it contains Hebrew, return an empty string to blank it out.
+                // We return an empty string instead of deleting it so it stays aligned with the Hebrew side!
+                return containsHebrew ? '' : line;
+              });
+            }
+
+            return rawArray;
           };
 
           // Then update where you call it:
