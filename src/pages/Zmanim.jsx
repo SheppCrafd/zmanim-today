@@ -381,8 +381,8 @@ Use actual astronomical calculations. Verify data is correct.`,
                     </Card>
                 )}
 
-                {/* Error State */}
-                {error && location && (
+                {/* Error State - Only show if we actually failed AND have no data to show */}
+                {error && !zmanim && location && (
                     <Card className="shadow-lg border-0 bg-red-50">
                         <CardContent className="py-6 text-center">
                             <p className="text-red-700">{error}</p>
