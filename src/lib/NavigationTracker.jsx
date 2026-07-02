@@ -4,6 +4,9 @@ import { useAuth } from './AuthContext';
 import { base44 } from '@/api/base44Client';
 import { pagesConfig } from '@/pages.config';
 
+// Strict allowlist of trusted parent origins (Base44 builder/dashboard only)
+const ALLOWED_ORIGIN_PATTERN = /^https:\/\/([a-z0-9-]+\.)*base44\.(com|app)$/i;
+
 export default function NavigationTracker() {
     const location = useLocation();
     const { isAuthenticated } = useAuth();
@@ -13,11 +16,17 @@ export default function NavigationTracker() {
     // Post navigation changes to parent window
     useEffect(() => {
         if (window.parent && window.parent !== window && document.referrer) {
-            const parentOrigin = new URL(document.referrer).origin;
-            window.parent.postMessage({
-                type: "app_changed_url",
-                url: window.location.href
-            }, parentOrigin);
+            try {
+                const parentOrigin = new URL(document.referrer).origin;
+                if (ALLOWED_ORIGIN_PATTERN.test(parentOrigin)) {
+                    window.parent.postMessage({
+                        type: "app_changed_url",
+                        url: window.location.href
+                    }, parentOrigin);
+                }
+            } catch (e) {
+                // ignore malformed referrer
+            }
         }
     }, [location]);
 
