@@ -386,7 +386,7 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
       <div className="flex-1 overflow-hidden">
 
         {page === 'toc' && (
-          <div className="h-full overflow-y-auto px-4 pb-10">
+          <div className="h-full overflow-y-auto px-4 pb-24">
             {loading && (
               <div className="py-10 flex justify-center">
                 <Loader2 className="animate-spin text-blue-500" />
@@ -426,7 +426,7 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
 
         {page === 'reader' && (
           <div
-            className="h-full overflow-y-auto px-4 pb-10"
+            className="h-full overflow-y-auto px-4 pb-24"
             onScroll={onScroll}
             ref={scrollRef}
           >
@@ -450,6 +450,21 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
         )}
 
       </div>
+
+        {/* --- SEFARIA ATTRIBUTION FOOTER --- */}
+                <div className="bg-white dark:bg-slate-950 border-t py-2 px-4 text-center text-xs text-slate-500 z-50">
+                Powered by the{' '}
+                <a 
+                    href="https://www.sefaria.org" 
+                    target="_blank" 
+                    rel="noreferrer" 
+                    className="underline hover:text-slate-700 dark:hover:text-slate-300 transition-colors"
+                >
+                    Sefaria API
+                </a>
+                . Text provided under Sefaria's open-source licenses.
+                </div>
+
     </div>
   );
 }
