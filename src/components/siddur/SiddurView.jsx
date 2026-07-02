@@ -451,28 +451,37 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
 
       </div>
 
-        {/* --- SEFARIA ATTRIBUTION FOOTER --- */}
-                <div className="bg-white dark:bg-slate-950 border-t py-2 px-4 text-center text-xs text-slate-500 z-50">
-                Powered by{' '}
+      {/* --- SEFARIA ATTRIBUTION FOOTER --- */}
+            <div className="bg-slate-100 dark:bg-slate-900 border-t py-3 px-4 flex flex-col items-center justify-center gap-1 z-50">
+              
+              {/* Clickable Badge Linking to Sefaria Library */}
+              <a 
+                href="https://www.sefaria.org/texts" 
+                target="_blank" 
+                rel="noreferrer" 
+                className="transition-transform hover:scale-105"
+              >
+                <img 
+                  src="https://files.readme.io/dcee0a8-image.png" 
+                  alt="Powered by Sefaria" 
+                  className="h-11 w-auto rounded-md shadow-sm bg-white"
+                />
+              </a>
+
+              {/* Technical Credit Linking to API Portal */}
+              <div className="text-[10px] text-slate-500">
+                and the{' '}
                 <a 
-                    href="https://www.sefaria.org/texts" 
-                    target="_blank" 
-                    rel="noreferrer" 
-                    className="underline hover:text-slate-700 dark:hover:text-slate-300 transition-colors"
+                  href="https://developers.sefaria.org" 
+                  target="_blank" 
+                  rel="noreferrer" 
+                  className="underline hover:text-slate-700 dark:hover:text-slate-300 transition-colors"
                 >
-                    Sefaria
+                  Sefaria API
                 </a>
-                {' '}and the{' '}
-                <a 
-                    href="https://developers.sefaria.org" 
-                    target="_blank" 
-                    rel="noreferrer" 
-                    className="underline hover:text-slate-700 dark:hover:text-slate-300 transition-colors"
-                >
-                    Sefaria API
-                </a>
-                . Text provided under Sefaria's open-source licenses.
-                </div>
+              </div>
+              
+            </div>
 
     </div>
   );
