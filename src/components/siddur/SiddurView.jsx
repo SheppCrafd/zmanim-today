@@ -7,7 +7,7 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import NavMenu from '@/components/NavMenu';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 
 /* ---------------- TOC CATEGORIZER ---------------- */
 function getCategory(breadcrumb) {
@@ -134,6 +134,7 @@ function Section({ sec, data, langMode, rowRef, index }) {
 /* ---------------- MAIN ---------------- */
 export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
   const navigate = useNavigate();
+  const location = useLocation();
 
   const scrollRef = useRef(null);
   const rowRefs = useRef({});
@@ -224,6 +225,10 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
 
     if (observerRef.current) observerRef.current.disconnect();
 
+    // Dynamically grab the base path of whatever page we are currently on
+    // (This strips away "/section/..." if we are already reading)
+    const basePath = location.pathname.split('/section')[0];
+
     observerRef.current = new IntersectionObserver(
       (entries) => {
         for (const entry of entries) {
@@ -235,7 +240,7 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
           currentSection.current = index;
 
           navigate(
-            `/SephardicSiddur/section/${index}/${langMode}`,
+            `${basePath}/section/${index}/${langMode}`,
             { replace: true }
           );
         }
@@ -249,7 +254,7 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
       if (el) observerRef.current.observe(el);
     });
 
-  }, [sections, langMode, navigate]);
+  }, [sections, langMode, navigate, location.pathname]);
 
   /* ---------------- SCROLL WINDOW ---------------- */
   const onScroll = (e) => {
