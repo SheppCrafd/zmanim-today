@@ -197,19 +197,20 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
           const engData = await engResp.json();
 
           // 1. Update the function to accept an expected language ('he' or 'en')
+          // Add an expectedLang parameter ('he' or 'en')
           const extractText = (data, expectedLang) => {
-          if (!data?.versions || data.versions.length === 0) return [];
+          if (!data?.versions || data.versions.length === 0) return [];  
 
-          // Find the version that explicitly matches 'he' or 'en'
+          // Explicitly find the version matching the language we want
           const version = data.versions.find(v => v.language === expectedLang);
         
-          // If no version matches that language, return an empty array instead of a fallback
+          // If that language version isn't there, return an empty array
           if (!version || !version.text) return [];
 
           return Array.isArray(version.text) ? version.text : [version.text];
           };
 
-          // 2. Pass the expected languages into the calls below it:
+          // Then update where you call it:
           const heArr = extractText(hebData, 'he');
           const enArr = extractText(engData, 'en');
 
