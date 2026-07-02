@@ -9,8 +9,19 @@ import { Button } from '@/components/ui/button';
 import NavMenu from '@/components/NavMenu';
 import { useNavigate } from 'react-router-dom';
 
-/* ---------------- TOC FLATTEN ---------------- */
+/* ---------------- TOC CATEGORIZER ---------------- */
+function getCategory(breadcrumb) {
+  const lower = (breadcrumb || '').toLowerCase();
+  
+  if (lower.includes('shacharit') || lower.includes('morning')) return 'Shacharit';
+  if (lower.includes('mussaf') || lower.includes('musaf')) return 'Mussaf';
+  if (lower.includes('mincha') || lower.includes('minha') || lower.includes('afternoon')) return 'Mincha';
+  if (lower.includes('maariv') || lower.includes("ma'ariv") || lower.includes('arvit') || lower.includes('arbit') || lower.includes('evening')) return "Ma'ariv / Arbit";
+  
+  return 'Other';
+}
 
+/* ---------------- TOC FLATTEN ---------------- */
 function flattenNodes(nodes, keyPath = '', labelPath = '') {
   const result = [];
 
@@ -59,7 +70,6 @@ function sanitizeHTML(htmlString) {
 }
 
 /* ---------------- SECTION ---------------- */
-
 function Section({ sec, data, langMode, rowRef, index }) {
   if (!data) {
     return (
@@ -122,7 +132,6 @@ function Section({ sec, data, langMode, rowRef, index }) {
 }
 
 /* ---------------- MAIN ---------------- */
-
 export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
   const navigate = useNavigate();
 
@@ -144,7 +153,6 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
   const currentSection = useRef(0);
 
   /* ---------------- LOAD TOC ---------------- */
-
   useEffect(() => {
     fetch(`https://www.sefaria.org/api/index/${bookRef}`)
       .then(r => r.json())
@@ -164,8 +172,7 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
       });
   }, [bookRef]);
 
-/* ---------------- TEXT WINDOW LOADING ---------------- */
-
+  /* ---------------- TEXT WINDOW LOADING ---------------- */
   useEffect(() => {
     if (!sections.length) return;
 
@@ -212,7 +219,6 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
   }, [range, sections]);
 
   /* ---------------- OBSERVER ---------------- */
-
   useEffect(() => {
     if (!sections.length) return;
 
@@ -246,7 +252,6 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
   }, [sections, langMode, navigate]);
 
   /* ---------------- SCROLL WINDOW ---------------- */
-
   const onScroll = (e) => {
     const el = e.target;
 
@@ -265,8 +270,7 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
     }
   };
 
-/* ---------------- FIXED JUMP ---------------- */
-
+  /* ---------------- FIXED JUMP ---------------- */
   const jumpTo = (i) => {
     setPage('reader');
     setRange({
@@ -276,7 +280,7 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
     setPendingJump(i);
   };
 
-useEffect(() => {
+  useEffect(() => {
     if (pendingJump === null || page !== 'reader') return;
 
     // 1. Wait for the text to actually fetch from Sefaria
@@ -330,8 +334,19 @@ useEffect(() => {
 
   }, [textMap, pendingJump, page]);
 
-  /* ---------------- RENDER ---------------- */
+  /* ---------------- GROUP TOC ---------------- */
+  // Moved this ABOVE the return statement so the variables actually exist!
+  const groupedSections = sections.reduce((acc, sec, index) => {
+    const category = getCategory(sec.breadcrumb);
+    if (!acc[category]) acc[category] = [];
+    
+    acc[category].push({ ...sec, originalIndex: index });
+    return acc;
+  }, {});
 
+  const categoryOrder = ['Shacharit', 'Mussaf', 'Mincha', "Ma'ariv / Arbit", 'Other'];
+
+  /* ---------------- RENDER ---------------- */
   return (
     <div className="h-screen flex flex-col bg-slate-50 dark:bg-slate-950 overflow-hidden">
 
@@ -437,18 +452,4 @@ useEffect(() => {
       </div>
     </div>
   );
-
-    /* ---------------- GROUP TOC ---------------- */
-  const groupedSections = sections.reduce((acc, sec, index) => {
-    // Group based on the breadcrumb text generated in flattenNodes
-    const category = getCategory(sec.breadcrumb);
-    if (!acc[category]) acc[category] = [];
-    
-    // Save the original index so jumpTo(i) targets the correct text chunk
-    acc[category].push({ ...sec, originalIndex: index });
-    return acc;
-  }, {});
-
-  const categoryOrder = ['Shacharit', 'Mussaf', 'Mincha', "Ma'ariv / Arbit", 'Other'];
-
 }
