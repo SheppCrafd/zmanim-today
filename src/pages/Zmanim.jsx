@@ -1,12 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { MapPin, Calendar as CalendarIcon, Loader2, RefreshCw, Search, ChevronLeft, ChevronRight, Printer } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { format } from 'date-fns';
-import { base44 } from '@/api/base44Client';
 import ZmanimCard from '../components/zmanim/ZmanimCard';
 import LocationDisplay from '../components/zmanim/LocationDisplay';
 import { getHebrewDate } from '../lib/hebrewDate';
@@ -17,9 +16,8 @@ import { useDashboardPrefs } from '@/hooks/useDashboardPrefs';
 import { ZMANIM_GROUPS, getGroupEntries } from '@/lib/zmanimSchema';
 
 export default function Zmanim() {
-    const { location, loading: gpsLoading, error: gpsError, detectGPS, searchLocation: searchSavedLocation, clearLocation } = useSavedLocation();
+    const { location, loading: gpsLoading, detectGPS, searchLocation: searchSavedLocation, clearLocation } = useSavedLocation();
     const { prefs } = useDashboardPrefs();
-    const [loading, setLoading] = useState(false);
     const [calculating, setCalculating] = useState(false);
     const [zmanim, setZmanim] = useState(null);
     const [error, setError] = useState(null);
@@ -28,13 +26,18 @@ export default function Zmanim() {
     const [searchingLocation, setSearchingLocation] = useState(false);
     const [hebrewInfo, setHebrewInfo] = useState(null);
     
-    // The request bouncer
+    // The request bouncer to prevent race conditions
     const requestRef = useRef(0);
 
+    // Debounced API call for when date or location changes
     useEffect(() => {
-        if (location) {
+        if (!location) return;
+
+        const debounceTimer = setTimeout(() => {
             calculateZmanim();
-        }
+        }, 600); // Wait 600ms after last click before fetching
+
+        return () => clearTimeout(debounceTimer);
     }, [location, currentDate]);
 
     useEffect(() => {
@@ -48,80 +51,99 @@ export default function Zmanim() {
     };
 
     const calculateZmanim = async () => {
-            // Keep our bouncer to prevent race conditions
-            const currentRequest = Date.now();
-            requestRef.current = currentRequest;
+        const currentRequest = Date.now();
+        requestRef.current = currentRequest;
 
-            setCalculating(true);
-            setError(null);
+        setCalculating(true);
+        setError(null);
 
-            try {
-                const dateStr = format(currentDate, 'yyyy-MM-dd');
-                
-                // 1. Make a direct HTTP request to Hebcal's API
-                const response = await fetch(
-                    `https://www.hebcal.com/zmanim?cfg=json&latitude=${location.latitude}&longitude=${location.longitude}&date=${dateStr}`
-                );
+        try {
+            const dateStr = format(currentDate, 'yyyy-MM-dd');
+            
+            // 1. Direct HTTP request to Hebcal's API
+            const response = await fetch(
+                `https://www.hebcal.com/zmanim?cfg=json&latitude=${location.latitude}&longitude=${location.longitude}&date=${dateStr}`
+            );
 
-                if (!response.ok) {
-                    throw new Error('Failed to fetch data from Hebcal');
-                }
-
-                const data = await response.json();
-
-                // 2. Helper to format Hebcal's ISO strings into "h:mm A" (e.g., "6:30 PM")
-                const formatTime = (isoString) => {
-                    if (!isoString) return "";
-                    const d = new Date(isoString);
-                    // This automatically converts the UTC timestamp to the user's local browser timezone
-                    return d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
-                };
-
-                // 3. Map Hebcal's exact data into your app's state structure
-                const result = {
-                    location_name: location.city || location.name || "Selected Location",
-                    timezone: data.location?.tzid || "Local Time",
-                    zmanim: {
-                        alot_hashachar: formatTime(data.times.alotHashachar),
-                        misheyakir: formatTime(data.times.misheyakir),
-                        sunrise: formatTime(data.times.sunrise),
-                        sof_zman_shma_gra: formatTime(data.times.sofZmanShma),
-                        sof_zman_shma_mga: formatTime(data.times.sofZmanShmaMGA),
-                        sof_zman_tefillah_gra: formatTime(data.times.sofZmanTfilla),
-                        sof_zman_tefillah_mga: formatTime(data.times.sofZmanTfillaMGA),
-                        chatzot: formatTime(data.times.chatzot),
-                        mincha_gedola: formatTime(data.times.minchaGedola),
-                        mincha_ketana: formatTime(data.times.minchaKetana),
-                        plag_hamincha: formatTime(data.times.plagHaMincha),
-                        // Hebcal doesn't always return candle lighting unless it's Friday/Erev Yom Tov
-                        candle_lighting: data.times.candleLighting ? formatTime(data.times.candleLighting) : "N/A", 
-                        sunset: formatTime(data.times.sunset),
-                        // Hebcal offers multiple Tzeit calculations. 8.5 degrees is standard for 3 stars
-                        tzait_hakochavim: formatTime(data.times.tzeit85deg), 
-                        tzait_72: formatTime(data.times.tzeit72min),
-                        chatzot_laila: formatTime(data.times.chatzotNight)
-                    }
-                };
-
-                // Only update if this request is STILL the most recent one
-                if (requestRef.current === currentRequest) {
-                    setZmanim(result);
-                    setError(null);
-                }
-
-            } catch (err) {
-                console.error("Zmanim Fetch Error:", err);
-                // Only show error and clear data if the failed request was the most recent one
-                if (requestRef.current === currentRequest) {
-                    setError('Failed to load zmanim data. Please try again.');
-                    setZmanim(null);
-                }
-            } finally {
-                if (requestRef.current === currentRequest) {
-                    setCalculating(false);
-                }
+            if (!response.ok) {
+                throw new Error('Failed to fetch data from Hebcal');
             }
-        };
+
+            const data = await response.json();
+
+            const formatTime = (timeInput) => {
+                if (!timeInput) return "";
+                const d = new Date(timeInput);
+                return d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+            };
+
+            const dayOfWeek = currentDate.getDay();
+
+            // 2. Candle Lighting: Calculate for Friday, OR if Hebcal provided a Yom Tov time
+            let candleLightingTime = data.times.candleLighting;
+            if (!candleLightingTime && dayOfWeek === 5 && data.times.sunset) {
+                const sunsetDate = new Date(data.times.sunset);
+                sunsetDate.setMinutes(sunsetDate.getMinutes() - 18);
+                candleLightingTime = sunsetDate; 
+            }
+
+            // 3. Havdalah: ONLY calculate if it's Saturday
+            let havdalahTime = null;
+            if (dayOfWeek === 6 && data.times.tzeit85deg) {
+                havdalahTime = data.times.tzeit85deg;
+            }
+
+            // 4. Build the base zmanim object without conditional keys
+            const zmanimData = {
+                alot_hashachar: formatTime(data.times.alotHashachar),
+                misheyakir: formatTime(data.times.misheyakir),
+                sunrise: formatTime(data.times.sunrise),
+                sof_zman_shma_gra: formatTime(data.times.sofZmanShma),
+                sof_zman_shma_mga: formatTime(data.times.sofZmanShmaMGA),
+                sof_zman_tefillah_gra: formatTime(data.times.sofZmanTfilla),
+                sof_zman_tefillah_mga: formatTime(data.times.sofZmanTfillaMGA),
+                chatzot: formatTime(data.times.chatzot),
+                mincha_gedola: formatTime(data.times.minchaGedola),
+                mincha_ketana: formatTime(data.times.minchaKetana),
+                plag_hamincha: formatTime(data.times.plagHaMincha),
+                sunset: formatTime(data.times.sunset),
+                tzait_hakochavim: formatTime(data.times.tzeit85deg), 
+                tzait_72: formatTime(data.times.tzeit72min),
+                chatzot_laila: formatTime(data.times.chatzotNight),
+            };
+
+            // 5. Only add Candle Lighting and Havdalah if they actually exist
+            if (candleLightingTime) {
+                zmanimData.candle_lighting = formatTime(candleLightingTime);
+            }
+            if (havdalahTime) {
+                zmanimData.havdalah = formatTime(havdalahTime);
+            }
+
+            const result = {
+                location_name: location.city || location.name || "Selected Location",
+                timezone: data.location?.tzid || "Local Time",
+                zmanim: zmanimData
+            };
+
+            // Only update state if this is the most recent request
+            if (requestRef.current === currentRequest) {
+                setZmanim(result);
+                setError(null);
+            }
+
+        } catch (err) {
+            console.error("Zmanim Fetch Error:", err);
+            if (requestRef.current === currentRequest) {
+                setError('Failed to load zmanim data. Please try again.');
+                setZmanim(null);
+            }
+        } finally {
+            if (requestRef.current === currentRequest) {
+                setCalculating(false);
+            }
+        }
+    };
 
     const handleManualLocation = async (e) => {
         e.preventDefault();
@@ -375,7 +397,7 @@ export default function Zmanim() {
                     </Card>
                 )}
 
-                {/* Error State - Only show if we actually failed AND have no data to show */}
+                {/* Error State */}
                 {error && !zmanim && location && (
                     <Card className="shadow-lg border-0 bg-red-50">
                         <CardContent className="py-6 text-center">
