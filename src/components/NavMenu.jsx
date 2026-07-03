@@ -80,8 +80,8 @@ export default function NavMenu() {
                             <BookOpen className="w-4 h-4" />
                         </div>
                         <div className="flex-1 text-left">
-                            <p className="font-semibold text-sm">Siddurim</p>
-                            <p className="text-xs text-slate-500">Prayer books</p>
+                            <p className="font-semibold text-sm">Siddurim (BETA)</p>
+                            <p className="text-xs text-slate-500">Prayer books (BETA)</p>
                         </div>
                         {siddurimOpen ? <ChevronUp className="w-4 h-4 text-slate-400" /> : <ChevronDown className="w-4 h-4 text-slate-400" />}
                     </button>
