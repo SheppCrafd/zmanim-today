@@ -423,7 +423,7 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
           />
         </a>
 
-        <div className="text-[10px] text-slate-500">
+        <div className="text-xs text-slate-500">
           and the{' '}
           <a
             href="https://developers.sefaria.org"

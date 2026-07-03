@@ -219,16 +219,19 @@ export default function ZmanimRemindersPanel({ zmanimData, currentDate }) {
                                             </div>
                                         </button>
 
-                                        <div
+                                        <button
+                                            type="button"
+                                            role="switch"
+                                            aria-checked={pref.enabled}
                                             onClick={() => toggleReminder(key)}
-                                            className={`w-10 h-5 rounded-full transition-colors cursor-pointer flex-shrink-0 ml-2 ${
+                                            className={`w-10 h-5 rounded-full transition-colors cursor-pointer flex-shrink-0 ml-2 border-0 p-0 ${
                                                 pref.enabled ? 'bg-blue-500' : 'bg-slate-200'
                                             }`}
                                         >
                                             <div className={`w-4 h-4 rounded-full bg-white shadow-sm mt-0.5 transition-transform ${
                                                 pref.enabled ? 'translate-x-5' : 'translate-x-0.5'
                                             }`} />
-                                        </div>
+                                        </button>
                                     </div>
 
                                     {pref.enabled && (

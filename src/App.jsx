@@ -1,4 +1,5 @@
 import './App.css'
+import { lazy, Suspense } from 'react'
 import { Toaster } from "@/components/ui/toaster"
 import { QueryClientProvider } from '@tanstack/react-query'
 import { queryClientInstance } from '@/lib/query-client'
@@ -13,13 +14,13 @@ import { ThemeProvider } from '@/lib/ThemeContext'
 import UserNotRegisteredError from '@/components/UserNotRegisteredError'
 import { Navigate } from 'react-router-dom';
 
-import Home from './pages/Home'
-import Zmanim from './pages/Zmanim'
-import SephardicSiddur from './pages/SephardicSiddur'
-import AshkenaziSiddur from './pages/AshkenaziSiddur'
-import ChabadSiddur from './pages/ChabadSiddur'
-import Compass from './pages/Compass'
-import Settings from './pages/Settings'
+const Home = lazy(() => import('./pages/Home'))
+const Zmanim = lazy(() => import('./pages/Zmanim'))
+const SephardicSiddur = lazy(() => import('./pages/SephardicSiddur'))
+const AshkenaziSiddur = lazy(() => import('./pages/AshkenaziSiddur'))
+const ChabadSiddur = lazy(() => import('./pages/ChabadSiddur'))
+const Compass = lazy(() => import('./pages/Compass'))
+const Settings = lazy(() => import('./pages/Settings'))
 
 const AuthenticatedApp = () => {
   const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
@@ -47,6 +48,7 @@ const AuthenticatedApp = () => {
     : location.pathname;
 
   return (
+    <Suspense fallback={<div className="fixed inset-0 flex items-center justify-center"><div className="w-8 h-8 border-4 border-slate-200 border-t-slate-800 rounded-full animate-spin"></div></div>}>
     <AnimatePresence mode="wait">
       <Routes location={location} key={routeKey}>
         <Route path="/" element={<PageTransition><Home /></PageTransition>} />
@@ -82,6 +84,7 @@ const AuthenticatedApp = () => {
       />
       </Routes>
     </AnimatePresence>
+    </Suspense>
   );
 };
 

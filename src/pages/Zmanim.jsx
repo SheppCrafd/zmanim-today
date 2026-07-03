@@ -14,6 +14,7 @@ import NavMenu from '@/components/NavMenu';
 import { printZmanim } from '@/lib/printZmanim';
 import { useDashboardPrefs } from '@/hooks/useDashboardPrefs';
 import { ZMANIM_GROUPS, getGroupEntries } from '@/lib/zmanimSchema';
+import { usePullToRefresh } from '@/hooks/usePullToRefresh.jsx';
 
 export default function Zmanim() {
     const { location, loading: gpsLoading, detectGPS, searchLocation: searchSavedLocation, clearLocation } = useSavedLocation();
@@ -174,8 +175,16 @@ export default function Zmanim() {
         }
     };
 
+    const { onTouchStart, onTouchMove, onTouchEnd, PullIndicator } = usePullToRefresh(handleRefresh);
+
     return (
-        <div className="min-h-screen bg-background pb-24 overscroll-y-contain">
+        <div
+            className="min-h-screen bg-background pb-24 overscroll-y-contain"
+            onTouchStart={onTouchStart}
+            onTouchMove={onTouchMove}
+            onTouchEnd={onTouchEnd}
+        >
+            {PullIndicator}
             <div className="max-w-4xl mx-auto px-4 pt-4 pb-8 md:px-8">
                 {/* Header */}
                 <div className="flex items-center mb-8 min-h-[72px]">

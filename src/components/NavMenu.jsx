@@ -24,6 +24,7 @@ export default function NavMenu() {
             {/* Hamburger Button */}
             <button
                 onClick={() => setOpen(true)}
+                aria-label="Open navigation menu"
                 className="select-none p-2 rounded-lg bg-white/90 shadow-sm border border-slate-200 hover:bg-slate-50 transition-colors"
             >
                 <Menu className="w-5 h-5 text-slate-700" />

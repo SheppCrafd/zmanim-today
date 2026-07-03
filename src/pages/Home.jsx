@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState } from 'react';
 import { MapPin, Loader2, Search, ChevronRight, AlertCircle, Settings, Printer } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -13,6 +13,7 @@ import NavMenu from '@/components/NavMenu';
 import { printZmanim } from '@/lib/printZmanim';
 import ZmanimRemindersPanel from '@/components/zmanim/ZmanimRemindersPanel';
 import { formatTime } from '@/lib/timeUtils';
+import { usePullToRefresh } from '@/hooks/usePullToRefresh.jsx';
 
 function LocationLabel({ location }) {
     if (!location) return null;
@@ -35,35 +36,7 @@ export default function Home() {
     const [showSearch, setShowSearch] = useState(false);
 
     // Pull-to-refresh
-    const [pullDistance, setPullDistance] = useState(0);
-    const [isRefreshing, setIsRefreshing] = useState(false);
-    const touchStartY = useRef(0);
-    const isPulling = useRef(false);
-
-    const onTouchStart = (e) => {
-        if (window.scrollY === 0) {
-            touchStartY.current = e.touches[0].clientY;
-            isPulling.current = true;
-        }
-    };
-
-    const onTouchMove = (e) => {
-        if (!isPulling.current || isRefreshing) return;
-        const diff = e.touches[0].clientY - touchStartY.current;
-        if (diff > 0 && window.scrollY === 0) {
-            setPullDistance(Math.min(diff * 0.4, 80));
-        }
-    };
-
-    const onTouchEnd = async () => {
-        if (pullDistance > 60) {
-            setIsRefreshing(true);
-            await refetchZmanim();
-            setIsRefreshing(false);
-        }
-        setPullDistance(0);
-        isPulling.current = false;
-    };
+    const { onTouchStart, onTouchMove, onTouchEnd, PullIndicator } = usePullToRefresh(refetchZmanim);
 
     const enabledZmanimIds = prefs.items.filter(i => i.enabled && !['compass', 'next_zman'].includes(i.id)).map(i => i.id);
     const showCompass = prefs.items.find(i => i.id === 'compass')?.enabled;
@@ -89,14 +62,7 @@ export default function Home() {
             onTouchEnd={onTouchEnd}
         >
             {/* Pull-to-refresh indicator */}
-            {(pullDistance > 0 || isRefreshing) && (
-                <div
-                    className="flex items-center justify-center overflow-hidden"
-                    style={{ height: `${isRefreshing ? 40 : pullDistance}px` }}
-                >
-                    <Loader2 className={`w-5 h-5 text-blue-500 ${(isRefreshing || pullDistance > 40) ? 'animate-spin' : ''}`} />
-                </div>
-            )}
+            {PullIndicator}
             <div className="max-w-lg mx-auto px-4 pt-4 pb-4">
 
                 {/* Header */}
