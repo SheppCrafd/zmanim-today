@@ -150,7 +150,7 @@ export default function Home() {
                         )}
 
                         {/* Tomorrow's Havdalah (Fridays only) */}
-                        {isFriday && tomorrowZmanim?.zmanim?.tzait_72 && (
+                        {isFriday && (tomorrowZmanim?.zmanim?.havdalah || tomorrowZmanim?.zmanim?.tzait_hakochavim) && (
                             <div className="bg-white rounded-xl border border-slate-200 px-4 py-3 flex items-center justify-between">
                                 <div className="flex items-center gap-3">
                                     <span className="text-base">🕍</span>
@@ -160,7 +160,7 @@ export default function Home() {
                                     </div>
                                 </div>
                                 <span className="text-sm font-semibold text-slate-800 tabular-nums">
-                                    {formatTime(tomorrowZmanim.zmanim.tzait_72, prefs.use24Hour)}
+                                    {formatTime(tomorrowZmanim.zmanim.havdalah || tomorrowZmanim.zmanim.tzait_hakochavim, prefs.use24Hour)}
                                 </span>
                             </div>
                         )}
