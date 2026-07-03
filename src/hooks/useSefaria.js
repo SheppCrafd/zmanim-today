@@ -37,7 +37,7 @@ export function useSefariaText(ref) {
     queryKey: ['sefaria-text', ref],
     queryFn: async () => {
       const encodedRef = encodeURIComponent(ref);
-
+      
       // Fetch both versions simultaneously using Promise.all
       const [hebResp, engResp] = await Promise.all([
         fetch(`https://www.sefaria.org/api/v3/texts/${encodedRef}?version=source&context=0`),
@@ -74,7 +74,7 @@ export function usePrefetchSefariaText() {
         ]);
         const hebData = await hebResp.json();
         const engData = await engResp.json();
-
+        
         return {
           he: extractText(hebData, 'he'),
           en: extractText(engData, 'en')
