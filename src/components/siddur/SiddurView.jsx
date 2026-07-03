@@ -8,6 +8,37 @@ import {
 import { Button } from '@/components/ui/button';
 import NavMenu from '@/components/NavMenu';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+
+/* ---------------- API & REACT QUERY HOOKS ---------------- */
+
+const fetchSefariaText = async (ref) => {
+  if (!ref) return null;
+  const encodedRef = encodeURIComponent(ref);
+  
+  // Fire both requests simultaneously
+  const [hebResp, engResp] = await Promise.all([
+    fetch(`https://www.sefaria.org/api/v3/texts/${encodedRef}?version=source&context=0`),
+    fetch(`https://www.sefaria.org/api/v3/texts/${encodedRef}?version=english|Sefaria%20Community%20Translation&context=0`)
+  ]);
+
+  if (!hebResp.ok || !engResp.ok) throw new Error("Failed to fetch Sefaria API");
+
+  const hebData = await hebResp.json();
+  const engData = await engResp.json();
+
+  return { hebData, engData };
+};
+
+export function useSefariaText(ref) {
+  return useQuery({
+    queryKey: ['sefaria-text', ref],
+    queryFn: () => fetchSefariaText(ref),
+    staleTime: 1000 * 60 * 60 * 24, // Cache the text for 24 hours
+    refetchOnWindowFocus: false,
+    enabled: !!ref, // Only fetch if a ref actually exists
+  });
+}
 
 /* ---------------- TOC CATEGORIZER ---------------- */
 function getCategory(breadcrumb) {
@@ -49,29 +80,44 @@ function flattenNodes(nodes, keyPath = '', labelPath = '') {
 function sanitizeHTML(htmlString) {
   if (!htmlString) return '';
   
-  // Use the browser's native parser
   const parser = new DOMParser();
   const doc = parser.parseFromString(htmlString, 'text/html');
   
-  // 1. Destroy dangerous tags completely
   const badTags = doc.querySelectorAll('script, iframe, object, embed, style, link, meta, base');
   badTags.forEach(el => el.remove());
   
-  // 2. Strip ALL attributes from remaining tags to kill inline event handlers (e.g., onerror, onclick, href="javascript:")
   const allElements = doc.querySelectorAll('*');
   allElements.forEach(el => {
-    // Collect all attribute names
     const attrs = Array.from(el.attributes).map(attr => attr.name);
-    // Remove them all
     attrs.forEach(attrName => el.removeAttribute(attrName));
   });
   
   return doc.body.innerHTML;
 }
 
+/* ---------------- LEGACY EXTRACTOR (To be replaced in Phase 2) ---------------- */
+const extractText = (data, expectedLang) => {
+  if (!data?.versions || data.versions.length === 0) return [];
+  const version = data.versions.find(v => v.language === expectedLang);
+  if (!version || !version.text) return [];
+
+  const rawArray = Array.isArray(version.text) ? version.text : [version.text];
+
+  if (expectedLang === 'en') {
+    return rawArray.map(line => {
+      const containsHebrew = /[\u0590-\u05FF]/.test(line || '');
+      return containsHebrew ? '' : line;
+    });
+  }
+  return rawArray;
+};
+
 /* ---------------- SECTION ---------------- */
-function Section({ sec, data, langMode, rowRef, index }) {
-  if (!data) {
+function Section({ sec, langMode, rowRef, index }) {
+  // Each section now manages its own independent data fetching!
+  const { data, isLoading, isError } = useSefariaText(sec.ref);
+
+  if (isLoading) {
     return (
       <div className="py-10 flex justify-center">
         <Loader2 className="animate-spin text-blue-500" />
@@ -79,7 +125,7 @@ function Section({ sec, data, langMode, rowRef, index }) {
     );
   }
 
-  if (data.error) {
+  if (isError || !data) {
     return (
       <div className="text-center text-sm text-red-500">
         Failed to load section
@@ -87,12 +133,12 @@ function Section({ sec, data, langMode, rowRef, index }) {
     );
   }
 
-  const heArr = data.he || [];
-  const enArr = data.en || [];
+  // Use the legacy extraction logic for Phase 1
+  const heArr = extractText(data.hebData, 'he') || [];
+  const enArr = extractText(data.engData, 'en') || [];
 
   const showEN = langMode !== 'he';
   const showHB = langMode !== 'en';
-
   const maxLen = Math.max(heArr.length, enArr.length);
 
   return (
@@ -135,6 +181,7 @@ function Section({ sec, data, langMode, rowRef, index }) {
 export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
   const navigate = useNavigate();
   const location = useLocation();
+  const queryClient = useQueryClient(); // Inject React Query Client
 
   const scrollRef = useRef(null);
   const rowRefs = useRef({});
@@ -142,7 +189,6 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
   const [pendingJump, setPendingJump] = useState(null);
 
   const [sections, setSections] = useState([]);
-  const [textMap, setTextMap] = useState({});
   const [range, setRange] = useState({ start: 0, end: 5 });
 
   const [loading, setLoading] = useState(true);
@@ -173,78 +219,30 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
       });
   }, [bookRef]);
 
-  /* ---------------- TEXT WINDOW LOADING ---------------- */
+  /* ---------------- REACT QUERY PREFETCHING ---------------- */
   useEffect(() => {
-    if (!sections.length) return;
+    if (!sections.length || page !== 'reader') return;
 
-    const load = async () => {
-      for (let i = range.start; i <= range.end; i++) {
-        if (!sections[i] || textMap[i]) continue;
-
-        try {
-          const ref = encodeURIComponent(sections[i].ref);
-          
-          // Fetch Hebrew (source)
-          const hebResp = await fetch(
-            `https://www.sefaria.org/api/v3/texts/${ref}?version=source&context=0`
-          );
-          const hebData = await hebResp.json();
-          
-          // Fetch English (Community Translation)
-          const engResp = await fetch(
-            `https://www.sefaria.org/api/v3/texts/${ref}?version=english|Sefaria%20Community%20Translation&context=0`
-          );
-          const engData = await engResp.json();
-
-          // 1. Update the function to accept an expected language ('he' or 'en')
-          // Add an expectedLang parameter ('he' or 'en')
-        const extractText = (data, expectedLang) => {
-            if (!data?.versions || data.versions.length === 0) return [];
-
-            const version = data.versions.find(v => v.language === expectedLang);
-            if (!version || !version.text) return [];
-
-            const rawArray = Array.isArray(version.text) ? version.text : [version.text];
-
-            // If we are processing the English side, let's aggressively filter out Hebrew
-            if (expectedLang === 'en') {
-              return rawArray.map(line => {
-                // Check if the string contains any Hebrew characters (Unicode range \u0590-\u05FF)
-                const containsHebrew = /[\u0590-\u05FF]/.test(line || '');
-                
-                // If it contains Hebrew, return an empty string to blank it out.
-                // We return an empty string instead of deleting it so it stays aligned with the Hebrew side!
-                return containsHebrew ? '' : line;
-              });
-            }
-
-            return rawArray;
-          };
-
-          // Then update where you call it:
-          const heArr = extractText(hebData, 'he');
-          const enArr = extractText(engData, 'en');
-
-          setTextMap(prev => ({ 
-            ...prev, 
-            [i]: { he: heArr, en: enArr } 
-          }));
-        } catch {
-          setTextMap(prev => ({ ...prev, [i]: { error: true } }));
-        }
+    // Aggressively prefetch the NEXT 3 sections invisibly in the background
+    const prefetchEnd = Math.min(sections.length - 1, range.end + 3);
+    
+    for (let i = range.start; i <= prefetchEnd; i++) {
+      const refToFetch = sections[i]?.ref;
+      if (refToFetch) {
+        queryClient.prefetchQuery({
+          queryKey: ['sefaria-text', refToFetch],
+          queryFn: () => fetchSefariaText(refToFetch)
+        });
       }
-    };
+    }
+  }, [range, sections, queryClient, page]);
 
-    load();
-  }, [range, sections]);
-
-/* ---------------- OBSERVER ---------------- */
+  /* ---------------- OBSERVER ---------------- */
   useEffect(() => {
-    if (!sections.length) return;
+    if (!sections.length || page !== 'reader') return;
 
     if (observerRef.current) observerRef.current.disconnect();
 
-    // Extract ONLY the base book route (e.g., "/ChabadSiddur")
     const basePath = '/' + location.pathname.split('/')[1];
 
     observerRef.current = new IntersectionObserver(
@@ -272,7 +270,7 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
       if (el) observerRef.current.observe(el);
     });
 
-  }, [sections, langMode, navigate, location.pathname]);
+  }, [sections, langMode, navigate, location.pathname, page, range]);
 
   /* ---------------- SCROLL WINDOW ---------------- */
   const onScroll = (e) => {
@@ -306,19 +304,22 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
   useEffect(() => {
     if (pendingJump === null || page !== 'reader') return;
 
-    // 1. Wait for the text to actually fetch from Sefaria
+    // Check React Query cache directly instead of the old textMap state
     const startIdx = Math.max(0, pendingJump - 2);
     let allReady = true;
     for (let j = startIdx; j <= pendingJump; j++) {
-      if (!textMap[j]) {
-        allReady = false;
-        break;
+      const refToCheck = sections[j]?.ref;
+      if (refToCheck) {
+        const cachedData = queryClient.getQueryData(['sefaria-text', refToCheck]);
+        if (!cachedData) {
+          allReady = false;
+          break;
+        }
       }
     }
 
-    if (!allReady) return; // Data isn't here yet, keep waiting
+    if (!allReady) return; 
 
-    // 2. Data is ready! Now we align mathematically instead of trusting the browser.
     let attempts = 0;
     
     const tryAlign = () => {
@@ -329,11 +330,8 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
 
       const containerRect = container.getBoundingClientRect();
       const elRect = el.getBoundingClientRect();
-
-      // Calculate the exact distance to the target header
       const targetTop = elRect.top - containerRect.top;
 
-      // Snap the scrollbar exactly to that pixel
       if (Math.abs(targetTop) > 1) {
         container.scrollTop += targetTop;
       }
@@ -343,22 +341,18 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
       attempts++;
       tryAlign();
 
-      // "Lock" the scroll in place for 15 frames (~250ms).
-      // As the heavy Hebrew/English text pops into the DOM and tries to shift the layout,
-      // this loop will aggressively pin the target header right to the top.
       if (attempts < 15) {
         requestAnimationFrame(loop);
       } else {
-        setPendingJump(null); // We are stable, release the jump lock
+        setPendingJump(null);
       }
     };
 
     requestAnimationFrame(loop);
 
-  }, [textMap, pendingJump, page]);
+  }, [pendingJump, page, sections, queryClient]);
 
   /* ---------------- GROUP TOC ---------------- */
-  // Moved this ABOVE the return statement so the variables actually exist!
   const groupedSections = sections.reduce((acc, sec, index) => {
     const category = getCategory(sec.breadcrumb);
     if (!acc[category]) acc[category] = [];
@@ -461,7 +455,6 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
                   key={index}
                   index={index}
                   sec={sec}
-                  data={textMap[index]}
                   langMode={langMode}
                   rowRef={(el) => {
                     rowRefs.current[index] = el;
@@ -475,36 +468,31 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
       </div>
 
       {/* --- SEFARIA ATTRIBUTION FOOTER --- */}
-            <div className="bg-slate-100 dark:bg-slate-900 border-t py-3 px-4 flex flex-col items-center justify-center gap-1 z-50">
-              
-              {/* Clickable Badge Linking to Sefaria Library */}
-              <a 
-                href="https://www.sefaria.org/texts" 
-                target="_blank" 
-                rel="noreferrer" 
-                className="transition-transform hover:scale-105"
-              >
-                <img 
-                  src="https://files.readme.io/dcee0a8-image.png" 
-                  alt="Powered by Sefaria" 
-                  className="h-11 w-auto rounded-md shadow-sm bg-white"
-                />
-              </a>
-
-              {/* Technical Credit Linking to API Portal */}
-              <div className="text-[10px] text-slate-500">
-                and the{' '}
-                <a 
-                  href="https://developers.sefaria.org" 
-                  target="_blank" 
-                  rel="noreferrer" 
-                  className="underline hover:text-slate-700 dark:hover:text-slate-300 transition-colors"
-                >
-                  Sefaria API
-                </a>
-              </div>
-              
-            </div>
+      <div className="bg-slate-100 dark:bg-slate-900 border-t py-3 px-4 flex flex-col items-center justify-center gap-1 z-50">
+        <a 
+          href="https://www.sefaria.org/texts" 
+          target="_blank" 
+          rel="noreferrer" 
+          className="transition-transform hover:scale-105"
+        >
+          <img 
+            src="https://files.readme.io/dcee0a8-image.png" 
+            alt="Powered by Sefaria" 
+            className="h-11 w-auto rounded-md shadow-sm bg-white"
+          />
+        </a>
+        <div className="text-[10px] text-slate-500">
+          and the{' '}
+          <a 
+            href="https://developers.sefaria.org" 
+            target="_blank" 
+            rel="noreferrer" 
+            className="underline hover:text-slate-700 dark:hover:text-slate-300 transition-colors"
+          >
+            Sefaria API
+          </a>
+        </div>
+      </div>
 
     </div>
   );
