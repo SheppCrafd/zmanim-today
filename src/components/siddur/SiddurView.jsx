@@ -555,6 +555,7 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
         )}
 
       </div>
+      
 
       {/* --- SEFARIA ATTRIBUTION FOOTER --- */}
             <div className="bg-slate-100 dark:bg-slate-900 border-t py-3 px-4 flex flex-col items-center justify-center gap-1 z-50">
