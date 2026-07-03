@@ -1,30 +1,26 @@
 import './App.css'
-import { lazy, Suspense } from 'react'
 import { Toaster } from "@/components/ui/toaster"
 import { QueryClientProvider } from '@tanstack/react-query'
 import { queryClientInstance } from '@/lib/query-client'
 import VisualEditAgent from '@/lib/VisualEditAgent'
 import NavigationTracker from '@/lib/NavigationTracker'
-import { BrowserRouter as Router, Route, Routes, useLocation } from 'react-router-dom'
-import { AnimatePresence } from 'framer-motion'
-import PageTransition from '@/components/PageTransition'
+import { BrowserRouter as Router, Route, Routes } from 'react-router-dom'
 import PageNotFound from './lib/PageNotFound'
 import { AuthProvider, useAuth } from '@/lib/AuthContext'
 import { ThemeProvider } from '@/lib/ThemeContext'
 import UserNotRegisteredError from '@/components/UserNotRegisteredError'
 import { Navigate } from 'react-router-dom';
 
-const Home = lazy(() => import('./pages/Home'))
-const Zmanim = lazy(() => import('./pages/Zmanim'))
-const SephardicSiddur = lazy(() => import('./pages/SephardicSiddur'))
-const AshkenaziSiddur = lazy(() => import('./pages/AshkenaziSiddur'))
-const ChabadSiddur = lazy(() => import('./pages/ChabadSiddur'))
-const Compass = lazy(() => import('./pages/Compass'))
-const Settings = lazy(() => import('./pages/Settings'))
+import Home from './pages/Home'
+import Zmanim from './pages/Zmanim'
+import SephardicSiddur from './pages/SephardicSiddur'
+import AshkenaziSiddur from './pages/AshkenaziSiddur'
+import ChabadSiddur from './pages/ChabadSiddur'
+import Compass from './pages/Compass'
+import Settings from './pages/Settings'
 
 const AuthenticatedApp = () => {
   const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
-  const location = useLocation();
 
   if (isLoadingPublicSettings || isLoadingAuth) {
     return (
@@ -42,19 +38,12 @@ const AuthenticatedApp = () => {
     }
   }
 
-  // Group Siddur sub-routes so internal navigation (toc → section) doesn't remount
-  const routeKey = ['/SephardicSiddur', '/AshkenaziSiddur', '/ChabadSiddur'].some(p => location.pathname.startsWith(p))
-    ? location.pathname.split('/')[1]
-    : location.pathname;
-
   return (
-    <Suspense fallback={<div className="fixed inset-0 flex items-center justify-center"><div className="w-8 h-8 border-4 border-slate-200 border-t-slate-800 rounded-full animate-spin"></div></div>}>
-    <AnimatePresence mode="wait">
-      <Routes location={location} key={routeKey}>
-        <Route path="/" element={<PageTransition><Home /></PageTransition>} />
-        <Route path="/Zmanim" element={<PageTransition><Zmanim /></PageTransition>} />
-        <Route path="/Compass" element={<PageTransition><Compass /></PageTransition>} />
-        <Route path="/Settings" element={<PageTransition><Settings /></PageTransition>} />
+    <Routes>
+      <Route path="/" element={<Home />} />
+      <Route path="/Zmanim" element={<Zmanim />} />
+      <Route path="/Compass" element={<Compass />} />
+      <Route path="/Settings" element={<Settings />} />
 
       {/* SIDDUR ROUTES (NEW ARCHITECTURE) */}
       <Route path="/SephardicSiddur/toc" element={<SephardicSiddur />} />
@@ -66,7 +55,7 @@ const AuthenticatedApp = () => {
       <Route path="/ChabadSiddur/toc" element={<ChabadSiddur />} />
       <Route path="/ChabadSiddur/section/:sectionId/:language" element={<ChabadSiddur />} />
 
-      <Route path="*" element={<PageTransition><PageNotFound /></PageTransition>} />
+      <Route path="*" element={<PageNotFound />} />
 
       <Route
       path="/SephardicSiddur"
@@ -83,8 +72,6 @@ const AuthenticatedApp = () => {
       element={<Navigate to="/ChabadSiddur/toc" replace />}
       />
       </Routes>
-    </AnimatePresence>
-    </Suspense>
   );
 };
 

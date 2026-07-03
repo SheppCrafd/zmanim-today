@@ -67,7 +67,6 @@ export function useZmanim(location, date = new Date()) {
     const [zmanim, setZmanim] = useState(null);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
-    const [refetchTrigger, setRefetchTrigger] = useState(0);
 
     const dateStr = format(date, 'yyyy-MM-dd');
 
@@ -128,18 +127,7 @@ export function useZmanim(location, date = new Date()) {
             .finally(() => {
                 setLoading(false);
             });
-    }, [location?.latitude, location?.longitude, dateStr, refetchTrigger]);
+    }, [location?.latitude, location?.longitude, dateStr]);
 
-    const refetch = () => {
-        try {
-            const raw = sessionStorage.getItem(STORAGE_KEY);
-            const store = raw ? JSON.parse(raw) : {};
-            const key = cacheKey(location.latitude, location.longitude, dateStr);
-            delete store[key];
-            sessionStorage.setItem(STORAGE_KEY, JSON.stringify(store));
-        } catch { /* ignore */ }
-        setRefetchTrigger(t => t + 1);
-    };
-
-    return { zmanim, loading, error, refetch };
+    return { zmanim, loading, error };
 }

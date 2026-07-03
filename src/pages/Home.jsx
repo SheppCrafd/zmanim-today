@@ -9,10 +9,10 @@ import { useDashboardPrefs } from '@/hooks/useDashboardPrefs';
 import MiniCompass from '@/components/home/MiniCompass';
 import NextZmanCard from '@/components/home/NextZmanCard';
 import ZmanimSummary from '@/components/home/ZmanimSummary';
+import NavMenu from '@/components/NavMenu';
 import { printZmanim } from '@/lib/printZmanim';
 import ZmanimRemindersPanel from '@/components/zmanim/ZmanimRemindersPanel';
 import { formatTime } from '@/lib/timeUtils';
-import { usePullToRefresh } from '@/hooks/usePullToRefresh.jsx';
 
 function LocationLabel({ location }) {
     if (!location) return null;
@@ -28,14 +28,11 @@ const isFriday = today.getDay() === 5;
 
 export default function Home() {
     const { location, loading: locLoading, error: locError, detectGPS, searchLocation, clearLocation } = useSavedLocation();
-    const { zmanim, loading: zmanimLoading, refetch: refetchZmanim } = useZmanim(location);
+    const { zmanim, loading: zmanimLoading } = useZmanim(location);
     const { zmanim: tomorrowZmanim } = useZmanim(location, tomorrow);
     const { prefs } = useDashboardPrefs();
     const [searchQuery, setSearchQuery] = useState('');
     const [showSearch, setShowSearch] = useState(false);
-
-    // Pull-to-refresh
-    const { onTouchStart, onTouchMove, onTouchEnd, PullIndicator } = usePullToRefresh(refetchZmanim);
 
     const enabledZmanimIds = prefs.items.filter(i => i.enabled && !['compass', 'next_zman'].includes(i.id)).map(i => i.id);
     const showCompass = prefs.items.find(i => i.id === 'compass')?.enabled;
@@ -54,19 +51,12 @@ export default function Home() {
     };
 
     return (
-        <div
-            className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-amber-50 pb-24 overscroll-y-contain"
-            onTouchStart={onTouchStart}
-            onTouchMove={onTouchMove}
-            onTouchEnd={onTouchEnd}
-        >
-            {/* Pull-to-refresh indicator */}
-            {PullIndicator}
+        <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-amber-50 pb-24">
             <div className="max-w-lg mx-auto px-4 pt-4 pb-4">
 
                 {/* Header */}
                 <div className="flex items-center mb-6 min-h-[56px]">
-                    <div className="shrink-0 w-9"></div>
+                    <div className="shrink-0"><NavMenu /></div>
                     <div className="flex-1 text-center px-2">
                         <h1 className="text-2xl font-bold text-slate-800 tracking-tight">Zmanim Today</h1>
                         <p className="text-slate-500 text-sm">זמני היום</p>
@@ -74,7 +64,7 @@ export default function Home() {
                     <div className="shrink-0 flex items-center gap-2">
                         <ZmanimRemindersPanel zmanimData={zmanim} currentDate={today} />
                         <Link to="/Settings">
-                            <button aria-label="Settings" className="p-2 rounded-lg bg-white/90 shadow-sm border border-slate-200 hover:bg-slate-50 transition-colors">
+                            <button className="p-2 rounded-lg bg-white/90 shadow-sm border border-slate-200 hover:bg-slate-50 transition-colors">
                                 <Settings className="w-5 h-5 text-slate-700" />
                             </button>
                         </Link>
@@ -114,7 +104,7 @@ export default function Home() {
                                 {locLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <MapPin className="w-4 h-4" />}
                                 <span className="ml-1">{locLoading ? 'Detecting…' : 'Use My Location'}</span>
                             </Button>
-                            <Button size="sm" variant="outline" aria-label="Search location" onClick={() => setShowSearch(true)}>
+                            <Button size="sm" variant="outline" onClick={() => setShowSearch(true)}>
                                 <Search className="w-4 h-4" />
                             </Button>
                         </div>
@@ -166,7 +156,7 @@ export default function Home() {
                                     <span className="text-base">🕍</span>
                                     <div>
                                         <p className="text-sm font-medium text-slate-700">Tomorrow's Havdalah</p>
-                                        <p className="text-sm text-slate-400">Motzei Shabbat</p>
+                                        <p className="text-xs text-slate-400">Motzei Shabbat</p>
                                     </div>
                                 </div>
                                 <span className="text-sm font-semibold text-slate-800 tabular-nums">
@@ -189,7 +179,7 @@ export default function Home() {
                             <div className="flex gap-2">
                                 <button
                                     onClick={() => printZmanim({ zmanimData: zmanim, date: today, locationLabel })}
-                                    className="flex-1 flex items-center justify-center gap-2 py-2.5 px-3 bg-white border border-slate-200 rounded-xl text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors active:scale-95"
+                                    className="flex-1 flex items-center justify-center gap-2 py-2.5 px-3 bg-white border border-slate-200 rounded-xl text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors"
                                 >
                                     <Printer className="w-4 h-4 text-slate-500" />
                                     Print Today's Zmanim
@@ -197,7 +187,7 @@ export default function Home() {
                                 {tomorrowZmanim && (
                                     <button
                                         onClick={() => printZmanim({ zmanimData: tomorrowZmanim, date: tomorrow, locationLabel })}
-                                        className="flex-1 flex items-center justify-center gap-2 py-2.5 px-3 bg-white border border-slate-200 rounded-xl text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors active:scale-95"
+                                        className="flex-1 flex items-center justify-center gap-2 py-2.5 px-3 bg-white border border-slate-200 rounded-xl text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors"
                                     >
                                         <Printer className="w-4 h-4 text-slate-500" />
                                         Print Tomorrow's Zmanim
@@ -209,7 +199,7 @@ export default function Home() {
                         {/* Link to full zmanim */}
                         {zmanim && !zmanimLoading && (
                             <Link to="/Zmanim">
-                                <div className="flex items-center justify-center gap-1.5 py-3 text-sm text-blue-600 hover:text-blue-700 font-medium active:bg-blue-50">
+                                <div className="flex items-center justify-center gap-1.5 py-3 text-sm text-blue-600 hover:text-blue-700 font-medium">
                                     View full zmanim list
                                     <ChevronRight className="w-4 h-4" />
                                 </div>

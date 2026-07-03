@@ -132,7 +132,6 @@ export default function ZmanimRemindersPanel({ zmanimData, currentDate }) {
         <Sheet open={open} onOpenChange={setOpen}>
             <SheetTrigger asChild>
                 <button
-                    aria-label="Set reminders"
                     className="p-2 rounded-lg bg-white/90 shadow-sm border border-slate-200 hover:bg-slate-50 transition-colors relative"
                     title="Set reminders"
                 >
@@ -219,19 +218,16 @@ export default function ZmanimRemindersPanel({ zmanimData, currentDate }) {
                                             </div>
                                         </button>
 
-                                        <button
-                                            type="button"
-                                            role="switch"
-                                            aria-checked={pref.enabled}
+                                        <div
                                             onClick={() => toggleReminder(key)}
-                                            className={`w-10 h-5 rounded-full transition-colors cursor-pointer flex-shrink-0 ml-2 border-0 p-0 ${
+                                            className={`w-10 h-5 rounded-full transition-colors cursor-pointer flex-shrink-0 ml-2 ${
                                                 pref.enabled ? 'bg-blue-500' : 'bg-slate-200'
                                             }`}
                                         >
                                             <div className={`w-4 h-4 rounded-full bg-white shadow-sm mt-0.5 transition-transform ${
                                                 pref.enabled ? 'translate-x-5' : 'translate-x-0.5'
                                             }`} />
-                                        </button>
+                                        </div>
                                     </div>
 
                                     {pref.enabled && (
