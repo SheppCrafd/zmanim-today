@@ -154,18 +154,7 @@ button:focus-visible {
   }
   body {
     @apply bg-background text-foreground;
-    padding-top: env(safe-area-inset-top);
-    padding-left: env(safe-area-inset-left);
-    padding-right: env(safe-area-inset-right);
-    overscroll-behavior: none;
-    -webkit-overflow-scrolling: touch;
   }
-  * { overscroll-behavior: inherit; }
-  nav, button, a, [role="tab"], [role="button"] {
-    user-select: none;
-    -webkit-user-select: none;
-  }
-  .pt-safe { padding-top: env(safe-area-inset-top); }
 }
 
 /* Dark mode overrides for app-wide surfaces */

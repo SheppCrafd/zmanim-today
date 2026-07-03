@@ -9,7 +9,7 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import NavMenu from '@/components/NavMenu';
-import { useNavigate, useLocation, useParams } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useSefariaText, usePrefetchSefariaText, fetchAndZipSefaria } from '@/hooks/useSefaria';
 
 /* ---------------- TOC CATEGORIZER ---------------- */
@@ -85,17 +85,8 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
 
-  const { sectionId, language } = useParams();
-  const basePath = '/' + location.pathname.split('/')[1];
-  const page = sectionId !== undefined ? 'reader' : 'toc';
-  const [langMode, setLangMode] = useState(language || 'both');
-
-  /* ---------------- SYNC LANG FROM URL ---------------- */
-  useEffect(() => {
-    if (language && ['en', 'he', 'both'].includes(language) && language !== langMode) {
-      setLangMode(language);
-    }
-  }, [language]);
+  const [page, setPage] = useState('toc');
+  const [langMode, setLangMode] = useState('both');
 
   /* ---------------- LOAD TOC ---------------- */
   useEffect(() => {
@@ -175,6 +166,8 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
     if (topItem && topItem.sectionIndex !== activeSectionRef.current) {
       activeSectionRef.current = topItem.sectionIndex;
 
+      const basePath = '/' + location.pathname.split('/')[1]; 
+      
       // Silently update the URL without refreshing the page!
       navigate(
         `${basePath}/section/${topItem.sectionIndex}/${langMode}`,
@@ -203,9 +196,9 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
 
   /* ---------------- PERFECT JUMPING ---------------- */
   const jumpTo = (i) => {
+    setPage('reader');
     setRange({ start: Math.max(0, i - 2), end: i + 6 });
     setPendingJump(i);
-    navigate(`${basePath}/section/${i}/${langMode}`);
   };
 
   // Natively scroll to the exact header index once the data loads
@@ -258,7 +251,7 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
           <Button size="sm" variant={langMode === 'he' ? "default" : "outline"} onClick={() => setLangMode('he')}>HB</Button>
           <Button size="sm" variant={langMode === 'both' ? "default" : "outline"} onClick={() => setLangMode('both')}>BOTH</Button>
           {page === 'reader' && (
-            <Button size="sm" variant="outline" onClick={() => navigate(`${basePath}/toc`)}>
+            <Button size="sm" variant="outline" onClick={() => setPage('toc')}>
               <ArrowLeft className="w-4 h-4 mr-1" /> Back
             </Button>
           )}
@@ -271,7 +264,7 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
         {/* TOC VIEW */}
         {page === 'toc' && (
            // ... (Leave your TOC mapping code here exactly as it was) ...
-           <div className="h-full overflow-y-auto px-4 pb-24" style={{ overscrollBehaviorY: 'none' }}>
+           <div className="h-full overflow-y-auto px-4 pb-24">
              {/* Replace this comment with your TOC rendering logic */}
              {categoryOrder.map(category => {
               const items = groupedSections[category];
@@ -305,7 +298,6 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
             className="h-full overflow-y-auto px-4 pb-24"
             onScroll={onScroll}
             ref={scrollRef}
-            style={{ overscrollBehaviorY: 'none' }}
           >
             {/* The Virtualizer Wrapper */}
             <div

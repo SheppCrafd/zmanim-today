@@ -132,8 +132,7 @@ export default function ZmanimRemindersPanel({ zmanimData, currentDate }) {
         <Sheet open={open} onOpenChange={setOpen}>
             <SheetTrigger asChild>
                 <button
-                    className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg bg-white/90 shadow-sm border border-slate-200 hover:bg-slate-50 transition-colors relative"
-                    aria-label="Set reminders"
+                    className="p-2 rounded-lg bg-white/90 shadow-sm border border-slate-200 hover:bg-slate-50 transition-colors relative"
                     title="Set reminders"
                 >
                     {hasEnabled
@@ -146,7 +145,7 @@ export default function ZmanimRemindersPanel({ zmanimData, currentDate }) {
                 </button>
             </SheetTrigger>
 
-            <SheetContent side="bottom" className="h-[85vh] overflow-y-auto rounded-t-xl">
+            <SheetContent side="right" className="w-80 overflow-y-auto">
                 <SheetHeader>
                     <SheetTitle className="flex items-center gap-2">
                         <Bell className="w-5 h-5" /> Zmanim Reminders

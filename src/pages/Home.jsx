@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState } from 'react';
 import { MapPin, Loader2, Search, ChevronRight, AlertCircle, Settings, Printer } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -28,41 +28,11 @@ const isFriday = today.getDay() === 5;
 
 export default function Home() {
     const { location, loading: locLoading, error: locError, detectGPS, searchLocation, clearLocation } = useSavedLocation();
-    const { zmanim, loading: zmanimLoading, refetch } = useZmanim(location);
+    const { zmanim, loading: zmanimLoading } = useZmanim(location);
     const { zmanim: tomorrowZmanim } = useZmanim(location, tomorrow);
     const { prefs } = useDashboardPrefs();
     const [searchQuery, setSearchQuery] = useState('');
     const [showSearch, setShowSearch] = useState(false);
-
-    // Pull-to-refresh
-    const touchStartY = useRef(0);
-    const [pullDistance, setPullDistance] = useState(0);
-    const [isRefreshing, setIsRefreshing] = useState(false);
-
-    const onTouchStart = (e) => {
-        if (window.scrollY === 0) {
-            touchStartY.current = e.touches[0].clientY;
-        } else {
-            touchStartY.current = 0;
-        }
-    };
-
-    const onTouchMove = (e) => {
-        if (touchStartY.current <= 0 || isRefreshing) return;
-        const diff = e.touches[0].clientY - touchStartY.current;
-        if (diff > 0) setPullDistance(Math.min(diff * 0.5, 80));
-    };
-
-    const onTouchEnd = async () => {
-        if (pullDistance > 60 && !isRefreshing) {
-            setIsRefreshing(true);
-            setPullDistance(40);
-            try { await refetch(); } catch { /* ignore */ }
-            setIsRefreshing(false);
-        }
-        setPullDistance(0);
-        touchStartY.current = 0;
-    };
 
     const enabledZmanimIds = prefs.items.filter(i => i.enabled && !['compass', 'next_zman'].includes(i.id)).map(i => i.id);
     const showCompass = prefs.items.find(i => i.id === 'compass')?.enabled;
@@ -81,20 +51,8 @@ export default function Home() {
     };
 
     return (
-        <div
-            className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-amber-50 pb-24"
-            onTouchStart={onTouchStart}
-            onTouchMove={onTouchMove}
-            onTouchEnd={onTouchEnd}
-            style={{ overscrollBehaviorY: 'none' }}
-        >
-            {/* Pull-to-refresh indicator */}
-            {(pullDistance > 0 || isRefreshing) && (
-                <div className="flex justify-center overflow-hidden" style={{ height: `${pullDistance}px` }}>
-                    <Loader2 className={`text-blue-500 ${isRefreshing ? 'animate-spin' : ''}`} style={{ marginTop: 8 }} />
-                </div>
-            )}
-            <div className="max-w-lg mx-auto px-4 pt-safe pb-4">
+        <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-amber-50 pb-24">
+            <div className="max-w-lg mx-auto px-4 pt-4 pb-4">
 
                 {/* Header */}
                 <div className="flex items-center mb-6 min-h-[56px]">
@@ -106,7 +64,7 @@ export default function Home() {
                     <div className="shrink-0 flex items-center gap-2">
                         <ZmanimRemindersPanel zmanimData={zmanim} currentDate={today} />
                         <Link to="/Settings">
-                            <button aria-label="Settings" className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg bg-white/90 shadow-sm border border-slate-200 hover:bg-slate-50 transition-colors">
+                            <button className="p-2 rounded-lg bg-white/90 shadow-sm border border-slate-200 hover:bg-slate-50 transition-colors">
                                 <Settings className="w-5 h-5 text-slate-700" />
                             </button>
                         </Link>

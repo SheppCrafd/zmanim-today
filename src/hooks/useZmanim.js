@@ -67,24 +67,8 @@ export function useZmanim(location, date = new Date()) {
     const [zmanim, setZmanim] = useState(null);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
-    const [refreshTrigger, setRefreshTrigger] = useState(0);
 
     const dateStr = format(date, 'yyyy-MM-dd');
-
-    const refetch = () => {
-        if (location?.latitude && location?.longitude) {
-            const key = cacheKey(location.latitude, location.longitude, dateStr);
-            try {
-                const raw = sessionStorage.getItem(STORAGE_KEY);
-                if (raw) {
-                    const store = JSON.parse(raw);
-                    delete store[key];
-                    sessionStorage.setItem(STORAGE_KEY, JSON.stringify(store));
-                }
-            } catch { /* ignore */ }
-        }
-        setRefreshTrigger(t => t + 1);
-    };
 
     useEffect(() => {
         if (!location?.latitude || !location?.longitude) return;
@@ -143,7 +127,7 @@ export function useZmanim(location, date = new Date()) {
             .finally(() => {
                 setLoading(false);
             });
-    }, [location?.latitude, location?.longitude, dateStr, refreshTrigger]);
+    }, [location?.latitude, location?.longitude, dateStr]);
 
-    return { zmanim, loading, error, refetch };
+    return { zmanim, loading, error };
 }

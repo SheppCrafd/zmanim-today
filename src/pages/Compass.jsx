@@ -270,7 +270,7 @@ export default function Compass() {
 
   return (
     <div className="min-h-screen bg-background pb-24">
-      <div className="max-w-sm mx-auto px-4 pt-safe pb-4">
+      <div className="max-w-sm mx-auto px-4 pt-4 pb-4">
 
         {/* Header */}
         <div className="flex items-center mb-8 min-h-[72px]">
