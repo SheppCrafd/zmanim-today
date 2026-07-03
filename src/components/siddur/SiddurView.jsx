@@ -116,31 +116,31 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
   });
 
   /* ---------------- FLATTEN THE STATE ---------------- */
-  // We mash headers, loading spinners, and segments into ONE 1D array
-  const flatItems = React.useMemo(() => {
-    const items = [];
-    activeSections.forEach((sec, i) => {
-      // 1. Push the Section Header
-      items.push({ 
-        type: 'header', 
-        label: sec.label, 
-        sectionIndex: range.start + i 
-      });
+    const flatItems = React.useMemo(() => {
+      const items = [];
+      activeSections.forEach((sec, i) => {
+        const currentSectionIndex = range.start + i; // 1. Calculate it once per section
       
-      const query = sectionQueries[i];
-      if (query.isLoading) {
-        items.push({ type: 'loading', id: `load-${sec.ref}` });
-      } else if (query.isError) {
-        items.push({ type: 'error', id: `err-${sec.ref}` });
-      } else if (query.data) {
-        // 2. Push every mapped segment for this section
-        query.data.forEach(seg => {
-          items.push({ type: 'segment', ...seg });
+        items.push({ 
+          type: 'header', 
+          label: sec.label, 
+          sectionIndex: currentSectionIndex 
         });
-      }
-    });
-    return items;
-  }, [activeSections, sectionQueries, range.start]);
+      
+        const query = sectionQueries[i];
+        if (query.isLoading) {
+          items.push({ type: 'loading', id: `load-${sec.ref}`, sectionIndex: currentSectionIndex });
+        } else if (query.isError) {
+          items.push({ type: 'error', id: `err-${sec.ref}`, sectionIndex: currentSectionIndex });
+        } else if (query.data) {
+          // 2. Attach it to every single segment!
+          query.data.forEach(seg => {
+            items.push({ type: 'segment', ...seg, sectionIndex: currentSectionIndex });
+          });
+        }
+      });
+      return items;
+    }, [activeSections, sectionQueries, range.start]);
 
   /* ---------------- VIRTUALIZER INITIALIZATION ---------------- */
   const virtualizer = useVirtualizer({
