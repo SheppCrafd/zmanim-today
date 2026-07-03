@@ -15,12 +15,12 @@ import { useSefariaText, usePrefetchSefariaText, fetchAndZipSefaria } from '@/ho
 /* ---------------- TOC CATEGORIZER ---------------- */
 function getCategory(breadcrumb) {
   const lower = (breadcrumb || '').toLowerCase();
- 
+
   if (lower.includes('shacharit') || lower.includes('morning')) return 'Shacharit';
   if (lower.includes('mussaf') || lower.includes('musaf')) return 'Mussaf';
   if (lower.includes('mincha') || lower.includes('minha') || lower.includes('afternoon')) return 'Mincha';
   if (lower.includes('maariv') || lower.includes("ma'ariv") || lower.includes('arvit') || lower.includes('arbit') || lower.includes('evening')) return "Ma'ariv / Arbit";
- 
+
   return 'Other';
 }
 
@@ -122,21 +122,21 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
     const items = [];
     activeSections.forEach((sec, i) => {
       // 1. Push the Section Header
-      items.push({ 
-        type: 'header', 
-        label: sec.label, 
-        sectionIndex: range.start + i 
+      items.push({
+        type: 'header',
+        label: sec.label,
+        sectionIndex: range.start + i
       });
-      
+
       const query = sectionQueries[i];
       if (query.isLoading) {
-        items.push({ type: 'loading', id: `load-${sec.ref}` });
+        items.push({ type: 'loading', id: `load-${sec.ref}`, sectionIndex: range.start + i });
       } else if (query.isError) {
-        items.push({ type: 'error', id: `err-${sec.ref}` });
+        items.push({ type: 'error', id: `err-${sec.ref}`, sectionIndex: range.start + i });
       } else if (query.data) {
         // 2. Push every mapped segment for this section
         query.data.forEach(seg => {
-          items.push({ type: 'segment', ...seg });
+          items.push({ type: 'segment', ...seg, sectionIndex: range.start + i });
         });
       }
     });
@@ -153,7 +153,7 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
 
   /* ---------------- URL SYNCING ---------------- */
   const visibleItems = virtualizer.getVirtualItems();
-  
+
   useEffect(() => {
     // Only run this if we are actively reading and have items on screen
     if (page !== 'reader' || visibleItems.length === 0) return;
@@ -166,8 +166,8 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
     if (topItem && topItem.sectionIndex !== activeSectionRef.current) {
       activeSectionRef.current = topItem.sectionIndex;
 
-      const basePath = '/' + location.pathname.split('/')[1]; 
-      
+      const basePath = '/' + location.pathname.split('/')[1];
+
       // Silently update the URL without refreshing the page!
       navigate(
         `${basePath}/section/${topItem.sectionIndex}/${langMode}`,
@@ -204,7 +204,7 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
   // Natively scroll to the exact header index once the data loads
   useEffect(() => {
     if (pendingJump === null || page !== 'reader') return;
-    
+
     const targetIndex = flatItems.findIndex(
       item => item.type === 'header' && item.sectionIndex === pendingJump
     );
@@ -232,7 +232,7 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
   return (
     <div className="h-screen flex flex-col bg-slate-50 dark:bg-slate-950 overflow-hidden">
 
-      {/* TOP BAR (Unchanged) */}
+      {/* TOP BAR */}
       <div className="sticky top-0 z-50 bg-white dark:bg-slate-950 border-b">
         <div className="flex items-center justify-between px-4 pt-4 pb-2">
           <div className="flex items-center gap-2">
@@ -260,13 +260,22 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
 
       {/* BODY */}
       <div className="flex-1 overflow-hidden">
-        
+
         {/* TOC VIEW */}
         {page === 'toc' && (
-           // ... (Leave your TOC mapping code here exactly as it was) ...
-           <div className="h-full overflow-y-auto px-4 pb-24">
-             {/* Replace this comment with your TOC rendering logic */}
-             {categoryOrder.map(category => {
+          <div className="h-full overflow-y-auto px-4 pb-24">
+            {loading && (
+              <div className="py-10 flex justify-center">
+                <Loader2 className="animate-spin text-blue-500" />
+              </div>
+            )}
+            {error && (
+              <div className="py-10 flex justify-center text-red-500">
+                <AlertCircle className="w-8 h-8" />
+              </div>
+            )}
+
+            {!loading && !error && categoryOrder.map(category => {
               const items = groupedSections[category];
               if (!items || items.length === 0) return null;
 
@@ -289,7 +298,7 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
                 </div>
               );
             })}
-           </div>
+          </div>
         )}
 
         {/* VIRTUALIZED READER VIEW */}
@@ -366,6 +375,35 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
         )}
 
       </div>
+
+      {/* --- SEFARIA ATTRIBUTION FOOTER --- */}
+      <div className="bg-slate-100 dark:bg-slate-900 border-t py-3 px-4 flex flex-col items-center justify-center gap-1 z-50 shrink-0">
+        <a
+          href="https://www.sefaria.org/texts"
+          target="_blank"
+          rel="noreferrer"
+          className="transition-transform hover:scale-105"
+        >
+          <img
+            src="https://files.readme.io/dcee0a8-image.png"
+            alt="Powered by Sefaria"
+            className="h-11 w-auto rounded-md shadow-sm bg-white"
+          />
+        </a>
+
+        <div className="text-[10px] text-slate-500">
+          and the{' '}
+          <a
+            href="https://developers.sefaria.org"
+            target="_blank"
+            rel="noreferrer"
+            className="underline hover:text-slate-700 dark:hover:text-slate-300 transition-colors"
+          >
+            Sefaria API
+          </a>
+        </div>
+      </div>
+
     </div>
   );
 }
