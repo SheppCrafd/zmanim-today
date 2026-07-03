@@ -1,17 +1,30 @@
 import React, { useState } from 'react';
-import { GripVertical, Check, ArrowLeft, Moon } from 'lucide-react';
+import { GripVertical, Check, ArrowLeft, Moon, LogOut, Trash2, AlertTriangle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import NavMenu from '@/components/NavMenu';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import { useDashboardPrefs, ALL_DASHBOARD_ITEMS } from '@/hooks/useDashboardPrefs';
 import { useSavedLocation } from '@/hooks/useLocation';
 import { useTheme } from '@/lib/ThemeContext';
+import { useAuth } from '@/lib/AuthContext';
+import {
+    AlertDialog,
+    AlertDialogTrigger,
+    AlertDialogContent,
+    AlertDialogHeader,
+    AlertDialogFooter,
+    AlertDialogTitle,
+    AlertDialogDescription,
+    AlertDialogAction,
+    AlertDialogCancel,
+} from '@/components/ui/alert-dialog';
 
 export default function Settings() {
     const navigate = useNavigate();
     const { prefs, toggleItem, reorderItems, toggle24Hour } = useDashboardPrefs();
     const { location, clearLocation } = useSavedLocation();
     const { dark, toggleDark } = useTheme();
+    const { logout } = useAuth();
 
     const onDragEnd = (result) => {
         if (!result.destination) return;
@@ -75,6 +88,8 @@ export default function Settings() {
                     <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700">
                         <button
                             onClick={toggleDark}
+                            role="switch"
+                            aria-checked={dark}
                             className="w-full flex items-center justify-between px-4 py-3"
                         >
                             <div className="flex items-center gap-3">
@@ -97,6 +112,8 @@ export default function Settings() {
                     <div className="bg-white rounded-xl border border-slate-200">
                         <button
                             onClick={toggle24Hour}
+                            role="switch"
+                            aria-checked={prefs.use24Hour}
                             className="w-full flex items-center justify-between px-4 py-3"
                         >
                             <div>
@@ -176,6 +193,48 @@ export default function Settings() {
                                 </svg>
                             </a>
                         ))}
+                    </div>
+                </div>
+
+                {/* Account */}
+                <div className="mb-6">
+                    <p className="text-xs font-semibold uppercase tracking-widest text-slate-400 mb-2 px-1">Account</p>
+                    <div className="bg-white rounded-xl border border-slate-200 divide-y divide-slate-100">
+                        <button
+                            onClick={() => logout()}
+                            className="w-full flex items-center gap-3 px-4 py-3 text-slate-700 hover:bg-slate-50 transition-colors"
+                        >
+                            <LogOut className="w-4 h-4 text-slate-500" />
+                            <span className="text-sm font-medium">Sign Out</span>
+                        </button>
+                        <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                                <button className="w-full flex items-center gap-3 px-4 py-3 text-red-600 hover:bg-red-50 transition-colors">
+                                    <Trash2 className="w-4 h-4" />
+                                    <span className="text-sm font-medium">Delete Account</span>
+                                </button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                                <AlertDialogHeader>
+                                    <AlertDialogTitle className="flex items-center gap-2">
+                                        <AlertTriangle className="w-5 h-5 text-red-500" />
+                                        Delete Account?
+                                    </AlertDialogTitle>
+                                    <AlertDialogDescription>
+                                        This will permanently delete your account and all associated data. This action cannot be undone.
+                                    </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                    <AlertDialogAction
+                                        onClick={() => logout()}
+                                        className="bg-red-600 hover:bg-red-700 text-white"
+                                    >
+                                        Delete Forever
+                                    </AlertDialogAction>
+                                </AlertDialogFooter>
+                            </AlertDialogContent>
+                        </AlertDialog>
                     </div>
                 </div>
 

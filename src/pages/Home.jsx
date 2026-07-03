@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { MapPin, Loader2, Search, ChevronRight, AlertCircle, Settings, Printer } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -28,11 +28,42 @@ const isFriday = today.getDay() === 5;
 
 export default function Home() {
     const { location, loading: locLoading, error: locError, detectGPS, searchLocation, clearLocation } = useSavedLocation();
-    const { zmanim, loading: zmanimLoading } = useZmanim(location);
+    const { zmanim, loading: zmanimLoading, refetch: refetchZmanim } = useZmanim(location);
     const { zmanim: tomorrowZmanim } = useZmanim(location, tomorrow);
     const { prefs } = useDashboardPrefs();
     const [searchQuery, setSearchQuery] = useState('');
     const [showSearch, setShowSearch] = useState(false);
+
+    // Pull-to-refresh
+    const [pullDistance, setPullDistance] = useState(0);
+    const [isRefreshing, setIsRefreshing] = useState(false);
+    const touchStartY = useRef(0);
+    const isPulling = useRef(false);
+
+    const onTouchStart = (e) => {
+        if (window.scrollY === 0) {
+            touchStartY.current = e.touches[0].clientY;
+            isPulling.current = true;
+        }
+    };
+
+    const onTouchMove = (e) => {
+        if (!isPulling.current || isRefreshing) return;
+        const diff = e.touches[0].clientY - touchStartY.current;
+        if (diff > 0 && window.scrollY === 0) {
+            setPullDistance(Math.min(diff * 0.4, 80));
+        }
+    };
+
+    const onTouchEnd = async () => {
+        if (pullDistance > 60) {
+            setIsRefreshing(true);
+            await refetchZmanim();
+            setIsRefreshing(false);
+        }
+        setPullDistance(0);
+        isPulling.current = false;
+    };
 
     const enabledZmanimIds = prefs.items.filter(i => i.enabled && !['compass', 'next_zman'].includes(i.id)).map(i => i.id);
     const showCompass = prefs.items.find(i => i.id === 'compass')?.enabled;
@@ -51,7 +82,21 @@ export default function Home() {
     };
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-amber-50 pb-24">
+        <div
+            className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-amber-50 pb-24 overscroll-y-contain"
+            onTouchStart={onTouchStart}
+            onTouchMove={onTouchMove}
+            onTouchEnd={onTouchEnd}
+        >
+            {/* Pull-to-refresh indicator */}
+            {(pullDistance > 0 || isRefreshing) && (
+                <div
+                    className="flex items-center justify-center overflow-hidden"
+                    style={{ height: `${isRefreshing ? 40 : pullDistance}px` }}
+                >
+                    <Loader2 className={`w-5 h-5 text-blue-500 ${(isRefreshing || pullDistance > 40) ? 'animate-spin' : ''}`} />
+                </div>
+            )}
             <div className="max-w-lg mx-auto px-4 pt-4 pb-4">
 
                 {/* Header */}
@@ -64,7 +109,7 @@ export default function Home() {
                     <div className="shrink-0 flex items-center gap-2">
                         <ZmanimRemindersPanel zmanimData={zmanim} currentDate={today} />
                         <Link to="/Settings">
-                            <button className="p-2 rounded-lg bg-white/90 shadow-sm border border-slate-200 hover:bg-slate-50 transition-colors">
+                            <button aria-label="Settings" className="p-2 rounded-lg bg-white/90 shadow-sm border border-slate-200 hover:bg-slate-50 transition-colors">
                                 <Settings className="w-5 h-5 text-slate-700" />
                             </button>
                         </Link>
@@ -104,7 +149,7 @@ export default function Home() {
                                 {locLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <MapPin className="w-4 h-4" />}
                                 <span className="ml-1">{locLoading ? 'Detecting…' : 'Use My Location'}</span>
                             </Button>
-                            <Button size="sm" variant="outline" onClick={() => setShowSearch(true)}>
+                            <Button size="sm" variant="outline" aria-label="Search location" onClick={() => setShowSearch(true)}>
                                 <Search className="w-4 h-4" />
                             </Button>
                         </div>

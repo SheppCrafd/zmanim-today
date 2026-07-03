@@ -269,7 +269,7 @@ export default function Compass() {
     : null;
 
   return (
-    <div className="min-h-screen bg-background pb-24">
+    <div className="min-h-screen bg-background pb-24 overscroll-y-contain">
       <div className="max-w-sm mx-auto px-4 pt-4 pb-4">
 
         {/* Header */}

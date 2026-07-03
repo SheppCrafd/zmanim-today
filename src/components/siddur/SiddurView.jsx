@@ -295,7 +295,7 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
 
         {/* TOC VIEW */}
         {page === 'toc' && (
-          <div className="h-full overflow-y-auto px-4 pb-24">
+          <div className="h-full overflow-y-auto px-4 pb-24 overscroll-contain">
             {loading && (
               <div className="py-10 flex justify-center">
                 <Loader2 className="animate-spin text-blue-500" />
@@ -336,7 +336,7 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
         {/* VIRTUALIZED READER VIEW */}
         {page === 'reader' && (
           <div
-            className="h-full overflow-y-auto px-4 pb-24"
+            className="h-full overflow-y-auto px-4 pb-24 overscroll-contain"
             onScroll={onScroll}
             ref={scrollRef}
           >

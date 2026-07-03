@@ -175,7 +175,7 @@ export default function Zmanim() {
     };
 
     return (
-        <div className="min-h-screen bg-background pb-24">
+        <div className="min-h-screen bg-background pb-24 overscroll-y-contain">
             <div className="max-w-4xl mx-auto px-4 pt-4 pb-8 md:px-8">
                 {/* Header */}
                 <div className="flex items-center mb-8 min-h-[72px]">
