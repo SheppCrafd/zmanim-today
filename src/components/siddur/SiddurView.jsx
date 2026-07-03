@@ -528,8 +528,15 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
             {sections.slice(range.start, range.end + 1).map((sec, i) => {
               const index = range.start + i;
               
-              // Calculate which sections to prefetch (e.g., the next 2 sections)
-              const nextSections = sections.slice(index + 1, index + 3).map(s => s.ref);
+              // 1. Define the sliding window of indices around the current index
+              // (e.g., if index is 7, this creates [5, 6, 8, 9])
+              const windowIndices = [index - 2, index - 1, index + 1, index + 2];
+
+              // 2. Filter out invalid indices (like negative numbers at the start of the book)
+              // and map them to their actual Sefaria refs.
+              const slidingWindowRefs = windowIndices
+                .filter(idx => idx >= 0 && idx < sections.length)
+                .map(idx => sections[idx].ref);
 
               return (
                 <Section
@@ -537,7 +544,7 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
                   index={index}
                   sec={sec}
                   langMode={langMode}
-                  prefetchRefs={nextSections}
+                  prefetchRefs={slidingWindowRefs} // Pass the calculated window
                   rowRef={(el) => {
                     rowRefs.current[index] = el;
                   }}
@@ -547,9 +554,7 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
           </div>
         )}
 
-
       </div>
-
 
       {/* --- SEFARIA ATTRIBUTION FOOTER --- */}
             <div className="bg-slate-100 dark:bg-slate-900 border-t py-3 px-4 flex flex-col items-center justify-center gap-1 z-50">
