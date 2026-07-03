@@ -10,7 +10,6 @@ import NavMenu from '@/components/NavMenu';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useSefariaText, usePrefetchSefariaText } from '@/hooks/useSefaria';
 
-
 /* ---------------- TOC CATEGORIZER ---------------- */
 function getCategory(breadcrumb) {
   const lower = (breadcrumb || '').toLowerCase();
@@ -23,17 +22,14 @@ function getCategory(breadcrumb) {
   return 'Other';
 }
 
-
 /* ---------------- TOC FLATTEN ---------------- */
 function flattenNodes(nodes, keyPath = '', labelPath = '') {
   const result = [];
-
 
   for (const node of nodes) {
     const key = node.key || node.title;
     const fullKeyPath = keyPath ? `${keyPath}, ${key}` : key;
     const fullLabelPath = labelPath ? `${labelPath} > ${node.title}` : node.title;
-
 
     if (node.nodes) {
       result.push(...flattenNodes(node.nodes, fullKeyPath, fullLabelPath));
@@ -47,32 +43,28 @@ function flattenNodes(nodes, keyPath = '', labelPath = '') {
     }
   }
 
-
   return result;
 }
-
 
 /* ---------------- NATIVE SANITIZER ---------------- */
 function sanitizeHTML(htmlString) {
   if (!htmlString) return '';
- 
+
   // Use the browser's native parser
   const parser = new DOMParser();
   const doc = parser.parseFromString(htmlString, 'text/html');
- 
+
   // 1. Destroy dangerous tags completely
   const badTags = doc.querySelectorAll('script, iframe, object, embed, style, link, meta, base');
   badTags.forEach(el => el.remove());
- 
-  // 2. Strip ALL attributes from remaining tags to kill inline event handlers (e.g., onerror, onclick, href="javascript:")
+
+  // 2. Strip ALL attributes from remaining tags to kill inline event handlers
   const allElements = doc.querySelectorAll('*');
   allElements.forEach(el => {
-    // Collect all attribute names
     const attrs = Array.from(el.attributes).map(attr => attr.name);
-    // Remove them all
     attrs.forEach(attrName => el.removeAttribute(attrName));
   });
- 
+
   return doc.body.innerHTML;
 }
 
@@ -152,28 +144,21 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
   const navigate = useNavigate();
   const location = useLocation();
 
-
   const scrollRef = useRef(null);
   const rowRefs = useRef({});
   const observerRef = useRef(null);
   const [pendingJump, setPendingJump] = useState(null);
 
-
   const [sections, setSections] = useState([]);
-  const [textMap, setTextMap] = useState({});
   const [range, setRange] = useState({ start: 0, end: 5 });
-
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
 
-
   const [page, setPage] = useState('toc');
   const [langMode, setLangMode] = useState('both');
 
-
   const currentSection = useRef(0);
-
 
   /* ---------------- LOAD TOC ---------------- */
   useEffect(() => {
@@ -183,9 +168,7 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
         const nodes = data?.schema?.nodes || [];
         const rootKey = data?.schema?.key || bookRef.replace(/_/g, ' ');
 
-
         const flat = flattenNodes(nodes, rootKey);
-
 
         setSections(flat);
         setLoading(false);
@@ -197,107 +180,23 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
       });
   }, [bookRef]);
 
-
-  /* ---------------- TEXT WINDOW LOADING ---------------- */
+  /* ---------------- OBSERVER ---------------- */
   useEffect(() => {
     if (!sections.length) return;
-
-
-    const load = async () => {
-      for (let i = range.start; i <= range.end; i++) {
-        if (!sections[i] || textMap[i]) continue;
-
-
-        try {
-          const ref = encodeURIComponent(sections[i].ref);
-         
-          // Fetch Hebrew (source)
-          const hebResp = await fetch(
-            `https://www.sefaria.org/api/v3/texts/${ref}?version=source&context=0`
-          );
-          const hebData = await hebResp.json();
-         
-          // Fetch English (Community Translation)
-          const engResp = await fetch(
-            `https://www.sefaria.org/api/v3/texts/${ref}?version=english|Sefaria%20Community%20Translation&context=0`
-          );
-          const engData = await engResp.json();
-
-
-          // 1. Update the function to accept an expected language ('he' or 'en')
-          // Add an expectedLang parameter ('he' or 'en')
-        const extractText = (data, expectedLang) => {
-            if (!data?.versions || data.versions.length === 0) return [];
-
-
-            const version = data.versions.find(v => v.language === expectedLang);
-            if (!version || !version.text) return [];
-
-
-            const rawArray = Array.isArray(version.text) ? version.text : [version.text];
-
-
-            // If we are processing the English side, let's aggressively filter out Hebrew
-            if (expectedLang === 'en') {
-              return rawArray.map(line => {
-                // Check if the string contains any Hebrew characters (Unicode range \u0590-\u05FF)
-                const containsHebrew = /[\u0590-\u05FF]/.test(line || '');
-               
-                // If it contains Hebrew, return an empty string to blank it out.
-                // We return an empty string instead of deleting it so it stays aligned with the Hebrew side!
-                return containsHebrew ? '' : line;
-              });
-            }
-
-
-            return rawArray;
-          };
-
-
-          // Then update where you call it:
-          const heArr = extractText(hebData, 'he');
-          const enArr = extractText(engData, 'en');
-
-
-          setTextMap(prev => ({
-            ...prev,
-            [i]: { he: heArr, en: enArr }
-          }));
-        } catch {
-          setTextMap(prev => ({ ...prev, [i]: { error: true } }));
-        }
-      }
-    };
-
-
-    load();
-  }, [range, sections]);
-
-
-/* ---------------- OBSERVER ---------------- */
-  useEffect(() => {
-    if (!sections.length) return;
-
 
     if (observerRef.current) observerRef.current.disconnect();
 
-
-    // Extract ONLY the base book route (e.g., "/ChabadSiddur")
     const basePath = '/' + location.pathname.split('/')[1];
-
 
     observerRef.current = new IntersectionObserver(
       (entries) => {
         for (const entry of entries) {
           if (!entry.isIntersecting) continue;
 
-
           const index = Number(entry.target.dataset.index);
           if (Number.isNaN(index)) continue;
 
-
           currentSection.current = index;
-
 
           navigate(
             `${basePath}/section/${index}/${langMode}`,
@@ -310,19 +209,15 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
       }
     );
 
-
     Object.values(rowRefs.current).forEach(el => {
       if (el) observerRef.current.observe(el);
     });
 
-
   }, [sections, langMode, navigate, location.pathname]);
-
 
   /* ---------------- SCROLL WINDOW ---------------- */
   const onScroll = (e) => {
     const el = e.target;
-
 
     if (el.scrollTop + el.clientHeight > el.scrollHeight - 800) {
       setRange(r => ({
@@ -331,7 +226,6 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
       }));
     }
 
-
     if (el.scrollTop < 800) {
       setRange(r => ({
         start: Math.max(0, r.start - 2),
@@ -339,7 +233,6 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
       }));
     }
   };
-
 
   /* ---------------- FIXED JUMP ---------------- */
   const jumpTo = (i) => {
@@ -351,91 +244,56 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
     setPendingJump(i);
   };
 
-
   useEffect(() => {
     if (pendingJump === null || page !== 'reader') return;
 
-
-    // 1. Wait for the text to actually fetch from Sefaria
-    const startIdx = Math.max(0, pendingJump - 2);
-    let allReady = true;
-    for (let j = startIdx; j <= pendingJump; j++) {
-      if (!textMap[j]) {
-        allReady = false;
-        break;
-      }
-    }
-
-
-    if (!allReady) return; // Data isn't here yet, keep waiting
-
-
-    // 2. Data is ready! Now we align mathematically instead of trusting the browser.
     let attempts = 0;
-   
+
     const tryAlign = () => {
       const container = scrollRef.current;
       const el = rowRefs.current[pendingJump];
 
-
       if (!container || !el) return;
-
 
       const containerRect = container.getBoundingClientRect();
       const elRect = el.getBoundingClientRect();
 
-
-      // Calculate the exact distance to the target header
       const targetTop = elRect.top - containerRect.top;
 
-
-      // Snap the scrollbar exactly to that pixel
       if (Math.abs(targetTop) > 1) {
         container.scrollTop += targetTop;
       }
     };
 
-
     const loop = () => {
       attempts++;
       tryAlign();
 
-
-      // "Lock" the scroll in place for 15 frames (~250ms).
-      // As the heavy Hebrew/English text pops into the DOM and tries to shift the layout,
-      // this loop will aggressively pin the target header right to the top.
       if (attempts < 15) {
         requestAnimationFrame(loop);
       } else {
-        setPendingJump(null); // We are stable, release the jump lock
+        setPendingJump(null); 
       }
     };
 
-
     requestAnimationFrame(loop);
 
-
-  }, [textMap, pendingJump, page]);
-
+  }, [pendingJump, page, range]); // Dependencies updated to match removed textMap
 
   /* ---------------- GROUP TOC ---------------- */
-  // Moved this ABOVE the return statement so the variables actually exist!
   const groupedSections = sections.reduce((acc, sec, index) => {
     const category = getCategory(sec.breadcrumb);
     if (!acc[category]) acc[category] = [];
-   
+
     acc[category].push({ ...sec, originalIndex: index });
     return acc;
   }, {});
 
-
   const categoryOrder = ['Shacharit', 'Mussaf', 'Mincha', "Ma'ariv / Arbit", 'Other'];
-
 
   /* ---------------- RENDER ---------------- */
   return (
     <div className="h-screen flex flex-col bg-slate-50 dark:bg-slate-950 overflow-hidden">
-
 
       {/* TOP BAR */}
       <div className="sticky top-0 z-50 bg-white dark:bg-slate-950 border-b">
@@ -448,7 +306,6 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
             </div>
           </div>
 
-
           <a href={sefariaUrl} target="_blank" rel="noreferrer">
             <Button size="sm" variant="outline">
               <ExternalLink className="w-4 h-4" />
@@ -456,12 +313,10 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
           </a>
         </div>
 
-
         <div className="px-4 flex gap-2 py-2">
           <Button size="sm" variant={langMode === 'en' ? "default" : "outline"} onClick={() => setLangMode('en')}>EN</Button>
           <Button size="sm" variant={langMode === 'he' ? "default" : "outline"} onClick={() => setLangMode('he')}>HB</Button>
           <Button size="sm" variant={langMode === 'both' ? "default" : "outline"} onClick={() => setLangMode('both')}>BOTH</Button>
-
 
           {page === 'reader' && (
             <Button size="sm" variant="outline" onClick={() => setPage('toc')}>
@@ -472,10 +327,8 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
         </div>
       </div>
 
-
       {/* BODY */}
       <div className="flex-1 overflow-hidden">
-
 
         {page === 'toc' && (
           <div className="h-full overflow-y-auto px-4 pb-24">
@@ -490,11 +343,9 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
               </div>
             )}
 
-
             {!loading && !error && categoryOrder.map(category => {
               const items = groupedSections[category];
               if (!items || items.length === 0) return null;
-
 
               return (
                 <div key={category} className="mb-8">
@@ -518,7 +369,6 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
           </div>
         )}
 
-
         {page === 'reader' && (
           <div
             className="h-full overflow-y-auto px-4 pb-24"
@@ -527,13 +377,8 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
           >
             {sections.slice(range.start, range.end + 1).map((sec, i) => {
               const index = range.start + i;
-              
-              // 1. Define the sliding window of indices around the current index
-              // (e.g., if index is 7, this creates [5, 6, 8, 9])
-              const windowIndices = [index - 2, index - 1, index + 1, index + 2];
 
-              // 2. Filter out invalid indices (like negative numbers at the start of the book)
-              // and map them to their actual Sefaria refs.
+              const windowIndices = [index - 2, index - 1, index + 1, index + 2];
               const slidingWindowRefs = windowIndices
                 .filter(idx => idx >= 0 && idx < sections.length)
                 .map(idx => sections[idx].ref);
@@ -544,7 +389,7 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
                   index={index}
                   sec={sec}
                   langMode={langMode}
-                  prefetchRefs={slidingWindowRefs} // Pass the calculated window
+                  prefetchRefs={slidingWindowRefs} 
                   rowRef={(el) => {
                     rowRefs.current[index] = el;
                   }}
@@ -555,41 +400,34 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
         )}
 
       </div>
-      
 
       {/* --- SEFARIA ATTRIBUTION FOOTER --- */}
-            <div className="bg-slate-100 dark:bg-slate-900 border-t py-3 px-4 flex flex-col items-center justify-center gap-1 z-50">
-             
-              {/* Clickable Badge Linking to Sefaria Library */}
-              <a
-                href="https://www.sefaria.org/texts"
-                target="_blank"
-                rel="noreferrer"
-                className="transition-transform hover:scale-105"
-              >
-                <img
-                  src="https://files.readme.io/dcee0a8-image.png"
-                  alt="Powered by Sefaria"
-                  className="h-11 w-auto rounded-md shadow-sm bg-white"
-                />
-              </a>
+      <div className="bg-slate-100 dark:bg-slate-900 border-t py-3 px-4 flex flex-col items-center justify-center gap-1 z-50">
+        <a
+          href="https://www.sefaria.org/texts"
+          target="_blank"
+          rel="noreferrer"
+          className="transition-transform hover:scale-105"
+        >
+          <img
+            src="https://files.readme.io/dcee0a8-image.png"
+            alt="Powered by Sefaria"
+            className="h-11 w-auto rounded-md shadow-sm bg-white"
+          />
+        </a>
 
-
-              {/* Technical Credit Linking to API Portal */}
-              <div className="text-[10px] text-slate-500">
-                and the{' '}
-                <a
-                  href="https://developers.sefaria.org"
-                  target="_blank"
-                  rel="noreferrer"
-                  className="underline hover:text-slate-700 dark:hover:text-slate-300 transition-colors"
-                >
-                  Sefaria API
-                </a>
-              </div>
-             
-            </div>
-
+        <div className="text-[10px] text-slate-500">
+          and the{' '}
+          <a
+            href="https://developers.sefaria.org"
+            target="_blank"
+            rel="noreferrer"
+            className="underline hover:text-slate-700 dark:hover:text-slate-300 transition-colors"
+          >
+            Sefaria API
+          </a>
+        </div>
+      </div>
 
     </div>
   );
