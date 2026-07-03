@@ -38,7 +38,6 @@ export function useSefariaText(ref) {
     queryFn: async () => {
       const encodedRef = encodeURIComponent(ref);
       
-      // Fetch both versions simultaneously using Promise.all
       const [hebResp, engResp] = await Promise.all([
         fetch(`https://www.sefaria.org/api/v3/texts/${encodedRef}?version=source&context=0`),
         fetch(`https://www.sefaria.org/api/v3/texts/${encodedRef}?version=english|Sefaria%20Community%20Translation&context=0`)
@@ -49,10 +48,22 @@ export function useSefariaText(ref) {
       const hebData = await hebResp.json();
       const engData = await engResp.json();
 
-      return {
-        he: extractText(hebData, 'he'),
-        en: extractText(engData, 'en')
-      };
+      const heArr = extractText(hebData, 'he');
+      const enArr = extractText(engData, 'en');
+
+      // THE ZIPPER: Stitch the two arrays together segment by segment
+      const maxLen = Math.max(heArr.length, enArr.length);
+      const segments = [];
+
+      for (let i = 0; i < maxLen; i++) {
+        segments.push({
+          segmentId: `${ref}-${i + 1}`, // Creates a unique ID like "Ashrei-1"
+          he: heArr[i] || null,         // Explicitly null if missing
+          en: enArr[i] || null
+        });
+      }
+
+      return segments;
     },
     enabled: !!ref,
   });
@@ -72,15 +83,27 @@ export function usePrefetchSefariaText() {
           fetch(`https://www.sefaria.org/api/v3/texts/${encodedRef}?version=source&context=0`),
           fetch(`https://www.sefaria.org/api/v3/texts/${encodedRef}?version=english|Sefaria%20Community%20Translation&context=0`)
         ]);
+        
         const hebData = await hebResp.json();
         const engData = await engResp.json();
         
-        return {
-          he: extractText(hebData, 'he'),
-          en: extractText(engData, 'en')
-        };
+        const heArr = extractText(hebData, 'he');
+        const enArr = extractText(engData, 'en');
+
+        const maxLen = Math.max(heArr.length, enArr.length);
+        const segments = [];
+
+        for (let i = 0; i < maxLen; i++) {
+          segments.push({
+            segmentId: `${ref}-${i + 1}`,
+            he: heArr[i] || null,
+            en: enArr[i] || null
+          });
+        }
+
+        return segments;
       },
-      staleTime: 1000 * 60 * 60 * 24, // Keep prefetched data fresh
+      staleTime: 1000 * 60 * 60 * 24,
     });
   };
 }
