@@ -9,7 +9,6 @@ import { useDashboardPrefs } from '@/hooks/useDashboardPrefs';
 import MiniCompass from '@/components/home/MiniCompass';
 import NextZmanCard from '@/components/home/NextZmanCard';
 import ZmanimSummary from '@/components/home/ZmanimSummary';
-import NavMenu from '@/components/NavMenu';
 import { printZmanim } from '@/lib/printZmanim';
 import ZmanimRemindersPanel from '@/components/zmanim/ZmanimRemindersPanel';
 import { formatTime } from '@/lib/timeUtils';
@@ -67,7 +66,7 @@ export default function Home() {
 
                 {/* Header */}
                 <div className="flex items-center mb-6 min-h-[56px]">
-                    <div className="shrink-0"><NavMenu /></div>
+                    <div className="shrink-0 w-9"></div>
                     <div className="flex-1 text-center px-2">
                         <h1 className="text-2xl font-bold text-slate-800 tracking-tight">Zmanim Today</h1>
                         <p className="text-slate-500 text-sm">זמני היום</p>
@@ -167,7 +166,7 @@ export default function Home() {
                                     <span className="text-base">🕍</span>
                                     <div>
                                         <p className="text-sm font-medium text-slate-700">Tomorrow's Havdalah</p>
-                                        <p className="text-xs text-slate-400">Motzei Shabbat</p>
+                                        <p className="text-sm text-slate-400">Motzei Shabbat</p>
                                     </div>
                                 </div>
                                 <span className="text-sm font-semibold text-slate-800 tabular-nums">
@@ -190,7 +189,7 @@ export default function Home() {
                             <div className="flex gap-2">
                                 <button
                                     onClick={() => printZmanim({ zmanimData: zmanim, date: today, locationLabel })}
-                                    className="flex-1 flex items-center justify-center gap-2 py-2.5 px-3 bg-white border border-slate-200 rounded-xl text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors"
+                                    className="flex-1 flex items-center justify-center gap-2 py-2.5 px-3 bg-white border border-slate-200 rounded-xl text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors active:scale-95"
                                 >
                                     <Printer className="w-4 h-4 text-slate-500" />
                                     Print Today's Zmanim
@@ -198,7 +197,7 @@ export default function Home() {
                                 {tomorrowZmanim && (
                                     <button
                                         onClick={() => printZmanim({ zmanimData: tomorrowZmanim, date: tomorrow, locationLabel })}
-                                        className="flex-1 flex items-center justify-center gap-2 py-2.5 px-3 bg-white border border-slate-200 rounded-xl text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors"
+                                        className="flex-1 flex items-center justify-center gap-2 py-2.5 px-3 bg-white border border-slate-200 rounded-xl text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors active:scale-95"
                                     >
                                         <Printer className="w-4 h-4 text-slate-500" />
                                         Print Tomorrow's Zmanim
@@ -210,7 +209,7 @@ export default function Home() {
                         {/* Link to full zmanim */}
                         {zmanim && !zmanimLoading && (
                             <Link to="/Zmanim">
-                                <div className="flex items-center justify-center gap-1.5 py-3 text-sm text-blue-600 hover:text-blue-700 font-medium">
+                                <div className="flex items-center justify-center gap-1.5 py-3 text-sm text-blue-600 hover:text-blue-700 font-medium active:bg-blue-50">
                                     View full zmanim list
                                     <ChevronRight className="w-4 h-4" />
                                 </div>

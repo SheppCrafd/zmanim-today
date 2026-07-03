@@ -3,14 +3,13 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { MapPin, Calendar as CalendarIcon, Loader2, RefreshCw, Search, ChevronLeft, ChevronRight, Printer } from 'lucide-react';
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerTrigger } from "@/components/ui/drawer";
 import { Calendar } from "@/components/ui/calendar";
 import { format } from 'date-fns';
 import ZmanimCard from '../components/zmanim/ZmanimCard';
 import LocationDisplay from '../components/zmanim/LocationDisplay';
 import { getHebrewDate } from '../lib/hebrewDate';
 import { useSavedLocation } from '@/hooks/useLocation';
-import NavMenu from '@/components/NavMenu';
 import { printZmanim } from '@/lib/printZmanim';
 import { useDashboardPrefs } from '@/hooks/useDashboardPrefs';
 import { ZMANIM_GROUPS, getGroupEntries } from '@/lib/zmanimSchema';
@@ -188,7 +187,7 @@ export default function Zmanim() {
             <div className="max-w-4xl mx-auto px-4 pt-4 pb-8 md:px-8">
                 {/* Header */}
                 <div className="flex items-center mb-8 min-h-[72px]">
-                    <div className="shrink-0"><NavMenu /></div>
+                    <div className="shrink-0 w-9"></div>
                     <div className="flex-1 text-center px-2">
                         <h1 className="text-4xl md:text-5xl font-bold text-slate-800 mb-2 tracking-tight">Zmanim</h1>
                         <p className="text-slate-600 text-lg">זמני היום</p>
@@ -340,8 +339,8 @@ export default function Zmanim() {
                                 >
                                     <ChevronLeft className="h-4 w-4" />
                                 </Button>
-                                <Popover>
-                                    <PopoverTrigger asChild>
+                                <Drawer>
+                                    <DrawerTrigger asChild>
                                         <Button
                                             variant="outline"
                                             className="flex-1 justify-start text-left font-semibold"
@@ -350,16 +349,19 @@ export default function Zmanim() {
                                             <CalendarIcon className="mr-2 h-4 w-4" />
                                             {format(currentDate, 'EEEE, MMMM d, yyyy')}
                                         </Button>
-                                    </PopoverTrigger>
-                                    <PopoverContent className="w-auto p-0" align="start">
-                                        <Calendar
-                                            mode="single"
-                                            selected={currentDate}
-                                            onSelect={(date) => date && setCurrentDate(date)}
-                                            initialFocus
-                                        />
-                                    </PopoverContent>
-                                </Popover>
+                                    </DrawerTrigger>
+                                    <DrawerContent>
+                                        <DrawerHeader><DrawerTitle>Select Date</DrawerTitle></DrawerHeader>
+                                        <div className="px-4 pb-8 flex justify-center">
+                                            <Calendar
+                                                mode="single"
+                                                selected={currentDate}
+                                                onSelect={(date) => date && setCurrentDate(date)}
+                                                initialFocus
+                                            />
+                                        </div>
+                                    </DrawerContent>
+                                </Drawer>
                                 <Button
                                     variant="outline"
                                     size="icon"

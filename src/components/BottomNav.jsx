@@ -13,6 +13,17 @@ export default function BottomNav() {
     const location = useLocation();
     const navigate = useNavigate();
 
+    // Store last visited path per tab for navigation stack preservation
+    const tabHistories = React.useRef({});
+
+    React.useEffect(() => {
+        NAV_ITEMS.forEach(({ path }) => {
+            if (location.pathname === path || location.pathname.startsWith(path + '/')) {
+                tabHistories.current[path] = location.pathname;
+            }
+        });
+    }, [location.pathname]);
+
     // Don't show on siddur pages (including sub-routes)
     const hiddenPaths = ['/SephardicSiddur', '/AshkenaziSiddur', '/ChabadSiddur'];
     if (hiddenPaths.some(p => location.pathname.startsWith(p))) return null;
@@ -28,12 +39,16 @@ export default function BottomNav() {
                             to={path}
                             aria-label={`${label} tab`}
                             aria-current={active ? 'page' : undefined}
-                            onClick={() => {
+                            onClick={(e) => {
+                                e.preventDefault();
                                 if (location.pathname === path) {
                                     navigate(path, { replace: true });
+                                    delete tabHistories.current[path];
+                                } else {
+                                    navigate(tabHistories.current[path] || path);
                                 }
                             }}
-                            className={`select-none flex flex-col items-center justify-center gap-0.5 min-h-[44px] min-w-[44px] px-4 py-2 rounded-xl transition-colors ${
+                            className={`select-none flex flex-col items-center justify-center gap-0.5 min-h-[44px] min-w-[44px] px-4 py-2 rounded-xl transition-colors active:opacity-70 ${
                                 active ? 'text-blue-600' : 'text-slate-400 hover:text-slate-600'
                             }`}
                         >
