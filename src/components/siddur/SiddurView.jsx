@@ -114,38 +114,14 @@ const extractText = (data, expectedLang) => {
 
 /* ---------------- SECTION ---------------- */
 function Section({ sec, langMode, rowRef, index }) {
-  // Each section now manages its own independent data fetching!
   const { data, isLoading, isError } = useSefariaText(sec.ref);
 
-  if (isLoading) {
-    return (
-      <div className="py-10 flex justify-center">
-        <Loader2 className="animate-spin text-blue-500" />
-      </div>
-    );
-  }
-
-  if (isError || !data) {
-    return (
-      <div className="text-center text-sm text-red-500">
-        Failed to load section
-      </div>
-    );
-  }
-
-  // Use the legacy extraction logic for Phase 1
-  const heArr = extractText(data.hebData, 'he') || [];
-  const enArr = extractText(data.engData, 'en') || [];
-
-  const showEN = langMode !== 'he';
-  const showHB = langMode !== 'en';
-  const maxLen = Math.max(heArr.length, enArr.length);
-
+  // The wrapper div MUST always render so rowRefs.current[index] is never null!
   return (
     <div
       ref={rowRef}
       data-index={index}
-      className="space-y-4 scroll-mt-24"
+      className="space-y-4 scroll-mt-24 min-h-[120px] pb-6"
     >
       <div className="sticky top-0 bg-white dark:bg-slate-900 py-2 z-10 border-b">
         <p className="font-semibold text-slate-700 dark:text-slate-100">
@@ -153,26 +129,48 @@ function Section({ sec, langMode, rowRef, index }) {
         </p>
       </div>
 
-      <div className="space-y-6">
-        {Array.from({ length: maxLen }).map((_, i) => (
-          <div key={i} className="space-y-2">
-            {showHB && heArr[i] && (
-              <p
-                className="text-right text-lg leading-loose text-slate-800 dark:text-slate-100 font-serif"
-                dir="rtl"
-                dangerouslySetInnerHTML={{ __html: sanitizeHTML(heArr[i]) }}
-              />
-            )}
+      {isLoading && (
+        <div className="py-10 flex justify-center">
+          <Loader2 className="animate-spin text-blue-500" />
+        </div>
+      )}
 
-            {showEN && enArr[i] && (
-              <p
-                className="text-left text-sm leading-relaxed text-slate-500 dark:text-slate-400"
-                dangerouslySetInnerHTML={{ __html: sanitizeHTML(enArr[i]) }}
-              />
-            )}
-          </div>
-        ))}
-      </div>
+      {isError && (
+        <div className="text-center text-sm text-red-500 py-6">
+          Failed to load section
+        </div>
+      )}
+
+      {!isLoading && !isError && data && (
+        <div className="space-y-6">
+          {(() => {
+            const heArr = extractText(data.hebData, 'he') || [];
+            const enArr = extractText(data.engData, 'en') || [];
+            const showEN = langMode !== 'he';
+            const showHB = langMode !== 'en';
+            const maxLen = Math.max(heArr.length, enArr.length);
+
+            return Array.from({ length: maxLen }).map((_, i) => (
+              <div key={i} className="space-y-2">
+                {showHB && heArr[i] && (
+                  <p
+                    className="text-right text-lg leading-loose text-slate-800 dark:text-slate-100 font-serif"
+                    dir="rtl"
+                    dangerouslySetInnerHTML={{ __html: sanitizeHTML(heArr[i]) }}
+                  />
+                )}
+
+                {showEN && enArr[i] && (
+                  <p
+                    className="text-left text-sm leading-relaxed text-slate-500 dark:text-slate-400"
+                    dangerouslySetInnerHTML={{ __html: sanitizeHTML(enArr[i]) }}
+                  />
+                )}
+              </div>
+            ));
+          })()}
+        </div>
+      )}
     </div>
   );
 }
