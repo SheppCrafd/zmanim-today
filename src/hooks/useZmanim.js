@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
 import { format } from 'date-fns';
-import { base44 } from '@/api/base44Client';
 import { subtractMinutes } from '@/lib/timeUtils';
 
-const STORAGE_KEY = 'zmanim_cache_v2';
+// Bumped cache version to clear out old LLM-formatted data
+const STORAGE_KEY = 'zmanim_cache_v3'; 
 
 /** Apply day-of-week rules: candle lighting only on Friday, havdalah only on Saturday. */
 function applyDayRules(result, date) {
@@ -14,7 +14,8 @@ function applyDayRules(result, date) {
         zmanim: {
             ...result.zmanim,
             candle_lighting: dow === 5 ? result.zmanim.candle_lighting : null,
-            havdalah:        dow === 6 ? result.zmanim.tzait_72 : null,
+            // FIXED: Havdalah now uses the 8.5 degree calculation to match the main page
+            havdalah:        dow === 6 ? result.zmanim.tzait_hakochavim : null, 
         }
     };
 }
@@ -29,6 +30,7 @@ function fixAlotHashachar(result) {
 
 /** Derive candle_lighting as exactly 18 minutes before sunset. */
 function fixCandleLighting(result) {
+    if (result?.zmanim?.candle_lighting) return result; // Use Hebcal's exact time if provided
     if (!result?.zmanim?.sunset) return result;
     const cl = subtractMinutes(result.zmanim.sunset, 18);
     if (!cl) return result;
@@ -56,7 +58,7 @@ function setCache(key, data) {
     } catch { /* ignore */ }
 }
 
-/** Apply all deterministic post-processing to a raw LLM result. */
+/** Apply all deterministic post-processing to a raw result. */
 function postProcess(result, date) {
     return applyDayRules(fixAlotHashachar(fixCandleLighting(result)), date);
 }
@@ -81,62 +83,50 @@ export function useZmanim(location, date = new Date()) {
         setLoading(true);
         setError(null);
 
-        base44.integrations.Core.InvokeLLM({
-            prompt: `Calculate accurate Jewish zmanim for ${dateStr} at coordinates: ${location.latitude}, ${location.longitude}
+        // Fetch directly from Hebcal API for speed and precision (No LLM required)
+        fetch(`https://www.hebcal.com/zmanim?cfg=json&latitude=${location.latitude}&longitude=${location.longitude}&date=${dateStr}`)
+            .then(res => {
+                if (!res.ok) throw new Error('Failed to fetch data from Hebcal');
+                return res.json();
+            })
+            .then(data => {
+                const zmanimData = {
+                    alot_hashachar: data.times.alotHashachar,
+                    misheyakir: data.times.misheyakir,
+                    sunrise: data.times.sunrise,
+                    sof_zman_shma_gra: data.times.sofZmanShma,
+                    sof_zman_shma_mga: data.times.sofZmanShmaMGA,
+                    sof_zman_tefillah_gra: data.times.sofZmanTfilla,
+                    sof_zman_tefillah_mga: data.times.sofZmanTfillaMGA,
+                    chatzot: data.times.chatzot,
+                    mincha_gedola: data.times.minchaGedola,
+                    mincha_ketana: data.times.minchaKetana,
+                    plag_hamincha: data.times.plagHaMincha,
+                    candle_lighting: data.times.candleLighting || null,
+                    sunset: data.times.sunset,
+                    tzait_hakochavim: data.times.tzeit85deg, // FIXED: Now exactly matches main page
+                    tzait_72: data.times.tzeit72min,
+                    chatzot_laila: data.times.chatzotNight,
+                };
 
-CRITICAL INSTRUCTIONS:
-1. Search hebcal.com API specifically for these exact coordinates and date
-2. Use this URL pattern: https://www.hebcal.com/zmanim?cfg=json&latitude=${location.latitude}&longitude=${location.longitude}&date=${dateStr}
-3. Verify times match astronomical reality for this location
+                const rawResult = {
+                    location_name: location.city || location.name || "Selected Location",
+                    timezone: data.location?.tzid || "Local Time",
+                    zmanim: zmanimData
+                };
 
-Required zmanim (return in 12-hour format with AM/PM):
-- alot_hashachar, misheyakir, sunrise, sof_zman_shma_gra, sof_zman_shma_mga
-- sof_zman_tefillah_gra, sof_zman_tefillah_mga, chatzot, mincha_gedola
-- mincha_ketana, plag_hamincha, candle_lighting, sunset
-- tzait_hakochavim, tzait_72, chatzot_laila
-
-LOCATION INFO:
-- location_name: City name for these coordinates
-- timezone: Local timezone`,
-            add_context_from_internet: true,
-            response_json_schema: {
-                type: "object",
-                properties: {
-                    location_name: { type: "string" },
-                    timezone: { type: "string" },
-                    zmanim: {
-                        type: "object",
-                        properties: {
-                            alot_hashachar:        { type: "string" },
-                            misheyakir:            { type: "string" },
-                            sunrise:               { type: "string" },
-                            sof_zman_shma_gra:     { type: "string" },
-                            sof_zman_shma_mga:     { type: "string" },
-                            sof_zman_tefillah_gra: { type: "string" },
-                            sof_zman_tefillah_mga: { type: "string" },
-                            chatzot:               { type: "string" },
-                            mincha_gedola:         { type: "string" },
-                            mincha_ketana:         { type: "string" },
-                            plag_hamincha:         { type: "string" },
-                            candle_lighting:       { type: "string" },
-                            sunset:                { type: "string" },
-                            tzait_hakochavim:      { type: "string" },
-                            tzait_72:              { type: "string" },
-                            chatzot_laila:         { type: "string" },
-                        }
-                    }
-                }
-            }
-        }).then(result => {
-            // Store the raw result (before day rules) so cache is date-agnostic
-            const fixed = fixAlotHashachar(fixCandleLighting(result));
-            setCache(key, fixed);
-            setZmanim(postProcess(fixed, date));
-        }).catch(() => {
-            setError('Failed to load zmanim.');
-        }).finally(() => {
-            setLoading(false);
-        });
+                // Store the raw result (before day rules) so cache is date-agnostic
+                const fixed = fixAlotHashachar(fixCandleLighting(rawResult));
+                setCache(key, fixed);
+                setZmanim(postProcess(fixed, date));
+            })
+            .catch((err) => {
+                console.error("Zmanim Hook Error:", err);
+                setError('Failed to load zmanim.');
+            })
+            .finally(() => {
+                setLoading(false);
+            });
     }, [location?.latitude, location?.longitude, dateStr]);
 
     return { zmanim, loading, error };
