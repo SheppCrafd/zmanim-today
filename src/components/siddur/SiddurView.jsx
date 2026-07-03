@@ -304,7 +304,7 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
   useEffect(() => {
     if (pendingJump === null || page !== 'reader') return;
 
-    // Check React Query cache directly instead of the old textMap state
+    // 1. Verify the data is in the cache
     const startIdx = Math.max(0, pendingJump - 2);
     let allReady = true;
     for (let j = startIdx; j <= pendingJump; j++) {
@@ -318,37 +318,54 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
       }
     }
 
-    if (!allReady) return; 
+    if (!allReady) return; // Still waiting for network, keep waiting
 
     let attempts = 0;
+    const maxAttempts = 30; // Extend to ~500ms to handle slower DOM renders
     
     const tryAlign = () => {
       const container = scrollRef.current;
       const el = rowRefs.current[pendingJump];
 
-      if (!container || !el) return;
+      if (!container || !el) return false;
+
+      // Check if the element has actually populated text yet.
+      // If it's less than 50px tall, it's likely still rendering the loading/empty state.
+      if (el.offsetHeight < 50) return false;
 
       const containerRect = container.getBoundingClientRect();
       const elRect = el.getBoundingClientRect();
+      
+      // Calculate exact distance to target header
       const targetTop = elRect.top - containerRect.top;
 
-      if (Math.abs(targetTop) > 1) {
+      // Snap the scrollbar exactly to that pixel
+      if (Math.abs(targetTop) > 0.5) {
         container.scrollTop += targetTop;
       }
+      return true;
     };
 
     const loop = () => {
       attempts++;
-      tryAlign();
+      const wasAligned = tryAlign();
 
-      if (attempts < 15) {
+      // If the DOM isn't ready or we haven't reached stability, keep pinning it.
+      // This forces the scrollbar to stay locked even as text elements pop into existence.
+      if (attempts < maxAttempts) {
         requestAnimationFrame(loop);
       } else {
-        setPendingJump(null);
+        setPendingJump(null); // Release the lock
       }
     };
 
-    requestAnimationFrame(loop);
+    // Use a macro-task delay (setTimeout 0) to allow React to complete 
+    // its render commit and paint the new text nodes into the DOM.
+    const timeoutId = setTimeout(() => {
+      requestAnimationFrame(loop);
+    }, 0);
+
+    return () => clearTimeout(timeoutId);
 
   }, [pendingJump, page, sections, queryClient]);
 
