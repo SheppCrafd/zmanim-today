@@ -159,7 +159,7 @@ export default function Zmanim() {
     }, [rawZmanim, prefs?.use24Hour]);
 
     const handleManualLocation = async (e) => {
-        preventDefault();
+        e.preventDefault();
         if (!manualLocation.trim()) return;
         setSearchingLocation(true);
         await searchSavedLocation(manualLocation);
