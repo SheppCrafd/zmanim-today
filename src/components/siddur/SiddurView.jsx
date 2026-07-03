@@ -76,6 +76,7 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
   const location = useLocation();
 
   const scrollRef = useRef(null);
+  const activeSectionRef = useRef(null);
   const [pendingJump, setPendingJump] = useState(null);
 
   const [sections, setSections] = useState([]);
@@ -116,31 +117,31 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
   });
 
   /* ---------------- FLATTEN THE STATE ---------------- */
-    const flatItems = React.useMemo(() => {
-      const items = [];
-      activeSections.forEach((sec, i) => {
-        const currentSectionIndex = range.start + i; // 1. Calculate it once per section
-      
-        items.push({ 
-          type: 'header', 
-          label: sec.label, 
-          sectionIndex: currentSectionIndex 
-        });
-      
-        const query = sectionQueries[i];
-        if (query.isLoading) {
-          items.push({ type: 'loading', id: `load-${sec.ref}`, sectionIndex: currentSectionIndex });
-        } else if (query.isError) {
-          items.push({ type: 'error', id: `err-${sec.ref}`, sectionIndex: currentSectionIndex });
-        } else if (query.data) {
-          // 2. Attach it to every single segment!
-          query.data.forEach(seg => {
-            items.push({ type: 'segment', ...seg, sectionIndex: currentSectionIndex });
-          });
-        }
+  // We mash headers, loading spinners, and segments into ONE 1D array
+  const flatItems = React.useMemo(() => {
+    const items = [];
+    activeSections.forEach((sec, i) => {
+      // 1. Push the Section Header
+      items.push({ 
+        type: 'header', 
+        label: sec.label, 
+        sectionIndex: range.start + i 
       });
-      return items;
-    }, [activeSections, sectionQueries, range.start]);
+      
+      const query = sectionQueries[i];
+      if (query.isLoading) {
+        items.push({ type: 'loading', id: `load-${sec.ref}` });
+      } else if (query.isError) {
+        items.push({ type: 'error', id: `err-${sec.ref}` });
+      } else if (query.data) {
+        // 2. Push every mapped segment for this section
+        query.data.forEach(seg => {
+          items.push({ type: 'segment', ...seg });
+        });
+      }
+    });
+    return items;
+  }, [activeSections, sectionQueries, range.start]);
 
   /* ---------------- VIRTUALIZER INITIALIZATION ---------------- */
   const virtualizer = useVirtualizer({
@@ -149,6 +150,31 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
     estimateSize: () => 100, // Guesses each row is 100px until measured
     overscan: 10,            // Keeps 10 rows rendered off-screen for smoothness
   });
+
+  /* ---------------- URL SYNCING ---------------- */
+  const visibleItems = virtualizer.getVirtualItems();
+  
+  useEffect(() => {
+    // Only run this if we are actively reading and have items on screen
+    if (page !== 'reader' || visibleItems.length === 0) return;
+
+    // Grab the very first item that TanStack is currently rendering
+    const topItemIndex = visibleItems[0].index;
+    const topItem = flatItems[topItemIndex];
+
+    // If the top item belongs to a different chapter than our current URL...
+    if (topItem && topItem.sectionIndex !== activeSectionRef.current) {
+      activeSectionRef.current = topItem.sectionIndex;
+
+      const basePath = '/' + location.pathname.split('/')[1]; 
+      
+      // Silently update the URL without refreshing the page!
+      navigate(
+        `${basePath}/section/${topItem.sectionIndex}/${langMode}`,
+        { replace: true }
+      );
+    }
+  }, [visibleItems, flatItems, page, langMode, navigate, location.pathname]);
 
   /* ---------------- SCROLL WINDOW ---------------- */
   const onScroll = (e) => {
