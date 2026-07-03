@@ -43,7 +43,7 @@ const AuthenticatedApp = () => {
 
   return (
     <AnimatePresence mode="wait">
-    <Routes location={location} key={location.pathname}>
+    <Routes location={location} key={location.pathname.split('/').slice(0, 2).join('/')}>
       <Route path="/" element={<PageWrapper><Home /></PageWrapper>} />
       <Route path="/Zmanim" element={<PageWrapper><Zmanim /></PageWrapper>} />
       <Route path="/Compass" element={<PageWrapper><Compass /></PageWrapper>} />

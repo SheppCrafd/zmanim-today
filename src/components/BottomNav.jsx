@@ -1,5 +1,5 @@
 import React from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Home, Clock, Compass, Settings } from 'lucide-react';
 
 const NAV_ITEMS = [
@@ -11,6 +11,7 @@ const NAV_ITEMS = [
 
 export default function BottomNav() {
     const location = useLocation();
+    const navigate = useNavigate();
 
     // Don't show on siddur pages
     const hiddenPaths = ['/SephardicSiddur', '/AshkenaziSiddur', '/ChabadSiddur'];
@@ -26,12 +27,13 @@ export default function BottomNav() {
                             key={path}
                             to={path}
                             aria-current={active ? 'page' : undefined}
+                            onClick={() => { if (active) navigate(path, { replace: true }); }}
                             className={`flex flex-col items-center gap-0.5 px-4 py-2 min-h-[44px] justify-center rounded-xl transition-colors select-none ${
                                 active ? 'text-blue-600' : 'text-slate-400 hover:text-slate-600'
                             }`}
                         >
                             <Icon className={`w-5 h-5 ${active ? 'stroke-[2.5]' : 'stroke-2'}`} />
-                            <span className={`text-[10px] font-medium ${active ? 'text-blue-600' : 'text-slate-400'}`}>
+                            <span className={`text-[11px] font-medium ${active ? 'text-blue-600' : 'text-slate-400'}`}>
                                 {label}
                             </span>
                         </Link>

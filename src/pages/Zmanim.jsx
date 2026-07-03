@@ -174,8 +174,50 @@ export default function Zmanim() {
         }
     };
 
+    // Pull-to-refresh
+    const touchStartY = useRef(0);
+    const [pullDistance, setPullDistance] = useState(0);
+    const [isRefreshing, setIsRefreshing] = useState(false);
+
+    const onTouchStart = (e) => {
+        if (window.scrollY === 0) {
+            touchStartY.current = e.touches[0].clientY;
+        } else {
+            touchStartY.current = 0;
+        }
+    };
+
+    const onTouchMove = (e) => {
+        if (touchStartY.current <= 0 || isRefreshing) return;
+        const diff = e.touches[0].clientY - touchStartY.current;
+        if (diff > 0) setPullDistance(Math.min(diff * 0.5, 80));
+    };
+
+    const onTouchEnd = async () => {
+        if (pullDistance > 60 && !isRefreshing) {
+            setIsRefreshing(true);
+            setPullDistance(40);
+            try { handleRefresh(); } catch { /* ignore */ }
+            setIsRefreshing(false);
+        }
+        setPullDistance(0);
+        touchStartY.current = 0;
+    };
+
     return (
-        <div className="min-h-screen bg-background pb-24">
+        <div
+            className="min-h-screen bg-background pb-24"
+            onTouchStart={onTouchStart}
+            onTouchMove={onTouchMove}
+            onTouchEnd={onTouchEnd}
+            style={{ overscrollBehaviorY: 'none' }}
+        >
+            {/* Pull-to-refresh indicator */}
+            {(pullDistance > 0 || isRefreshing) && (
+                <div className="flex justify-center overflow-hidden" style={{ height: `${pullDistance}px` }}>
+                    <Loader2 className={`text-blue-500 ${isRefreshing ? 'animate-spin' : ''}`} style={{ marginTop: 8 }} />
+                </div>
+            )}
             <div className="max-w-4xl mx-auto px-4 pt-safe pb-8 md:px-8">
                 {/* Header */}
                 <div className="flex items-center mb-8 min-h-[72px]">

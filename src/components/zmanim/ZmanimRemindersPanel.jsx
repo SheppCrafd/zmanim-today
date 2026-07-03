@@ -146,7 +146,7 @@ export default function ZmanimRemindersPanel({ zmanimData, currentDate }) {
                 </button>
             </SheetTrigger>
 
-            <SheetContent side="right" className="w-80 overflow-y-auto">
+            <SheetContent side="bottom" className="h-[85vh] overflow-y-auto rounded-t-xl">
                 <SheetHeader>
                     <SheetTitle className="flex items-center gap-2">
                         <Bell className="w-5 h-5" /> Zmanim Reminders

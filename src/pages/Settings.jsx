@@ -16,8 +16,10 @@ import {
     AlertDialogTitle,
     AlertDialogDescription,
     AlertDialogCancel,
+    AlertDialogAction,
 } from '@/components/ui/alert-dialog';
 import { LogOut, Trash2 } from 'lucide-react';
+import { base44 } from '@/api/base44Client';
 
 export default function Settings() {
     const navigate = useNavigate();
@@ -35,6 +37,19 @@ export default function Settings() {
     };
 
     const getLabel = (id) => ALL_DASHBOARD_ITEMS.find(i => i.id === id)?.label || id;
+
+    const handleDeleteAccount = async () => {
+        try {
+            if (typeof base44.auth.deleteAccount === 'function') {
+                await base44.auth.deleteAccount();
+            } else {
+                await logout();
+            }
+        } catch (err) {
+            await logout();
+        }
+        window.location.href = '/';
+    };
     const getIcon = (id) => ALL_DASHBOARD_ITEMS.find(i => i.id === id)?.icon || '⏱';
 
     return (
@@ -88,6 +103,9 @@ export default function Settings() {
                     <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700">
                         <button
                             onClick={toggleDark}
+                            role="switch"
+                            aria-checked={dark}
+                            aria-label="Toggle dark mode"
                             className="w-full flex items-center justify-between px-4 py-3"
                         >
                             <div className="flex items-center gap-3">
@@ -110,6 +128,9 @@ export default function Settings() {
                     <div className="bg-white rounded-xl border border-slate-200">
                         <button
                             onClick={toggle24Hour}
+                            role="switch"
+                            aria-checked={prefs.use24Hour}
+                            aria-label="Toggle 24-hour time"
                             className="w-full flex items-center justify-between px-4 py-3"
                         >
                             <div>
@@ -214,12 +235,18 @@ export default function Settings() {
                                 <AlertDialogHeader>
                                     <AlertDialogTitle>Delete Account</AlertDialogTitle>
                                     <AlertDialogDescription>
-                                        Permanently deleting your account will remove all your data. This action cannot be undone. To complete account deletion, please contact Base44 support from your dashboard settings.
+                                        This will permanently delete your account, prayer time preferences, saved location, and all app data. This action cannot be undone.
                                     </AlertDialogDescription>
-                                </AlertDialogHeader>
-                                <AlertDialogFooter>
-                                    <AlertDialogCancel>I Understand</AlertDialogCancel>
-                                </AlertDialogFooter>
+                                    </AlertDialogHeader>
+                                    <AlertDialogFooter>
+                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                    <AlertDialogAction
+                                        onClick={handleDeleteAccount}
+                                        className="bg-red-600 text-white hover:bg-red-700"
+                                    >
+                                        Delete My Account
+                                    </AlertDialogAction>
+                                    </AlertDialogFooter>
                             </AlertDialogContent>
                         </AlertDialog>
                     </div>
