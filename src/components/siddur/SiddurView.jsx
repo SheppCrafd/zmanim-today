@@ -264,7 +264,7 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
         {/* TOC VIEW */}
         {page === 'toc' && (
            // ... (Leave your TOC mapping code here exactly as it was) ...
-           <div className="h-full overflow-y-auto px-4 pb-24">
+           <div className="h-full overflow-y-auto px-4 pb-24" style={{ overscrollBehaviorY: 'none' }}>
              {/* Replace this comment with your TOC rendering logic */}
              {categoryOrder.map(category => {
               const items = groupedSections[category];
@@ -298,6 +298,7 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
             className="h-full overflow-y-auto px-4 pb-24"
             onScroll={onScroll}
             ref={scrollRef}
+            style={{ overscrollBehaviorY: 'none' }}
           >
             {/* The Virtualizer Wrapper */}
             <div

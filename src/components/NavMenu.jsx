@@ -24,7 +24,8 @@ export default function NavMenu() {
             {/* Hamburger Button */}
             <button
                 onClick={() => setOpen(true)}
-                className="p-2 rounded-lg bg-white/90 shadow-sm border border-slate-200 hover:bg-slate-50 transition-colors"
+                aria-label="Open navigation menu"
+                className="p-3 rounded-lg bg-white/90 shadow-sm border border-slate-200 hover:bg-slate-50 transition-colors select-none"
             >
                 <Menu className="w-5 h-5 text-slate-700" />
             </button>
@@ -43,7 +44,7 @@ export default function NavMenu() {
                     <h2 className="text-lg font-bold text-slate-800">Menu</h2>
                     <button
                         onClick={() => setOpen(false)}
-                        className="p-1 rounded hover:bg-slate-100 transition-colors"
+                        className="p-1 rounded hover:bg-slate-100 transition-colors select-none"
                     >
                         <X className="w-5 h-5 text-slate-600" />
                     </button>
@@ -74,7 +75,7 @@ export default function NavMenu() {
                     {/* Siddurim section */}
                     <button
                         onClick={() => setSiddurimOpen(!siddurimOpen)}
-                        className="w-full flex items-center gap-3 p-3 rounded-xl text-slate-700 hover:bg-slate-50 transition-colors"
+                        className="w-full flex items-center gap-3 p-3 rounded-xl text-slate-700 hover:bg-slate-50 transition-colors select-none"
                     >
                         <div className="p-2 rounded-lg bg-slate-100">
                             <BookOpen className="w-4 h-4" />

@@ -4,7 +4,9 @@ import { QueryClientProvider } from '@tanstack/react-query'
 import { queryClientInstance } from '@/lib/query-client'
 import VisualEditAgent from '@/lib/VisualEditAgent'
 import NavigationTracker from '@/lib/NavigationTracker'
-import { BrowserRouter as Router, Route, Routes } from 'react-router-dom'
+import { BrowserRouter as Router, Route, Routes, useLocation } from 'react-router-dom'
+import { AnimatePresence } from 'framer-motion'
+import PageWrapper from './components/PageWrapper'
 import PageNotFound from './lib/PageNotFound'
 import { AuthProvider, useAuth } from '@/lib/AuthContext'
 import { ThemeProvider } from '@/lib/ThemeContext'
@@ -21,6 +23,7 @@ import Settings from './pages/Settings'
 
 const AuthenticatedApp = () => {
   const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
+  const location = useLocation();
 
   if (isLoadingPublicSettings || isLoadingAuth) {
     return (
@@ -39,21 +42,22 @@ const AuthenticatedApp = () => {
   }
 
   return (
-    <Routes>
-      <Route path="/" element={<Home />} />
-      <Route path="/Zmanim" element={<Zmanim />} />
-      <Route path="/Compass" element={<Compass />} />
-      <Route path="/Settings" element={<Settings />} />
+    <AnimatePresence mode="wait">
+    <Routes location={location} key={location.pathname}>
+      <Route path="/" element={<PageWrapper><Home /></PageWrapper>} />
+      <Route path="/Zmanim" element={<PageWrapper><Zmanim /></PageWrapper>} />
+      <Route path="/Compass" element={<PageWrapper><Compass /></PageWrapper>} />
+      <Route path="/Settings" element={<PageWrapper><Settings /></PageWrapper>} />
 
       {/* SIDDUR ROUTES (NEW ARCHITECTURE) */}
-      <Route path="/SephardicSiddur/toc" element={<SephardicSiddur />} />
-      <Route path="/SephardicSiddur/section/:sectionId/:language" element={<SephardicSiddur />} />
+      <Route path="/SephardicSiddur/toc" element={<PageWrapper><SephardicSiddur /></PageWrapper>} />
+      <Route path="/SephardicSiddur/section/:sectionId/:language" element={<PageWrapper><SephardicSiddur /></PageWrapper>} />
 
-      <Route path="/AshkenaziSiddur/toc" element={<AshkenaziSiddur />} />
-      <Route path="/AshkenaziSiddur/section/:sectionId/:language" element={<AshkenaziSiddur />} />
+      <Route path="/AshkenaziSiddur/toc" element={<PageWrapper><AshkenaziSiddur /></PageWrapper>} />
+      <Route path="/AshkenaziSiddur/section/:sectionId/:language" element={<PageWrapper><AshkenaziSiddur /></PageWrapper>} />
 
-      <Route path="/ChabadSiddur/toc" element={<ChabadSiddur />} />
-      <Route path="/ChabadSiddur/section/:sectionId/:language" element={<ChabadSiddur />} />
+      <Route path="/ChabadSiddur/toc" element={<PageWrapper><ChabadSiddur /></PageWrapper>} />
+      <Route path="/ChabadSiddur/section/:sectionId/:language" element={<PageWrapper><ChabadSiddur /></PageWrapper>} />
 
       <Route path="*" element={<PageNotFound />} />
 
@@ -72,6 +76,7 @@ const AuthenticatedApp = () => {
       element={<Navigate to="/ChabadSiddur/toc" replace />}
       />
       </Routes>
+    </AnimatePresence>
   );
 };
 

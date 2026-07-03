@@ -6,12 +6,25 @@ import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import { useDashboardPrefs, ALL_DASHBOARD_ITEMS } from '@/hooks/useDashboardPrefs';
 import { useSavedLocation } from '@/hooks/useLocation';
 import { useTheme } from '@/lib/ThemeContext';
+import { useAuth } from '@/lib/AuthContext';
+import {
+    AlertDialog,
+    AlertDialogTrigger,
+    AlertDialogContent,
+    AlertDialogHeader,
+    AlertDialogFooter,
+    AlertDialogTitle,
+    AlertDialogDescription,
+    AlertDialogCancel,
+} from '@/components/ui/alert-dialog';
+import { LogOut, Trash2 } from 'lucide-react';
 
 export default function Settings() {
     const navigate = useNavigate();
     const { prefs, toggleItem, reorderItems, toggle24Hour } = useDashboardPrefs();
     const { location, clearLocation } = useSavedLocation();
     const { dark, toggleDark } = useTheme();
+    const { logout } = useAuth();
 
     const onDragEnd = (result) => {
         if (!result.destination) return;
@@ -26,7 +39,7 @@ export default function Settings() {
 
     return (
         <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-amber-50 pb-24">
-            <div className="max-w-lg mx-auto px-4 pt-4">
+            <div className="max-w-lg mx-auto px-4 pt-safe">
 
                 <div className="flex items-center mb-6 min-h-[56px]">
                     <div className="shrink-0"><NavMenu /></div>
@@ -176,6 +189,39 @@ export default function Settings() {
                                 </svg>
                             </a>
                         ))}
+                    </div>
+                </div>
+
+                {/* Account */}
+                <div className="mb-6">
+                    <p className="text-xs font-semibold uppercase tracking-widest text-slate-400 mb-2 px-1">Account</p>
+                    <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 divide-y divide-slate-100 dark:divide-slate-700">
+                        <button
+                            onClick={() => logout()}
+                            className="w-full flex items-center gap-3 px-4 py-3 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors"
+                        >
+                            <LogOut className="w-4 h-4 text-slate-400" />
+                            <span className="text-sm font-medium">Log Out</span>
+                        </button>
+                        <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                                <button className="w-full flex items-center gap-3 px-4 py-3 text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors">
+                                    <Trash2 className="w-4 h-4" />
+                                    <span className="text-sm font-medium">Delete Account</span>
+                                </button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                                <AlertDialogHeader>
+                                    <AlertDialogTitle>Delete Account</AlertDialogTitle>
+                                    <AlertDialogDescription>
+                                        Permanently deleting your account will remove all your data. This action cannot be undone. To complete account deletion, please contact Base44 support from your dashboard settings.
+                                    </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                    <AlertDialogCancel>I Understand</AlertDialogCancel>
+                                </AlertDialogFooter>
+                            </AlertDialogContent>
+                        </AlertDialog>
                     </div>
                 </div>
 

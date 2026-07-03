@@ -17,7 +17,7 @@ export default function BottomNav() {
     if (hiddenPaths.includes(location.pathname)) return null;
 
     return (
-        <nav className="fixed bottom-0 left-0 right-0 z-40 bg-white border-t border-slate-200 safe-area-inset-bottom">
+        <nav className="fixed bottom-0 left-0 right-0 z-40 bg-white border-t border-slate-200 select-none" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
             <div className="flex items-center justify-around h-16 max-w-lg mx-auto">
                 {NAV_ITEMS.map(({ label, path, icon: Icon }) => {
                     const active = location.pathname === path;
@@ -25,7 +25,8 @@ export default function BottomNav() {
                         <Link
                             key={path}
                             to={path}
-                            className={`flex flex-col items-center gap-0.5 px-4 py-2 rounded-xl transition-colors ${
+                            aria-current={active ? 'page' : undefined}
+                            className={`flex flex-col items-center gap-0.5 px-4 py-2 min-h-[44px] justify-center rounded-xl transition-colors select-none ${
                                 active ? 'text-blue-600' : 'text-slate-400 hover:text-slate-600'
                             }`}
                         >
