@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -19,7 +19,7 @@ export default function Zmanim() {
     const { location, loading: gpsLoading, detectGPS, searchLocation: searchSavedLocation, clearLocation } = useSavedLocation();
     const { prefs } = useDashboardPrefs();
     const [calculating, setCalculating] = useState(false);
-    const [zmanim, setZmanim] = useState(null);
+    const [rawZmanim, setRawZmanim] = useState(null); // Stores raw unformatted timestamps
     const [error, setError] = useState(null);
     const [currentDate, setCurrentDate] = useState(new Date());
     const [manualLocation, setManualLocation] = useState('');
@@ -70,65 +70,50 @@ export default function Zmanim() {
             }
 
             const data = await response.json();
-
-            const formatTime = (timeInput) => {
-                if (!timeInput) return "";
-                const d = new Date(timeInput);
-                return d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
-            };
-
             const dayOfWeek = currentDate.getDay();
 
-            // 2. Candle Lighting: Calculate for Friday, OR if Hebcal provided a Yom Tov time
+            // 2. Candle Lighting: Calculate raw time for Friday, OR if Hebcal provided a Yom Tov time
             let candleLightingTime = data.times.candleLighting;
             if (!candleLightingTime && dayOfWeek === 5 && data.times.sunset) {
                 const sunsetDate = new Date(data.times.sunset);
                 sunsetDate.setMinutes(sunsetDate.getMinutes() - 18);
-                candleLightingTime = sunsetDate; 
+                candleLightingTime = sunsetDate.toISOString(); 
             }
 
-            // 3. Havdalah: ONLY calculate if it's Saturday
+            // 3. Havdalah: ONLY calculate raw time if it's Saturday
             let havdalahTime = null;
             if (dayOfWeek === 6 && data.times.tzeit85deg) {
                 havdalahTime = data.times.tzeit85deg;
             }
 
-            // 4. Build the base zmanim object without conditional keys
-            const zmanimData = {
-                alot_hashachar: formatTime(data.times.alotHashachar),
-                misheyakir: formatTime(data.times.misheyakir),
-                sunrise: formatTime(data.times.sunrise),
-                sof_zman_shma_gra: formatTime(data.times.sofZmanShma),
-                sof_zman_shma_mga: formatTime(data.times.sofZmanShmaMGA),
-                sof_zman_tefillah_gra: formatTime(data.times.sofZmanTfilla),
-                sof_zman_tefillah_mga: formatTime(data.times.sofZmanTfillaMGA),
-                chatzot: formatTime(data.times.chatzot),
-                mincha_gedola: formatTime(data.times.minchaGedola),
-                mincha_ketana: formatTime(data.times.minchaKetana),
-                plag_hamincha: formatTime(data.times.plagHaMincha),
-                sunset: formatTime(data.times.sunset),
-                tzait_hakochavim: formatTime(data.times.tzeit85deg), 
-                tzait_72: formatTime(data.times.tzeit72min),
-                chatzot_laila: formatTime(data.times.chatzotNight),
-            };
-
-            // 5. Only add Candle Lighting and Havdalah if they actually exist
-            if (candleLightingTime) {
-                zmanimData.candle_lighting = formatTime(candleLightingTime);
-            }
-            if (havdalahTime) {
-                zmanimData.havdalah = formatTime(havdalahTime);
-            }
-
+            // 4. Build the base raw payload
             const result = {
                 location_name: location.city || location.name || "Selected Location",
                 timezone: data.location?.tzid || "Local Time",
-                zmanim: zmanimData
+                times: {
+                    alot_hashachar: data.times.alotHashachar,
+                    misheyakir: data.times.misheyakir,
+                    sunrise: data.times.sunrise,
+                    sof_zman_shma_gra: data.times.sofZmanShma,
+                    sof_zman_shma_mga: data.times.sofZmanShmaMGA,
+                    sof_zman_tefillah_gra: data.times.sofZmanTfilla,
+                    sof_zman_tefillah_mga: data.times.sofZmanTfillaMGA,
+                    chatzot: data.times.chatzot,
+                    mincha_gedola: data.times.minchaGedola,
+                    mincha_ketana: data.times.minchaKetana,
+                    plag_hamincha: data.times.plagHaMincha,
+                    sunset: data.times.sunset,
+                    tzait_hakochavim: data.times.tzeit85deg, 
+                    tzait_72: data.times.tzeit72min,
+                    chatzot_laila: data.times.chatzotNight,
+                    candle_lighting: candleLightingTime || null,
+                    havdalah: havdalahTime || null,
+                }
             };
 
             // Only update state if this is the most recent request
             if (requestRef.current === currentRequest) {
-                setZmanim(result);
+                setRawZmanim(result);
                 setError(null);
             }
 
@@ -136,7 +121,7 @@ export default function Zmanim() {
             console.error("Zmanim Fetch Error:", err);
             if (requestRef.current === currentRequest) {
                 setError('Failed to load zmanim data. Please try again.');
-                setZmanim(null);
+                setRawZmanim(null);
             }
         } finally {
             if (requestRef.current === currentRequest) {
@@ -145,8 +130,36 @@ export default function Zmanim() {
         }
     };
 
+    // 5. Dynamically format the zmanim object whenever raw data or 12h/24h pref changes
+    const zmanim = useMemo(() => {
+        if (!rawZmanim) return null;
+
+        const formatTime = (timeInput) => {
+            if (!timeInput) return "";
+            const d = new Date(timeInput);
+            return d.toLocaleTimeString([], { 
+                hour: 'numeric', 
+                minute: '2-digit',
+                hour12: !prefs?.use24Hour // Toggle 12hr representation dynamically
+            });
+        };
+
+        const formattedZmanimData = {};
+        Object.keys(rawZmanim.times).forEach(key => {
+            if (rawZmanim.times[key]) {
+                formattedZmanimData[key] = formatTime(rawZmanim.times[key]);
+            }
+        });
+
+        return {
+            location_name: rawZmanim.location_name,
+            timezone: rawZmanim.timezone,
+            zmanim: formattedZmanimData
+        };
+    }, [rawZmanim, prefs?.use24Hour]);
+
     const handleManualLocation = async (e) => {
-        e.preventDefault();
+        preventDefault();
         if (!manualLocation.trim()) return;
         setSearchingLocation(true);
         await searchSavedLocation(manualLocation);
@@ -254,7 +267,7 @@ export default function Zmanim() {
                                     size="sm"
                                     onClick={() => {
                                         clearLocation();
-                                        setZmanim(null);
+                                        setRawZmanim(null);
                                         setManualLocation('');
                                     }}
                                     className="text-slate-500 hover:text-slate-700"
