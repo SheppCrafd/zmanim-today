@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
-import { useQueries } from '@tanstack/react-query';
+import { useQueries, useQueryClient } from '@tanstack/react-query';
 import {
   ExternalLink,
   Loader2,
@@ -10,7 +10,7 @@ import {
 import { Button } from '@/components/ui/button';
 import NavMenu from '@/components/NavMenu';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { useSefariaText, usePrefetchSefariaText, fetchAndZipSefaria } from '@/hooks/useSefaria';
+import { fetchAndZipSefaria } from '@/hooks/useSefaria';
 
 /* ---------------- TOC CATEGORIZER ---------------- */
 function getCategory(breadcrumb) {
@@ -74,6 +74,7 @@ function sanitizeHTML(htmlString) {
 export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
   const navigate = useNavigate();
   const location = useLocation();
+  const queryClient = useQueryClient();
 
   const scrollRef = useRef(null);
   const activeSectionRef = useRef(null);
@@ -103,6 +104,37 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
         setLoading(false);
       });
   }, [bookRef]);
+
+  /* ---------------- SILENT BACKGROUND PREFETCHER ---------------- */
+  useEffect(() => {
+    // Only run if we actually have sections to fetch
+    if (sections.length === 0) return;
+
+    const prefetchAllSections = async () => {
+      const batchSize = 5; // Fetch 5 chapters at a time
+      
+      for (let i = 0; i < sections.length; i += batchSize) {
+        const batch = sections.slice(i, i + batchSize);
+        
+        // Fetch the batch concurrently
+        await Promise.all(
+          batch.map(sec =>
+            queryClient.prefetchQuery({
+              queryKey: ['sefaria-text', sec.ref],
+              queryFn: () => fetchAndZipSefaria(sec.ref),
+              staleTime: 1000 * 60 * 60 * 24, // Keep it fresh for 24 hours
+            })
+          )
+        );
+
+        // Wait 500ms before hitting Sefaria with the next batch to avoid rate limits
+        await new Promise(resolve => setTimeout(resolve, 500));
+      }
+    };
+
+    // Kick off the background download!
+    prefetchAllSections();
+  }, [sections, queryClient]);
 
   /* ---------------- DATA FETCHING (USE QUERIES) ---------------- */
   const activeSections = sections.slice(range.start, range.end + 1);
