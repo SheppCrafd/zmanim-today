@@ -272,22 +272,26 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
 
   /* ---------------- SCROLL WINDOW ---------------- */
   const onScroll = (e) => {
-    const el = e.target;
+      // CRITICAL GUARD: If we are programmatically jumping, 
+      // ignore scroll events so we don't accidentally expand pagination mid-flight.
+      if (pendingJump !== null) return;
 
-    if (el.scrollTop + el.clientHeight > el.scrollHeight - 800) {
-      setRange(r => ({
-        start: r.start,
-        end: Math.min(sections.length - 1, r.end + 2)
-      }));
-    }
+      const el = e.target;
 
-    if (el.scrollTop < 800) {
-      setRange(r => ({
-        start: Math.max(0, r.start - 2),
-        end: r.end
-      }));
-    }
-  };
+      if (el.scrollTop + el.clientHeight > el.scrollHeight - 800) {
+        setRange(r => ({
+          start: r.start,
+          end: Math.min(sections.length - 1, r.end + 2)
+        }));
+      }
+
+      if (el.scrollTop < 800) {
+        setRange(r => ({
+          start: Math.max(0, r.start - 2),
+          end: r.end
+        }));
+      }
+    };
 
   /* ---------------- FIXED JUMP ---------------- */
   const jumpTo = (i) => {
