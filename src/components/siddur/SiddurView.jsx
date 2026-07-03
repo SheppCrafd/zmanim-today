@@ -8,6 +8,7 @@ import {
 import { Button } from '@/components/ui/button';
 import NavMenu from '@/components/NavMenu';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { useSefariaText, usePrefetchSefariaText } from '@/hooks/useSefaria';
 
 
 /* ---------------- TOC CATEGORIZER ---------------- */
@@ -75,10 +76,18 @@ function sanitizeHTML(htmlString) {
   return doc.body.innerHTML;
 }
 
-
 /* ---------------- SECTION ---------------- */
-function Section({ sec, data, langMode, rowRef, index }) {
-  if (!data) {
+function Section({ sec, langMode, rowRef, index, prefetchRefs = [] }) {
+  // 1. Fetch text using React Query
+  const { data, isLoading, isError } = useSefariaText(sec.ref);
+  const prefetchText = usePrefetchSefariaText();
+
+  // 2. Automatically prefetch the next sections when this one mounts
+  useEffect(() => {
+    prefetchRefs.forEach(ref => prefetchText(ref));
+  }, [prefetchRefs, prefetchText]);
+
+  if (isLoading) {
     return (
       <div className="py-10 flex justify-center">
         <Loader2 className="animate-spin text-blue-500" />
@@ -86,8 +95,7 @@ function Section({ sec, data, langMode, rowRef, index }) {
     );
   }
 
-
-  if (data.error) {
+  if (isError) {
     return (
       <div className="text-center text-sm text-red-500">
         Failed to load section
@@ -95,17 +103,13 @@ function Section({ sec, data, langMode, rowRef, index }) {
     );
   }
 
-
-  const heArr = data.he || [];
-  const enArr = data.en || [];
-
+  const heArr = data?.he || [];
+  const enArr = data?.en || [];
 
   const showEN = langMode !== 'he';
   const showHB = langMode !== 'en';
 
-
   const maxLen = Math.max(heArr.length, enArr.length);
-
 
   return (
     <div
@@ -119,7 +123,6 @@ function Section({ sec, data, langMode, rowRef, index }) {
         </p>
       </div>
 
-
       <div className="space-y-6">
         {Array.from({ length: maxLen }).map((_, i) => (
           <div key={i} className="space-y-2">
@@ -130,7 +133,6 @@ function Section({ sec, data, langMode, rowRef, index }) {
                 dangerouslySetInnerHTML={{ __html: sanitizeHTML(heArr[i]) }}
               />
             )}
-
 
             {showEN && enArr[i] && (
               <p
@@ -144,7 +146,6 @@ function Section({ sec, data, langMode, rowRef, index }) {
     </div>
   );
 }
-
 
 /* ---------------- MAIN ---------------- */
 export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
@@ -526,15 +527,17 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
           >
             {sections.slice(range.start, range.end + 1).map((sec, i) => {
               const index = range.start + i;
-
+              
+              // Calculate which sections to prefetch (e.g., the next 2 sections)
+              const nextSections = sections.slice(index + 1, index + 3).map(s => s.ref);
 
               return (
                 <Section
                   key={index}
                   index={index}
                   sec={sec}
-                  data={textMap[index]}
                   langMode={langMode}
+                  prefetchRefs={nextSections}
                   rowRef={(el) => {
                     rowRefs.current[index] = el;
                   }}
