@@ -303,10 +303,34 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
     setPendingJump(i);
   };
 
+  const scrollToExactHeader = (targetIndex) => {
+      const container = scrollRef.current;
+      const el = rowRefs.current[targetIndex];
+
+      if (!container || !el) return false;
+
+      // Check if the container is still showing the empty/loading state.
+      // If it's short, the text hasn't painted yet.
+      if (el.offsetHeight < 100) return false;
+
+      // Get exact screen coordinates
+      const containerRect = container.getBoundingClientRect();
+      const elRect = el.getBoundingClientRect();
+
+      // Calculate the distance needed to make the top of the element (the header)
+      // hit the exact top of the scroll window.
+      const distanceToTop = elRect.top - containerRect.top;
+
+      // Apply the math directly to the scrollbar
+      container.scrollTop = container.scrollTop + distanceToTop;
+    
+      return true;
+    };
+
   useEffect(() => {
     if (pendingJump === null || page !== 'reader') return;
 
-    // 1. Verify the data is in the cache
+    // 1. VERIFY DATA: Ensure React Query has the data before we even try to scroll
     const startIdx = Math.max(0, pendingJump - 2);
     let allReady = true;
     for (let j = startIdx; j <= pendingJump; j++) {
@@ -320,54 +344,39 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
       }
     }
 
-    if (!allReady) return; // Still waiting for network, keep waiting
+    if (!allReady) return; // Keep waiting for network
 
+    // 2. VERIFY DOM: Data is in memory, now wait for React to paint it
     let attempts = 0;
-    const maxAttempts = 30; // Extend to ~500ms to handle slower DOM renders
-    
-    const tryAlign = () => {
-      const container = scrollRef.current;
-      const el = rowRefs.current[pendingJump];
+    const maxAttempts = 50; // Give it about 800ms total to settle
 
-      if (!container || !el) return false;
-
-      // Check if the element has actually populated text yet.
-      // If it's less than 50px tall, it's likely still rendering the loading/empty state.
-      if (el.offsetHeight < 50) return false;
-
-      const containerRect = container.getBoundingClientRect();
-      const elRect = el.getBoundingClientRect();
-      
-      // Calculate exact distance to target header
-      const targetTop = elRect.top - containerRect.top;
-
-      // Snap the scrollbar exactly to that pixel
-      if (Math.abs(targetTop) > 0.5) {
-        container.scrollTop += targetTop;
-      }
-      return true;
-    };
-
-    const loop = () => {
+    const executionLoop = () => {
       attempts++;
-      const wasAligned = tryAlign();
+      
+      // Fire our precision function
+      const success = scrollToExactHeader(pendingJump);
 
-      // If the DOM isn't ready or we haven't reached stability, keep pinning it.
-      // This forces the scrollbar to stay locked even as text elements pop into existence.
-      if (attempts < maxAttempts) {
-        requestAnimationFrame(loop);
+      if (success) {
+        // It successfully found the fully rendered text and aligned it.
+        // We fire it one more time on the next frame just to ensure no 
+        // late-stage layout shifts bumped it, then release the lock.
+        requestAnimationFrame(() => {
+          scrollToExactHeader(pendingJump);
+          setPendingJump(null);
+        });
+      } else if (attempts < maxAttempts) {
+        // Text is still painting. Try again next frame.
+        requestAnimationFrame(executionLoop);
       } else {
-        setPendingJump(null); // Release the lock
+        // Timeout safeguard
+        setPendingJump(null);
       }
     };
 
-    // Use a macro-task delay (setTimeout 0) to allow React to complete 
-    // its render commit and paint the new text nodes into the DOM.
-    const timeoutId = setTimeout(() => {
-      requestAnimationFrame(loop);
+    // Push the first check to the end of the event loop to let React commit
+    setTimeout(() => {
+      requestAnimationFrame(executionLoop);
     }, 0);
-
-    return () => clearTimeout(timeoutId);
 
   }, [pendingJump, page, sections, queryClient]);
 
