@@ -10,6 +10,7 @@ import { AuthProvider, useAuth } from '@/lib/AuthContext'
 import { ThemeProvider } from '@/lib/ThemeContext'
 import UserNotRegisteredError from '@/components/UserNotRegisteredError'
 import { Navigate } from 'react-router-dom';
+import { AnimatedPageShell, PullToRefreshShell } from '@/components/MobileAppShell'
 
 import Home from './pages/Home'
 import Zmanim from './pages/Zmanim'
@@ -39,6 +40,7 @@ const AuthenticatedApp = () => {
   }
 
   return (
+    <AnimatedPageShell>
     <Routes>
       <Route path="/" element={<Home />} />
       <Route path="/Zmanim" element={<Zmanim />} />
@@ -72,6 +74,7 @@ const AuthenticatedApp = () => {
       element={<Navigate to="/ChabadSiddur/toc" replace />}
       />
       </Routes>
+    </AnimatedPageShell>
   );
 };
 
@@ -82,7 +85,9 @@ function App() {
         <QueryClientProvider client={queryClientInstance}>
           <Router>
             <NavigationTracker />
-            <AuthenticatedApp />
+            <PullToRefreshShell>
+              <AuthenticatedApp />
+            </PullToRefreshShell>
           </Router>
           <Toaster />
           <VisualEditAgent />

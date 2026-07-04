@@ -6,12 +6,27 @@ import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import { useDashboardPrefs, ALL_DASHBOARD_ITEMS } from '@/hooks/useDashboardPrefs';
 import { useSavedLocation } from '@/hooks/useLocation';
 import { useTheme } from '@/lib/ThemeContext';
+import { useAuth } from '@/lib/AuthContext';
+import { toast } from '@/components/ui/use-toast';
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+    AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
 
 export default function Settings() {
     const navigate = useNavigate();
     const { prefs, toggleItem, reorderItems, toggle24Hour } = useDashboardPrefs();
     const { location, clearLocation } = useSavedLocation();
     const { dark, toggleDark } = useTheme();
+    const { isAuthenticated, deleteAccount } = useAuth();
+    const [deletingAccount, setDeletingAccount] = useState(false);
 
     const onDragEnd = (result) => {
         if (!result.destination) return;
@@ -23,6 +38,28 @@ export default function Settings() {
 
     const getLabel = (id) => ALL_DASHBOARD_ITEMS.find(i => i.id === id)?.label || id;
     const getIcon = (id) => ALL_DASHBOARD_ITEMS.find(i => i.id === id)?.icon || '⏱';
+    const handleDeleteAccount = async () => {
+        setDeletingAccount(true);
+        try {
+            const result = await deleteAccount();
+            if (result?.deleted) {
+                toast({
+                    title: 'Account deleted',
+                    description: 'Your account has been removed.',
+                });
+                navigate('/');
+            }
+        } catch (error) {
+            console.error('Account deletion failed:', error);
+            toast({
+                title: 'Deletion needs another step',
+                description: 'Please use the account page that opens next to finish removing your account.',
+                variant: 'destructive',
+            });
+        } finally {
+            setDeletingAccount(false);
+        }
+    };
 
     return (
         <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-amber-50 pb-24">
@@ -157,6 +194,46 @@ export default function Settings() {
                     </DragDropContext>
                 </div>
 
+                {/* Account */}
+                {isAuthenticated && (
+                    <div className="mb-6">
+                        <p className="text-xs font-semibold uppercase tracking-widest text-slate-400 mb-2 px-1">Account</p>
+                        <div className="bg-white dark:bg-slate-800 rounded-xl border border-red-100 dark:border-red-900/50">
+                            <div className="px-4 py-3">
+                                <p className="text-sm font-medium text-slate-800 dark:text-slate-100">Delete Account</p>
+                                <p className="text-xs text-slate-400 mt-1">Permanently remove your account and profile data.</p>
+                                <AlertDialog>
+                                    <AlertDialogTrigger asChild>
+                                        <button className="mt-3 w-full rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm font-semibold text-red-700 transition-colors hover:bg-red-100 dark:border-red-900/60 dark:bg-red-950/30 dark:text-red-300">
+                                            Delete my account
+                                        </button>
+                                    </AlertDialogTrigger>
+                                    <AlertDialogContent className="mx-4 max-w-sm rounded-xl">
+                                        <AlertDialogHeader>
+                                            <AlertDialogTitle>Delete your account?</AlertDialogTitle>
+                                            <AlertDialogDescription>
+                                                This is permanent. Your account access and saved profile data will be removed.
+                                            </AlertDialogDescription>
+                                        </AlertDialogHeader>
+                                        <AlertDialogFooter>
+                                            <AlertDialogCancel disabled={deletingAccount}>Cancel</AlertDialogCancel>
+                                            <AlertDialogAction
+                                                onClick={handleDeleteAccount}
+                                                disabled={deletingAccount}
+                                                className="bg-red-600 text-white hover:bg-red-700"
+                                            >
+                                                {deletingAccount ? 'Deleting...' : 'Delete account'}
+                                            </AlertDialogAction>
+                                        </AlertDialogFooter>
+                                    </AlertDialogContent>
+                                </AlertDialog>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {false && (
+                    <React.Fragment>
                 {/* Siddurim */}
                 <div className="mb-6">
                     <p className="text-xs font-semibold uppercase tracking-widest text-slate-400 mb-2 px-1">Siddurim</p>
@@ -178,6 +255,8 @@ export default function Settings() {
                         ))}
                     </div>
                 </div>
+                    </React.Fragment>
+                )}
 
             </div>
         </div>

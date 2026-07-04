@@ -2,6 +2,93 @@
 @tailwind components;
 @tailwind utilities;
 
+html {
+  min-height: 100%;
+  overscroll-behavior: none;
+  background: hsl(var(--background));
+}
+
+body {
+  min-width: 320px;
+  min-height: 100vh;
+  min-height: 100dvh;
+  margin: 0;
+  overscroll-behavior-y: none;
+  -webkit-overflow-scrolling: touch;
+  -webkit-tap-highlight-color: transparent;
+  padding-top: env(safe-area-inset-top);
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
+}
+
+#root {
+  min-height: 100vh;
+  min-height: 100dvh;
+  isolation: isolate;
+}
+
+button,
+a,
+nav,
+[role="button"],
+.safe-area-inset-bottom,
+.mobile-ui-chrome {
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+input,
+textarea,
+[contenteditable="true"],
+.selectable-text {
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+.safe-area-inset-bottom {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+.mobile-app-shell {
+  min-height: 100vh;
+  min-height: 100dvh;
+  overscroll-behavior-y: contain;
+}
+
+.pull-refresh-indicator {
+  position: fixed;
+  top: calc(env(safe-area-inset-top) + 8px);
+  left: 50%;
+  z-index: 60;
+  width: 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  color: rgb(37 99 235);
+  background: rgba(255, 255, 255, 0.96);
+  border: 1px solid rgb(226 232 240);
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.16);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 160ms ease, transform 180ms ease;
+}
+
+.pull-refresh-indicator.is-visible {
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
 
 /* :root {
   font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;

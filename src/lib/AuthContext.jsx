@@ -128,6 +128,31 @@ export const AuthProvider = ({ children }) => {
     base44.auth.redirectToLogin(window.location.href);
   };
 
+  const deleteAccount = async () => {
+    const deletionMethods = [
+      base44.auth.deleteAccount,
+      base44.auth.deleteCurrentUser,
+      base44.auth.deleteMe,
+      base44.auth.removeAccount,
+    ].filter(Boolean);
+
+    for (const deletionMethod of deletionMethods) {
+      try {
+        await deletionMethod.call(base44.auth);
+        setUser(null);
+        setIsAuthenticated(false);
+        return { deleted: true };
+      } catch (error) {
+        console.error('Account deletion method failed:', error);
+      }
+    }
+
+    const returnUrl = encodeURIComponent(window.location.origin);
+    const deleteUrl = `${appParams.serverUrl}/account/delete?app_id=${appParams.appId}&return_url=${returnUrl}`;
+    window.location.assign(deleteUrl);
+    return { redirected: true };
+  };
+
   return (
     <AuthContext.Provider value={{ 
       user, 
@@ -138,6 +163,7 @@ export const AuthProvider = ({ children }) => {
       appPublicSettings,
       logout,
       navigateToLogin,
+      deleteAccount,
       checkAppState
     }}>
       {children}
