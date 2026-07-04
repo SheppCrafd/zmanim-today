@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
-import { useQueries, useQueryClient } from '@tanstack/react-query';
+import { useQueries } from '@tanstack/react-query';
 import {
   ExternalLink,
   Loader2,
@@ -10,7 +10,7 @@ import {
 import { Button } from '@/components/ui/button';
 import NavMenu from '@/components/NavMenu';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { fetchAndZipSefaria } from '@/hooks/useSefaria';
+import { useSefariaText, usePrefetchSefariaText, fetchAndZipSefaria } from '@/hooks/useSefaria';
 
 /* ---------------- TOC CATEGORIZER ---------------- */
 function getCategory(breadcrumb) {
@@ -74,7 +74,6 @@ function sanitizeHTML(htmlString) {
 export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
   const navigate = useNavigate();
   const location = useLocation();
-  const queryClient = useQueryClient();
 
   const scrollRef = useRef(null);
   const activeSectionRef = useRef(null);
@@ -105,37 +104,6 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
       });
   }, [bookRef]);
 
-  /* ---------------- SILENT BACKGROUND PREFETCHER ---------------- */
-  useEffect(() => {
-    // Only run if we actually have sections to fetch
-    if (sections.length === 0) return;
-
-    const prefetchAllSections = async () => {
-      const batchSize = 5; // Fetch 5 chapters at a time
-      
-      for (let i = 0; i < sections.length; i += batchSize) {
-        const batch = sections.slice(i, i + batchSize);
-        
-        // Fetch the batch concurrently
-        await Promise.all(
-          batch.map(sec =>
-            queryClient.prefetchQuery({
-              queryKey: ['sefaria-text', sec.ref],
-              queryFn: () => fetchAndZipSefaria(sec.ref),
-              staleTime: 1000 * 60 * 60 * 24, // Keep it fresh for 24 hours
-            })
-          )
-        );
-
-        // Wait 500ms before hitting Sefaria with the next batch to avoid rate limits
-        await new Promise(resolve => setTimeout(resolve, 500));
-      }
-    };
-
-    // Kick off the background download!
-    prefetchAllSections();
-  }, [sections, queryClient]);
-
   /* ---------------- DATA FETCHING (USE QUERIES) ---------------- */
   const activeSections = sections.slice(range.start, range.end + 1);
 
@@ -162,13 +130,13 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
       
       const query = sectionQueries[i];
       if (query.isLoading) {
-        items.push({ type: 'loading', id: `load-${sec.ref}`, sectionIndex: range.start + i });
+        items.push({ type: 'loading', id: `load-${sec.ref}` });
       } else if (query.isError) {
-        items.push({ type: 'error', id: `err-${sec.ref}`, sectionIndex: range.start + i });
+        items.push({ type: 'error', id: `err-${sec.ref}` });
       } else if (query.data) {
         // 2. Push every mapped segment for this section
         query.data.forEach(seg => {
-          items.push({ type: 'segment', ...seg, sectionIndex: range.start + i });
+          items.push({ type: 'segment', ...seg });
         });
       }
     });
@@ -264,7 +232,7 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
   return (
     <div className="h-screen flex flex-col bg-slate-50 dark:bg-slate-950 overflow-hidden">
 
-      {/* TOP BAR */}
+      {/* TOP BAR (Unchanged) */}
       <div className="sticky top-0 z-50 bg-white dark:bg-slate-950 border-b">
         <div className="flex items-center justify-between px-4 pt-4 pb-2">
           <div className="flex items-center gap-2">
@@ -295,19 +263,10 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
         
         {/* TOC VIEW */}
         {page === 'toc' && (
-          <div className="h-full overflow-y-auto px-4 pb-24">
-            {loading && (
-              <div className="py-10 flex justify-center">
-                <Loader2 className="animate-spin text-blue-500" />
-              </div>
-            )}
-            {error && (
-              <div className="py-10 flex justify-center text-red-500">
-                <AlertCircle className="w-8 h-8" />
-              </div>
-            )}
-
-            {!loading && !error && categoryOrder.map(category => {
+           // ... (Leave your TOC mapping code here exactly as it was) ...
+           <div className="h-full overflow-y-auto px-4 pb-24">
+             {/* Replace this comment with your TOC rendering logic */}
+             {categoryOrder.map(category => {
               const items = groupedSections[category];
               if (!items || items.length === 0) return null;
 
@@ -407,35 +366,6 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
         )}
 
       </div>
-
-      {/* --- SEFARIA ATTRIBUTION FOOTER --- */}
-      <div className="bg-slate-100 dark:bg-slate-900 border-t py-3 px-4 flex flex-col items-center justify-center gap-1 z-50 shrink-0">
-        <a
-          href="https://www.sefaria.org/texts"
-          target="_blank"
-          rel="noreferrer"
-          className="transition-transform hover:scale-105"
-        >
-          <img
-            src="https://files.readme.io/dcee0a8-image.png"
-            alt="Powered by Sefaria"
-            className="h-11 w-auto rounded-md shadow-sm bg-white"
-          />
-        </a>
-
-        <div className="text-[10px] text-slate-500">
-          and the{' '}
-          <a
-            href="https://developers.sefaria.org"
-            target="_blank"
-            rel="noreferrer"
-            className="underline hover:text-slate-700 dark:hover:text-slate-300 transition-colors"
-          >
-            Sefaria API
-          </a>
-        </div>
-      </div>
-
     </div>
   );
 }
