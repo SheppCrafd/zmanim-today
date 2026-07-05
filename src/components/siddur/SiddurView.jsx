@@ -255,7 +255,6 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
 
   const lockAnchorSession = () => {
     // Only capture a new anchor if we aren't already in the middle of zooming.
-    // This prevents capturing corrupted math during a rapid pinch gesture.
     if (!activeAnchorRef.current) {
       activeAnchorRef.current = captureAnchorData();
     }
@@ -323,7 +322,7 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
       if (e.touches.length === 2) {
         pinchStartDist = getDist(e.touches);
         pinchStartScale = fontScaleRef.current;
-        lockAnchorSession(); // Lock in as soon as fingers touch
+        lockAnchorSession(); 
       }
     };
 
@@ -332,7 +331,7 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
         e.preventDefault();
         const dist = getDist(e.touches);
         if (pinchStartDist > 0) {
-          lockAnchorSession(); // Keep lock alive
+          lockAnchorSession(); 
           const newScale = pinchStartScale * (dist / pinchStartDist);
           setFontScale(Math.max(0.5, Math.min(3, Math.round(newScale * 100) / 100)));
         }
@@ -342,7 +341,7 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
     const onWheel = (e) => {
       if (e.ctrlKey || e.metaKey) {
         e.preventDefault();
-        lockAnchorSession(); // Lock in before scrolling
+        lockAnchorSession(); 
         const delta = e.deltaY > 0 ? -0.05 : 0.05;
         setFontScale(s => Math.max(0.5, Math.min(3, Math.round((s + delta) * 100) / 100)));
       }
@@ -466,11 +465,10 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
                       width: '100%',
                       transform: `translateY(${virtualItem.start}px)`,
                     }}
-                    className="py-2"
                   >
                     {/* Render Header */}
                     {item.type === 'header' && (
-                      <div className="bg-white dark:bg-slate-900 py-2 border-b mb-4">
+                      <div className="bg-white dark:bg-slate-900 py-3 border-b mb-6 mt-2 px-2">
                         <p className="font-semibold text-slate-700 dark:text-slate-100">
                           {item.label}
                         </p>
@@ -491,17 +489,30 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
 
                     {/* Render Mapped Segment */}
                     {item.type === 'segment' && (
-                      <div className="space-y-2 mb-6" style={{ fontSize: `${fontScale}em` }}>
+                      <div 
+                        style={{ 
+                          fontSize: `${fontScale}em`,
+                          paddingBottom: '1.5em',
+                          paddingTop: '0.5em' 
+                        }}
+                      >
                         {showHB && (
                           <p
-                            className="text-right text-[1.125em] leading-loose text-slate-800 dark:text-slate-100 font-serif min-h-[1.5em]"
+                            className="text-right text-slate-800 dark:text-slate-100 font-serif"
+                            style={{ fontSize: '1.125em', lineHeight: '2', minHeight: '1.5em' }}
                             dir="rtl"
                             dangerouslySetInnerHTML={{ __html: sanitizeHTML(item.he) }}
                           />
                         )}
                         {showEN && (
                           <p
-                            className="text-left text-[0.875em] leading-relaxed text-slate-500 dark:text-slate-400 min-h-[1.5em]"
+                            className="text-left text-slate-500 dark:text-slate-400"
+                            style={{ 
+                              fontSize: '0.875em', 
+                              lineHeight: '1.75', 
+                              minHeight: '1.5em',
+                              marginTop: showHB ? '1em' : '0'
+                            }}
                             dangerouslySetInnerHTML={{ __html: sanitizeHTML(item.en) }}
                           />
                         )}
