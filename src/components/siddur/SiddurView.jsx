@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useRef, useMemo } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { useQueries, useQueryClient } from '@tanstack/react-query';
 import {
@@ -44,6 +44,7 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
   const scrollRef = useRef(null);
   const activeSectionRef = useRef(null);
   const fontScaleRef = useRef(1);
+  const anchorRef = useRef(null);
   const [pendingJump, setPendingJump] = useState(null);
 
   const [tree, setTree] = useState([]);
@@ -169,6 +170,38 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
     overscan: 15,
   });
 
+  // Capture the top visible item + pixel offset within it, to preserve scroll on font scaling
+  const captureAnchor = () => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const items = virtualizer.getVirtualItems();
+    if (items.length === 0) return;
+    const topItem = items[0];
+    anchorRef.current = {
+      index: topItem.index,
+      offset: el.scrollTop - topItem.start
+    };
+  };
+
+  // After font scale changes, restore scroll so the anchored content stays at the top
+  useLayoutEffect(() => {
+    if (!anchorRef.current || !scrollRef.current) return;
+    const { index, offset } = anchorRef.current;
+
+    const restore = () => {
+      if (!scrollRef.current || !anchorRef.current) return;
+      const newStart = virtualizer.getOffsetForIndex(index);
+      scrollRef.current.scrollTop = newStart + offset;
+    };
+
+    const rafId = requestAnimationFrame(() => {
+      restore();
+      requestAnimationFrame(restore);
+    });
+
+    return () => cancelAnimationFrame(rafId);
+  }, [fontScale]);
+
   /* ---------------- URL SYNCING ---------------- */
   const visibleItems = virtualizer.getVirtualItems();
 
@@ -242,6 +275,7 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
       if (e.touches.length === 2) {
         pinchStartDist = getDist(e.touches);
         pinchStartScale = fontScaleRef.current;
+        captureAnchor();
       }
     };
 
@@ -259,6 +293,7 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
     const onWheel = (e) => {
       if (e.ctrlKey || e.metaKey) {
         e.preventDefault();
+        captureAnchor();
         const delta = e.deltaY > 0 ? -0.1 : 0.1;
         setFontScale(s => Math.max(0.5, Math.min(3, Math.round((s + delta) * 10) / 10)));
       }
@@ -304,11 +339,11 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
           {page === 'reader' && (
             <>
               <div className="flex items-center gap-1 ml-2">
-                <Button size="icon" variant="outline" className="h-8 w-8" onClick={() => setFontScale(s => Math.max(0.5, Math.round((s - 0.1) * 10) / 10))}>
+                <Button size="icon" variant="outline" className="h-8 w-8" onClick={() => { captureAnchor(); setFontScale(s => Math.max(0.5, Math.round((s - 0.1) * 10) / 10)); }}>
                   <ZoomOut className="w-4 h-4" />
                 </Button>
                 <span className="text-xs text-slate-500 w-10 text-center tabular-nums">{Math.round(fontScale * 100)}%</span>
-                <Button size="icon" variant="outline" className="h-8 w-8" onClick={() => setFontScale(s => Math.min(3, Math.round((s + 0.1) * 10) / 10))}>
+                <Button size="icon" variant="outline" className="h-8 w-8" onClick={() => { captureAnchor(); setFontScale(s => Math.min(3, Math.round((s + 0.1) * 10) / 10)); }}>
                   <ZoomIn className="w-4 h-4" />
                 </Button>
               </div>
