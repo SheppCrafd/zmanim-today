@@ -107,3 +107,33 @@ export function usePrefetchSefariaText() {
     });
   };
 }
+
+// --- Exported Fetcher (for useQueries / prefetchQuery in SiddurView) ---
+export const fetchAndZipSefaria = async (ref) => {
+  const encodedRef = encodeURIComponent(ref);
+  const [hebResp, engResp] = await Promise.all([
+    fetch(`https://www.sefaria.org/api/v3/texts/${encodedRef}?version=source&context=0`),
+    fetch(`https://www.sefaria.org/api/v3/texts/${encodedRef}?version=english|Sefaria%20Community%20Translation&context=0`)
+  ]);
+
+  if (!hebResp.ok || !engResp.ok) throw new Error('Failed to fetch text');
+
+  const hebData = await hebResp.json();
+  const engData = await engResp.json();
+
+  const heArr = extractText(hebData, 'he');
+  const enArr = extractText(engData, 'en');
+
+  const maxLen = Math.max(heArr.length, enArr.length);
+  const segments = [];
+
+  for (let i = 0; i < maxLen; i++) {
+    segments.push({
+      segmentId: `${ref}-${i + 1}`,
+      he: heArr[i] || null,
+      en: enArr[i] || null
+    });
+  }
+
+  return segments;
+};
