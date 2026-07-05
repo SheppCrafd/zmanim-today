@@ -54,6 +54,9 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
     }
   });
 
+  const showEN = langMode !== 'he';
+  const showHB = langMode !== 'en';
+
   // Keep ref in sync for touch handlers & persist
   useEffect(() => {
     fontScaleRef.current = fontScale;
@@ -145,12 +148,38 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
     return items;
   }, [activeSections, sectionQueries, range.start]);
 
+  /* --- BULLETPROOF VIRTUALIZER SETUP --- */
   const virtualizer = useVirtualizer({
     count: flatItems.length,
     getScrollElement: () => scrollRef.current,
-    estimateSize: () => 100,
+    estimateSize: (index) => {
+      const item = flatItems[index];
+      if (!item) return 100;
+      
+      // Smart Heuristic Estimation to prevent scroll-up glitching
+      if (item.type === 'header') return 45 * fontScale;
+      if (item.type === 'loading' || item.type === 'error') return 100;
+      
+      if (item.type === 'segment') {
+        const willShow = (showHB && item.hasHebrew) || (showEN && item.hasEnglish);
+        if (!willShow) return 0; // Completely collapse ghost gaps instantly
+        
+        let chars = 0;
+        if (showHB && item.hasHebrew) chars += item.sanitizedHe.length;
+        if (showEN && item.hasEnglish) chars += item.sanitizedEn.length;
+        
+        const lines = Math.max(1, chars / 60); // Approx 60 chars per wrapped line
+        return (lines * 30 * fontScale) + 30; // Font height + padding
+      }
+      return 100;
+    },
     overscan: 15,
   });
+
+  // Force cache invalidation if font scale or language mode changes
+  useEffect(() => {
+    virtualizer.measure();
+  }, [fontScale, langMode, virtualizer]);
 
   // URL Syncing
   const visibleItems = virtualizer.getVirtualItems();
@@ -210,7 +239,6 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
     anchorTimeoutRef.current = setTimeout(() => { activeAnchorRef.current = null; }, 500);
   };
 
-  // Clean up timeout on unmount
   useEffect(() => () => { if (anchorTimeoutRef.current) clearTimeout(anchorTimeoutRef.current); }, []);
 
   useLayoutEffect(() => {
@@ -289,9 +317,6 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
     };
   }, [page]);
 
-  const showEN = langMode !== 'he';
-  const showHB = langMode !== 'en';
-
   return (
     <div className="h-screen flex flex-col bg-slate-50 dark:bg-slate-950 overflow-hidden">
       {/* TOP BAR */}
@@ -351,7 +376,12 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
         )}
 
         {page === 'reader' && (
-          <div className="h-full overflow-y-auto px-4 pb-24" onScroll={onScroll} ref={scrollRef}>
+          <div 
+            className="h-full overflow-y-auto px-4 pb-24" 
+            onScroll={onScroll} 
+            ref={scrollRef}
+            style={{ overflowAnchor: 'none' }} // <-- Critical fix to stop Chrome from fighting the Virtualizer
+          >
             <div style={{ height: `${virtualizer.getTotalSize()}px`, width: '100%', position: 'relative' }}>
               {virtualizer.getVirtualItems().map((virtualItem) => {
                 const item = flatItems[virtualItem.index];
