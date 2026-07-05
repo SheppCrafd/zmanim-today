@@ -129,14 +129,25 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
     const items = [];
     activeSections.forEach((sec, i) => {
       const currentSectionIndex = range.start + i;
+      const query = sectionQueries[i];
+
+      // Detect if this section's segments completely lack English translation
+      let hasNoEnglish = false;
+      if (query.data && query.data.length > 0) {
+        const hasAnyEnglish = query.data.some(seg => {
+          const text = seg.en ? seg.en.replace(/<[^>]*>/g, '').trim() : '';
+          return text.length > 0;
+        });
+        hasNoEnglish = !hasAnyEnglish;
+      }
 
       items.push({
         type: 'header',
         label: sec.label,
-        sectionIndex: currentSectionIndex
+        sectionIndex: currentSectionIndex,
+        hasNoEnglish
       });
 
-      const query = sectionQueries[i];
       if (query.isLoading) {
         items.push({ type: 'loading', id: `load-${sec.ref}`, sectionIndex: currentSectionIndex });
       } else if (query.isError) {
@@ -370,6 +381,11 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
                         <p className="font-semibold text-slate-700 dark:text-slate-100">
                           {item.label}
                         </p>
+                        {showEN && !showHB && item.hasNoEnglish && (
+                          <p className="mt-2 text-sm italic text-amber-600 dark:text-amber-400">
+                            This section has no English
+                          </p>
+                        )}
                       </div>
                     )}
 
