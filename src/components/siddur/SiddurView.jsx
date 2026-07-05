@@ -453,6 +453,17 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
               {virtualizer.getVirtualItems().map((virtualItem) => {
                 const item = flatItems[virtualItem.index];
 
+                // DYNAMIC CONTENT CHECK FOR SEGMENTS
+                let hasHebrew = false;
+                let hasEnglish = false;
+                let showThisSegment = true;
+
+                if (item.type === 'segment') {
+                  hasHebrew = item.he && item.he.replace(/<[^>]*>/g, '').trim().length > 0;
+                  hasEnglish = item.en && item.en.replace(/<[^>]*>/g, '').trim().length > 0;
+                  showThisSegment = (showHB && hasHebrew) || (showEN && hasEnglish);
+                }
+
                 return (
                   <div
                     key={virtualItem.key}
@@ -468,7 +479,15 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
                   >
                     {/* Render Header */}
                     {item.type === 'header' && (
-                      <div className="bg-white dark:bg-slate-900 py-3 border-b mb-6 mt-2 px-2">
+                      <div 
+                        className="bg-white dark:bg-slate-900 border-b px-2"
+                        style={{
+                          fontSize: `${Math.max(1, fontScale * 0.9)}em`,
+                          paddingTop: '0.75em',
+                          paddingBottom: '0.5em',
+                          marginBottom: '0.5em'
+                        }}
+                      >
                         <p className="font-semibold text-slate-700 dark:text-slate-100">
                           {item.label}
                         </p>
@@ -488,29 +507,25 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
                     )}
 
                     {/* Render Mapped Segment */}
-                    {item.type === 'segment' && (
+                    {item.type === 'segment' && showThisSegment && (
                       <div 
                         style={{ 
                           fontSize: `${fontScale}em`,
-                          paddingBottom: '1.5em',
-                          paddingTop: '0.5em' 
+                          paddingTop: '0.25em',
+                          paddingBottom: '1.5em'
                         }}
                       >
-                        {showHB && (
+                        {showHB && hasHebrew && (
                           <p
-                            className="text-right text-slate-800 dark:text-slate-100 font-serif"
-                            style={{ fontSize: '1.125em', lineHeight: '2', minHeight: '1.5em' }}
+                            className="text-right text-[1.125em] leading-loose text-slate-800 dark:text-slate-100 font-serif min-h-[1.5em]"
                             dir="rtl"
                             dangerouslySetInnerHTML={{ __html: sanitizeHTML(item.he) }}
                           />
                         )}
-                        {showEN && (
+                        {showEN && hasEnglish && (
                           <p
-                            className="text-left text-slate-500 dark:text-slate-400"
+                            className="text-left text-[0.875em] leading-relaxed text-slate-500 dark:text-slate-400 min-h-[1.5em]"
                             style={{ 
-                              fontSize: '0.875em', 
-                              lineHeight: '1.75', 
-                              minHeight: '1.5em',
                               marginTop: showHB ? '1em' : '0'
                             }}
                             dangerouslySetInnerHTML={{ __html: sanitizeHTML(item.en) }}
