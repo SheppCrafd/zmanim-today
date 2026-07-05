@@ -9,7 +9,6 @@ import { fetchAndZipSefaria } from '@/hooks/useSefaria';
 import { processSefariaSchema } from '@/lib/siddurSchema';
 import TocTree from '@/components/siddur/TocTree';
 
-// Utility to enforce font scale boundaries and standard 5% rounding
 const clampScale = (scale) => Math.max(0.5, Math.min(3, Math.round(scale * 100) / 100));
 
 function sanitizeHTML(htmlString) {
@@ -57,13 +56,11 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
   const showEN = langMode !== 'he';
   const showHB = langMode !== 'en';
 
-  // Keep ref in sync for touch handlers & persist
   useEffect(() => {
     fontScaleRef.current = fontScale;
     try { localStorage.setItem('siddur-font-scale', String(fontScale)); } catch { /* ignore */ }
   }, [fontScale]);
 
-  // Load TOC
   useEffect(() => {
     fetch(`https://www.sefaria.org/api/index/${bookRef}`)
       .then(r => r.json())
@@ -80,7 +77,6 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
       });
   }, [bookRef]);
 
-  // Silent Background Prefetcher
   useEffect(() => {
     if (sections.length === 0) return;
     const prefetchAllSections = async () => {
@@ -101,7 +97,6 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
     prefetchAllSections();
   }, [sections, queryClient]);
 
-  // Data Fetching
   const activeSections = sections.slice(range.start, range.end + 1);
   const sectionQueries = useQueries({
     queries: activeSections.map(sec => ({
@@ -111,7 +106,7 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
     }))
   });
 
-  // Optimize state by pre-calculating sanitation and content flags outside the render loop
+  // Calculate items and assign permanent, stable IDs to prevent cache shifting
   const flatItems = useMemo(() => {
     const items = [];
     activeSections.forEach((sec, i) => {
@@ -122,19 +117,20 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
         (seg.en ? seg.en.replace(/<[^>]*>/g, '').trim() : '').length > 0
       ) : false;
 
-      items.push({ type: 'header', label: sec.label, sectionIndex: currentSectionIndex, hasNoEnglish });
+      items.push({ type: 'header', id: `hdr-${currentSectionIndex}`, label: sec.label, sectionIndex: currentSectionIndex, hasNoEnglish });
 
       if (query.isLoading) {
         items.push({ type: 'loading', id: `load-${sec.ref}`, sectionIndex: currentSectionIndex });
       } else if (query.isError) {
         items.push({ type: 'error', id: `err-${sec.ref}`, sectionIndex: currentSectionIndex });
       } else if (query.data) {
-        query.data.forEach(seg => {
+        query.data.forEach((seg, segIndex) => {
           const hasHebrew = (seg.he ? seg.he.replace(/<[^>]*>/g, '').trim() : '').length > 0;
           const hasEnglish = (seg.en ? seg.en.replace(/<[^>]*>/g, '').trim() : '').length > 0;
           
           items.push({ 
             type: 'segment', 
+            id: `seg-${currentSectionIndex}-${segIndex}`, // Bulletproof key
             ...seg, 
             sanitizedHe: sanitizeHTML(seg.he), 
             sanitizedEn: sanitizeHTML(seg.en),
@@ -148,53 +144,54 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
     return items;
   }, [activeSections, sectionQueries, range.start]);
 
-  /* --- BULLETPROOF VIRTUALIZER SETUP --- */
   const virtualizer = useVirtualizer({
     count: flatItems.length,
     getScrollElement: () => scrollRef.current,
+    getItemKey: (index) => flatItems[index]?.id || index, // Tie measurement cache strictly to the unique item
     estimateSize: (index) => {
       const item = flatItems[index];
       if (!item) return 100;
       
-      // Smart Heuristic Estimation to prevent scroll-up glitching
       if (item.type === 'header') return 45 * fontScale;
       if (item.type === 'loading' || item.type === 'error') return 100;
       
       if (item.type === 'segment') {
         const willShow = (showHB && item.hasHebrew) || (showEN && item.hasEnglish);
-        if (!willShow) return 0; // Completely collapse ghost gaps instantly
+        if (!willShow) return 0; 
         
         let chars = 0;
         if (showHB && item.hasHebrew) chars += item.sanitizedHe.length;
         if (showEN && item.hasEnglish) chars += item.sanitizedEn.length;
         
-        const lines = Math.max(1, chars / 60); // Approx 60 chars per wrapped line
-        return (lines * 30 * fontScale) + 30; // Font height + padding
+        const lines = Math.max(1, chars / 60); 
+        return (lines * 30 * fontScale) + 30; 
       }
       return 100;
     },
     overscan: 15,
   });
 
-  // Force cache invalidation if font scale or language mode changes
+  // ONLY invalidate measurement cache when fontScale or langMode explicitly change
+  const measureRef = useRef(virtualizer.measure);
   useEffect(() => {
-    virtualizer.measure();
-  }, [fontScale, langMode, virtualizer]);
+    measureRef.current = virtualizer.measure;
+  }, [virtualizer.measure]);
 
-  // URL Syncing
-  const visibleItems = virtualizer.getVirtualItems();
   useEffect(() => {
-    if (page !== 'reader' || visibleItems.length === 0) return;
-    const topItem = flatItems[visibleItems[0].index];
+    measureRef.current();
+  }, [fontScale, langMode]);
+
+  useEffect(() => {
+    if (page !== 'reader' || virtualizer.getVirtualItems().length === 0) return;
+    const topItem = flatItems[virtualizer.getVirtualItems()[0].index];
 
     if (topItem && topItem.sectionIndex !== activeSectionRef.current) {
       activeSectionRef.current = topItem.sectionIndex;
       const basePath = '/' + location.pathname.split('/')[1];
       navigate(`${basePath}/section/${topItem.sectionIndex}/${langMode}`, { replace: true });
     }
-  }, [visibleItems, flatItems, page, langMode, navigate, location.pathname]);
+  }, [virtualizer.getVirtualItems(), flatItems, page, langMode, navigate, location.pathname]);
 
-  // Scroll Actions & Jumping
   const onScroll = (e) => {
     const el = e.target;
     if (el.scrollTop + el.clientHeight > el.scrollHeight - 1500) {
@@ -217,7 +214,6 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
     }
   }, [pendingJump, page, flatItems, virtualizer]);
 
-  // Bulletproof Scroll Anchoring
   const captureAnchorData = () => {
     if (!scrollRef.current) return null;
     const items = virtualizer.getVirtualItems();
@@ -241,36 +237,20 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
 
   useEffect(() => () => { if (anchorTimeoutRef.current) clearTimeout(anchorTimeoutRef.current); }, []);
 
+  // Synchronous anchoring: Only triggers ONCE per fontScale change to avoid fighting browser scroll
   useLayoutEffect(() => {
-    if (!activeAnchorRef.current || page !== 'reader') return;
+    if (!activeAnchorRef.current || page !== 'reader' || !scrollRef.current) return;
     const { index, percentage } = activeAnchorRef.current;
-    let frameId;
-    let attempts = 0;
+    
+    const targetItem = virtualizer.getVirtualItems().find(it => it.index === index);
+    if (targetItem) {
+      const targetScrollTop = targetItem.start + (targetItem.size * percentage);
+      virtualizer.scrollToOffset(targetScrollTop);
+    } else {
+      virtualizer.scrollToIndex(index, { align: 'start' });
+    }
+  }, [fontScale, page]); // Removed virtualizer from deps to stop infinite loop
 
-    const enforceScroll = () => {
-      if (!scrollRef.current) return;
-      const targetItem = virtualizer.getVirtualItems().find(it => it.index === index);
-
-      if (targetItem) {
-        const targetScrollTop = targetItem.start + (targetItem.size * percentage);
-        if (Math.abs(scrollRef.current.scrollTop - targetScrollTop) > 2) {
-           virtualizer.scrollToOffset(targetScrollTop);
-        }
-      } else {
-         virtualizer.scrollToIndex(index, { align: 'start' });
-      }
-
-      if (attempts < 5) {
-        attempts++;
-        frameId = requestAnimationFrame(enforceScroll);
-      }
-    };
-
-    frameId = requestAnimationFrame(enforceScroll);
-    return () => cancelAnimationFrame(frameId);
-  }, [fontScale, page, virtualizer]);
-
-  // Pinch-To-Zoom & Ctrl+Wheel
   useEffect(() => {
     const el = scrollRef.current;
     if (!el || page !== 'reader') return;
@@ -380,7 +360,7 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
             className="h-full overflow-y-auto px-4 pb-24" 
             onScroll={onScroll} 
             ref={scrollRef}
-            style={{ overflowAnchor: 'none' }} // <-- Critical fix to stop Chrome from fighting the Virtualizer
+            style={{ overflowAnchor: 'none' }}
           >
             <div style={{ height: `${virtualizer.getTotalSize()}px`, width: '100%', position: 'relative' }}>
               {virtualizer.getVirtualItems().map((virtualItem) => {
@@ -392,10 +372,11 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
                     key={virtualItem.key}
                     data-index={virtualItem.index}
                     ref={virtualizer.measureElement}
-                    style={{ position: 'absolute', top: 0, left: 0, width: '100%', transform: `translateY(${virtualItem.start}px)` }}
+                    // contain: content ensures the browser cleanly locks the height of this node
+                    style={{ position: 'absolute', top: 0, left: 0, width: '100%', transform: `translateY(${virtualItem.start}px)`, contain: 'content' }}
                   >
                     {item.type === 'header' && (
-                      <div className="bg-white dark:bg-slate-900 border-b px-2" style={{ fontSize: `${Math.max(1, fontScale * 0.9)}em`, paddingTop: '0.75em', paddingBottom: '0.5em', marginBottom: '0.5em' }}>
+                      <div className="bg-white dark:bg-slate-900 border-b px-2" style={{ fontSize: `${Math.max(1, fontScale * 0.9)}em`, paddingTop: '0.75em', paddingBottom: '0.5em' }}>
                         <p className="font-semibold text-slate-700 dark:text-slate-100">{item.label}</p>
                         {showEN && !showHB && item.hasNoEnglish && <p className="mt-2 text-sm italic text-amber-600 dark:text-amber-400">This section has no English</p>}
                       </div>
@@ -414,8 +395,9 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
                         )}
                         {showEN && item.hasEnglish && (
                           <p
+                            // Margins collapsed out of the measurement boundary. Converted to padding!
                             className="text-left text-[0.875em] leading-relaxed text-slate-500 dark:text-slate-400 min-h-[1.5em]"
-                            style={{ marginTop: showHB ? '1em' : '0' }}
+                            style={{ paddingTop: showHB ? '1em' : '0' }} 
                             dangerouslySetInnerHTML={{ __html: item.sanitizedEn }}
                           />
                         )}
