@@ -351,15 +351,17 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
           {page === 'reader' && (
             <>
               <div className="flex items-center gap-1 ml-2">
-                {/* Zoom Out Button */}
                 <Button size="icon" variant="outline" className="h-8 w-8" onClick={() => {
                   captureAnchor(); 
                   setFontScale(s => Math.max(0.5, Math.round((s - 0.05) * 100) / 100)); // 5% decrement
                 }}>
                   <ZoomOut className="w-4 h-4" />
                 </Button>
-
-                {/* Zoom In Button */}
+                
+                <span className="text-xs text-slate-500 w-10 text-center tabular-nums">
+                  {Math.round(fontScale * 100)}%
+                </span>
+                
                 <Button size="icon" variant="outline" className="h-8 w-8" onClick={() => {
                   captureAnchor(); 
                   setFontScale(s => Math.min(3, Math.round((s + 0.05) * 100) / 100)); // 5% increment
