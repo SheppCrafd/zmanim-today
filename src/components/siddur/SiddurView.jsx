@@ -44,9 +44,8 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
   const scrollRef = useRef(null);
   const activeSectionRef = useRef(null);
   const fontScaleRef = useRef(1);
-  const anchorRef = useRef(null); // <-- NEW: Holds our scroll anchor data
+  
   const [pendingJump, setPendingJump] = useState(null);
-
   const [tree, setTree] = useState([]);
   const [sections, setSections] = useState([]);
   const [refToIndex, setRefToIndex] = useState({});
@@ -114,7 +113,7 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
     prefetchAllSections();
   }, [sections, queryClient]);
 
-  /* ---------------- DATA FETCHING (USE QUERIES) ---------------- */
+  /* ---------------- DATA FETCHING ---------------- */
   const activeSections = sections.slice(range.start, range.end + 1);
 
   const sectionQueries = useQueries({
@@ -132,7 +131,6 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
       const currentSectionIndex = range.start + i;
       const query = sectionQueries[i];
 
-      // Detect if this section's segments completely lack English translation
       let hasNoEnglish = false;
       if (query.data && query.data.length > 0) {
         const hasAnyEnglish = query.data.some(seg => {
@@ -191,7 +189,7 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
     }
   }, [visibleItems, flatItems, page, langMode, navigate, location.pathname]);
 
-  /* ---------------- SCROLL WINDOW (expand end only) ---------------- */
+  /* ---------------- SCROLL WINDOW ---------------- */
   const onScroll = (e) => {
     const el = e.target;
     if (el.scrollTop + el.clientHeight > el.scrollHeight - 1500) {
@@ -225,49 +223,89 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
     }
   }, [pendingJump, page, flatItems, virtualizer]);
 
-  /* ---------------- SCROLL ANCHORING (UPDATED) ---------------- */
-  const captureAnchor = () => {
-    if (!scrollRef.current || page !== 'reader') return;
-    
-    const currentVisibleItems = virtualizer.getVirtualItems();
-    if (currentVisibleItems.length === 0) return;
+  /* ---------------- BULLETPROOF SCROLL ANCHORING ---------------- */
+  const activeAnchorRef = useRef(null);
+  const anchorTimeoutRef = useRef(null);
 
-    const topItem = currentVisibleItems[0];
-    const currentScrollTop = scrollRef.current.scrollTop;
-    
-    const offset = currentScrollTop - topItem.start;
+  const captureAnchorData = () => {
+    if (!scrollRef.current) return null;
+    const items = virtualizer.getVirtualItems();
+    if (items.length === 0) return null;
 
-    anchorRef.current = {
-      index: topItem.index,
-      offset: offset,
-      scale: fontScaleRef.current // <-- NEW: Capture the font scale at this moment
+    const scrollTop = scrollRef.current.scrollTop;
+    let trueTopItem = items[0];
+
+    // Find the first item actually intersecting the top of the viewport (ignoring overscan)
+    for (const item of items) {
+      if (item.start + item.size > scrollTop) {
+        trueTopItem = item;
+        break;
+      }
+    }
+
+    // Capture the percentage of how deep into this specific item we are scrolled
+    const offsetPx = scrollTop - trueTopItem.start;
+    const percentage = Math.max(0, offsetPx / (trueTopItem.size || 1));
+
+    return {
+      index: trueTopItem.index,
+      percentage: percentage,
     };
   };
 
+  const lockAnchorSession = () => {
+    // Only capture a new anchor if we aren't already in the middle of zooming.
+    // This prevents capturing corrupted math during a rapid pinch gesture.
+    if (!activeAnchorRef.current) {
+      activeAnchorRef.current = captureAnchorData();
+    }
+    
+    // Clear the anchor lock 500ms after the last zoom action completes
+    if (anchorTimeoutRef.current) clearTimeout(anchorTimeoutRef.current);
+    anchorTimeoutRef.current = setTimeout(() => {
+      activeAnchorRef.current = null;
+    }, 500);
+  };
+
   useLayoutEffect(() => {
-    if (!anchorRef.current || page !== 'reader') return;
+    if (!activeAnchorRef.current || page !== 'reader') return;
 
-    const { index, offset, scale } = anchorRef.current;
+    const { index, percentage } = activeAnchorRef.current;
+    let frameId;
+    let attempts = 0;
 
-    // <-- NEW: Calculate how much the offset needs to stretch or shrink
-    const scaleRatio = fontScale / scale;
-    const adjustedOffset = offset * scaleRatio;
+    const enforceScroll = () => {
+      if (!scrollRef.current) return;
+      
+      const items = virtualizer.getVirtualItems();
+      const targetItem = items.find(it => it.index === index);
 
-    let raf = requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        const currentItems = virtualizer.getVirtualItems();
-        const targetItem = currentItems.find(item => item.index === index);
+      if (targetItem) {
+        // Recalculate exactly where that percentage lands us using the item's NEW height
+        const targetScrollTop = targetItem.start + (targetItem.size * percentage);
+        const currentScrollTop = scrollRef.current.scrollTop;
         
-        if (targetItem) {
-          virtualizer.scrollToOffset(targetItem.start + adjustedOffset);
+        // Only adjust if we are off by more than 2 pixels to prevent infinite micro-jitters
+        if (Math.abs(currentScrollTop - targetScrollTop) > 2) {
+           virtualizer.scrollToOffset(targetScrollTop);
         }
-      });
-    });
+      } else {
+         // Fallback if the item completely vanished from DOM
+         virtualizer.scrollToIndex(index, { align: 'start' });
+      }
 
-    return () => cancelAnimationFrame(raf);
+      // Loop for 5 frames to guarantee TanStack's ResizeObserver finishes measuring the DOM
+      if (attempts < 5) {
+        attempts++;
+        frameId = requestAnimationFrame(enforceScroll);
+      }
+    };
+
+    frameId = requestAnimationFrame(enforceScroll);
+    return () => cancelAnimationFrame(frameId);
   }, [fontScale, page, virtualizer]);
 
-  /* ---------------- PINCH-TO-ZOOM + CTRL+WHEEL (UPDATED TO 5%) ---------------- */
+  /* ---------------- PINCH-TO-ZOOM + CTRL+WHEEL ---------------- */
   useEffect(() => {
     const el = scrollRef.current;
     if (!el || page !== 'reader') return;
@@ -285,6 +323,7 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
       if (e.touches.length === 2) {
         pinchStartDist = getDist(e.touches);
         pinchStartScale = fontScaleRef.current;
+        lockAnchorSession(); // Lock in as soon as fingers touch
       }
     };
 
@@ -293,9 +332,8 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
         e.preventDefault();
         const dist = getDist(e.touches);
         if (pinchStartDist > 0) {
+          lockAnchorSession(); // Keep lock alive
           const newScale = pinchStartScale * (dist / pinchStartDist);
-          captureAnchor(); 
-          // Round to 2 decimal places (100) instead of 1 (10)
           setFontScale(Math.max(0.5, Math.min(3, Math.round(newScale * 100) / 100)));
         }
       }
@@ -304,9 +342,8 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
     const onWheel = (e) => {
       if (e.ctrlKey || e.metaKey) {
         e.preventDefault();
-        // Change delta to 0.05 for 5% steps
+        lockAnchorSession(); // Lock in before scrolling
         const delta = e.deltaY > 0 ? -0.05 : 0.05;
-        captureAnchor(); 
         setFontScale(s => Math.max(0.5, Math.min(3, Math.round((s + delta) * 100) / 100)));
       }
     };
@@ -352,8 +389,8 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
             <>
               <div className="flex items-center gap-1 ml-2">
                 <Button size="icon" variant="outline" className="h-8 w-8" onClick={() => {
-                  captureAnchor(); 
-                  setFontScale(s => Math.max(0.5, Math.round((s - 0.05) * 100) / 100)); // 5% decrement
+                  lockAnchorSession();
+                  setFontScale(s => Math.max(0.5, Math.round((s - 0.05) * 100) / 100));
                 }}>
                   <ZoomOut className="w-4 h-4" />
                 </Button>
@@ -363,8 +400,8 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
                 </span>
                 
                 <Button size="icon" variant="outline" className="h-8 w-8" onClick={() => {
-                  captureAnchor(); 
-                  setFontScale(s => Math.min(3, Math.round((s + 0.05) * 100) / 100)); // 5% increment
+                  lockAnchorSession();
+                  setFontScale(s => Math.min(3, Math.round((s + 0.05) * 100) / 100));
                 }}>
                   <ZoomIn className="w-4 h-4" />
                 </Button>
@@ -407,7 +444,6 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
             onScroll={onScroll}
             ref={scrollRef}
           >
-            {/* The Virtualizer Wrapper */}
             <div
               style={{
                 height: `${virtualizer.getTotalSize()}px`,
