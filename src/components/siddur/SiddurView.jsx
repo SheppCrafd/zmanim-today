@@ -225,7 +225,7 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
     }
   }, [pendingJump, page, flatItems, virtualizer]);
 
-  /* ---------------- SCROLL ANCHORING (NEW) ---------------- */
+  /* ---------------- SCROLL ANCHORING (UPDATED) ---------------- */
   const captureAnchor = () => {
     if (!scrollRef.current || page !== 'reader') return;
     
@@ -235,29 +235,31 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
     const topItem = currentVisibleItems[0];
     const currentScrollTop = scrollRef.current.scrollTop;
     
-    // Exact pixel offset from the top edge of this specific item
     const offset = currentScrollTop - topItem.start;
 
     anchorRef.current = {
       index: topItem.index,
       offset: offset,
+      scale: fontScaleRef.current // <-- NEW: Capture the font scale at this moment
     };
   };
 
   useLayoutEffect(() => {
     if (!anchorRef.current || page !== 'reader') return;
 
-    const { index, offset } = anchorRef.current;
+    const { index, offset, scale } = anchorRef.current;
 
-    // Use requestAnimationFrame to ensure the DOM has painted the new font scale 
-    // and the virtualizer has re-measured heights
+    // <-- NEW: Calculate how much the offset needs to stretch or shrink
+    const scaleRatio = fontScale / scale;
+    const adjustedOffset = offset * scaleRatio;
+
     let raf = requestAnimationFrame(() => {
       requestAnimationFrame(() => {
         const currentItems = virtualizer.getVirtualItems();
         const targetItem = currentItems.find(item => item.index === index);
         
         if (targetItem) {
-          virtualizer.scrollToOffset(targetItem.start + offset);
+          virtualizer.scrollToOffset(targetItem.start + adjustedOffset);
         }
       });
     });
@@ -265,7 +267,7 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
     return () => cancelAnimationFrame(raf);
   }, [fontScale, page, virtualizer]);
 
-  /* ---------------- PINCH-TO-ZOOM + CTRL+WHEEL ---------------- */
+  /* ---------------- PINCH-TO-ZOOM + CTRL+WHEEL (UPDATED TO 5%) ---------------- */
   useEffect(() => {
     const el = scrollRef.current;
     if (!el || page !== 'reader') return;
@@ -292,8 +294,9 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
         const dist = getDist(e.touches);
         if (pinchStartDist > 0) {
           const newScale = pinchStartScale * (dist / pinchStartDist);
-          captureAnchor(); // <-- NEW: Capture before scale changes
-          setFontScale(Math.max(0.5, Math.min(3, Math.round(newScale * 10) / 10)));
+          captureAnchor(); 
+          // Round to 2 decimal places (100) instead of 1 (10)
+          setFontScale(Math.max(0.5, Math.min(3, Math.round(newScale * 100) / 100)));
         }
       }
     };
@@ -301,9 +304,10 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
     const onWheel = (e) => {
       if (e.ctrlKey || e.metaKey) {
         e.preventDefault();
-        const delta = e.deltaY > 0 ? -0.1 : 0.1;
-        captureAnchor(); // <-- NEW: Capture before scale changes
-        setFontScale(s => Math.max(0.5, Math.min(3, Math.round((s + delta) * 10) / 10)));
+        // Change delta to 0.05 for 5% steps
+        const delta = e.deltaY > 0 ? -0.05 : 0.05;
+        captureAnchor(); 
+        setFontScale(s => Math.max(0.5, Math.min(3, Math.round((s + delta) * 100) / 100)));
       }
     };
 
