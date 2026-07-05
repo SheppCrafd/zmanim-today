@@ -1,6 +1,4 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useVirtualizer } from '@tanstack/react-virtual';
-import { useQueries, useQueryClient } from '@tanstack/react-query';
 import {
   ExternalLink,
   Loader2,
@@ -10,17 +8,17 @@ import {
 import { Button } from '@/components/ui/button';
 import NavMenu from '@/components/NavMenu';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { useSefariaText, usePrefetchSefariaText, fetchAndZipSefaria } from '@/hooks/useSefaria';
+import { useSefariaText, usePrefetchSefariaText } from '@/hooks/useSefaria';
 
 /* ---------------- TOC CATEGORIZER ---------------- */
 function getCategory(breadcrumb) {
   const lower = (breadcrumb || '').toLowerCase();
-
+ 
   if (lower.includes('shacharit') || lower.includes('morning')) return 'Shacharit';
   if (lower.includes('mussaf') || lower.includes('musaf')) return 'Mussaf';
   if (lower.includes('mincha') || lower.includes('minha') || lower.includes('afternoon')) return 'Mincha';
   if (lower.includes('maariv') || lower.includes("ma'ariv") || lower.includes('arvit') || lower.includes('arbit') || lower.includes('evening')) return "Ma'ariv / Arbit";
-
+ 
   return 'Other';
 }
 
@@ -70,14 +68,85 @@ function sanitizeHTML(htmlString) {
   return doc.body.innerHTML;
 }
 
+/* ---------------- SECTION ---------------- */
+function Section({ sec, langMode, rowRef, index, prefetchRefs = [] }) {
+  // 1. Fetch text using React Query
+  const { data, isLoading, isError } = useSefariaText(sec.ref);
+  const prefetchText = usePrefetchSefariaText();
+
+  // 2. Automatically prefetch the next sections when this one mounts
+  useEffect(() => {
+    prefetchRefs.forEach(ref => prefetchText(ref));
+  }, [prefetchRefs, prefetchText]);
+
+  if (isLoading) {
+    return (
+      <div className="py-10 flex justify-center">
+        <Loader2 className="animate-spin text-blue-500" />
+      </div>
+    );
+  }
+
+  if (isError) {
+    return (
+      <div className="text-center text-sm text-red-500">
+        Failed to load section
+      </div>
+    );
+  }
+
+  const heArr = data?.he || [];
+  const enArr = data?.en || [];
+
+  const showEN = langMode !== 'he';
+  const showHB = langMode !== 'en';
+
+  const maxLen = Math.max(heArr.length, enArr.length);
+
+  return (
+    <div
+      ref={rowRef}
+      data-index={index}
+      className="space-y-4 scroll-mt-24"
+    >
+      <div className="sticky top-0 bg-white dark:bg-slate-900 py-2 z-10 border-b">
+        <p className="font-semibold text-slate-700 dark:text-slate-100">
+          {sec.label}
+        </p>
+      </div>
+
+      <div className="space-y-6">
+        {Array.from({ length: maxLen }).map((_, i) => (
+          <div key={i} className="space-y-2">
+            {showHB && heArr[i] && (
+              <p
+                className="text-right text-lg leading-loose text-slate-800 dark:text-slate-100 font-serif"
+                dir="rtl"
+                dangerouslySetInnerHTML={{ __html: sanitizeHTML(heArr[i]) }}
+              />
+            )}
+
+            {showEN && enArr[i] && (
+              <p
+                className="text-left text-sm leading-relaxed text-slate-500 dark:text-slate-400"
+                dangerouslySetInnerHTML={{ __html: sanitizeHTML(enArr[i]) }}
+              />
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 /* ---------------- MAIN ---------------- */
 export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
   const navigate = useNavigate();
   const location = useLocation();
-  const queryClient = useQueryClient();
 
   const scrollRef = useRef(null);
-  const activeSectionRef = useRef(null);
+  const rowRefs = useRef({});
+  const observerRef = useRef(null);
   const [pendingJump, setPendingJump] = useState(null);
 
   const [sections, setSections] = useState([]);
@@ -89,6 +158,8 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
   const [page, setPage] = useState('toc');
   const [langMode, setLangMode] = useState('both');
 
+  const currentSection = useRef(0);
+
   /* ---------------- LOAD TOC ---------------- */
   useEffect(() => {
     fetch(`https://www.sefaria.org/api/index/${bookRef}`)
@@ -96,8 +167,12 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
       .then(data => {
         const nodes = data?.schema?.nodes || [];
         const rootKey = data?.schema?.key || bookRef.replace(/_/g, ' ');
-        setSections(flattenNodes(nodes, rootKey));
+
+        const flat = flattenNodes(nodes, rootKey);
+
+        setSections(flat);
         setLoading(false);
+        setRange({ start: 0, end: 5 });
       })
       .catch(() => {
         setError(true);
@@ -105,120 +180,53 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
       });
   }, [bookRef]);
 
-  /* ---------------- SILENT BACKGROUND PREFETCHER ---------------- */
+  /* ---------------- OBSERVER ---------------- */
   useEffect(() => {
-    // Only run if we actually have sections to fetch
-    if (sections.length === 0) return;
+    if (!sections.length) return;
 
-    const prefetchAllSections = async () => {
-      const batchSize = 5; // Fetch 5 chapters at a time
+    if (observerRef.current) observerRef.current.disconnect();
 
-      for (let i = 0; i < sections.length; i += batchSize) {
-        const batch = sections.slice(i, i + batchSize);
+    const basePath = '/' + location.pathname.split('/')[1];
 
-        // Fetch the batch concurrently
-        await Promise.all(
-          batch.map(sec =>
-            queryClient.prefetchQuery({
-              queryKey: ['sefaria-text', sec.ref],
-              queryFn: () => fetchAndZipSefaria(sec.ref),
-              staleTime: 1000 * 60 * 60 * 24, // Keep it fresh for 24 hours
-            })
-          )
-        );
+    observerRef.current = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (!entry.isIntersecting) continue;
 
-        // Wait 500ms before hitting Sefaria with the next batch to avoid rate limits
-        await new Promise(resolve => setTimeout(resolve, 500));
+          const index = Number(entry.target.dataset.index);
+          if (Number.isNaN(index)) continue;
+
+          currentSection.current = index;
+
+          navigate(
+            `${basePath}/section/${index}/${langMode}`,
+            { replace: true }
+          );
+        }
+      },
+      {
+        rootMargin: '-45% 0px -45% 0px'
       }
-    };
+    );
 
-    // Kick off the background download!
-    prefetchAllSections();
-  }, [sections, queryClient]);
-
-  /* ---------------- DATA FETCHING (USE QUERIES) ---------------- */
-  const activeSections = sections.slice(range.start, range.end + 1);
-
-  // Fetch all sections in the active range dynamically
-  const sectionQueries = useQueries({
-    queries: activeSections.map(sec => ({
-      queryKey: ['sefaria-text', sec.ref],
-      queryFn: () => fetchAndZipSefaria(sec.ref),
-      staleTime: 1000 * 60 * 60 * 24,
-    }))
-  });
-
-  /* ---------------- FLATTEN THE STATE ---------------- */
-  // We mash headers, loading spinners, and segments into ONE 1D array
-  const flatItems = React.useMemo(() => {
-    const items = [];
-    activeSections.forEach((sec, i) => {
-      // 1. Push the Section Header
-      items.push({
-        type: 'header',
-        label: sec.label,
-        sectionIndex: range.start + i
-      });
-
-      const query = sectionQueries[i];
-      if (query.isLoading) {
-        items.push({ type: 'loading', id: `load-${sec.ref}`, sectionIndex: range.start + i });
-      } else if (query.isError) {
-        items.push({ type: 'error', id: `err-${sec.ref}`, sectionIndex: range.start + i });
-      } else if (query.data) {
-        // 2. Push every mapped segment for this section
-        query.data.forEach(seg => {
-          items.push({ type: 'segment', ...seg, sectionIndex: range.start + i });
-        });
-      }
+    Object.values(rowRefs.current).forEach(el => {
+      if (el) observerRef.current.observe(el);
     });
-    return items;
-  }, [activeSections, sectionQueries, range.start]);
 
-  /* ---------------- VIRTUALIZER INITIALIZATION ---------------- */
-  const virtualizer = useVirtualizer({
-    count: flatItems.length,
-    getScrollElement: () => scrollRef.current,
-    estimateSize: () => 100, // Guesses each row is 100px until measured
-    overscan: 10,            // Keeps 10 rows rendered off-screen for smoothness
-  });
-
-  /* ---------------- URL SYNCING ---------------- */
-  const visibleItems = virtualizer.getVirtualItems();
-
-  useEffect(() => {
-    // Only run this if we are actively reading and have items on screen
-    if (page !== 'reader' || visibleItems.length === 0) return;
-
-    // Grab the very first item that TanStack is currently rendering
-    const topItemIndex = visibleItems[0].index;
-    const topItem = flatItems[topItemIndex];
-
-    // If the top item belongs to a different chapter than our current URL...
-    if (topItem && topItem.sectionIndex !== activeSectionRef.current) {
-      activeSectionRef.current = topItem.sectionIndex;
-
-      const basePath = '/' + location.pathname.split('/')[1];
-
-      // Silently update the URL without refreshing the page!
-      navigate(
-        `${basePath}/section/${topItem.sectionIndex}/${langMode}`,
-        { replace: true }
-      );
-    }
-  }, [visibleItems, flatItems, page, langMode, navigate, location.pathname]);
+  }, [sections, langMode, navigate, location.pathname]);
 
   /* ---------------- SCROLL WINDOW ---------------- */
   const onScroll = (e) => {
     const el = e.target;
-    // Keep expanding the range when we near the bottom of the virtualized list
-    if (el.scrollTop + el.clientHeight > el.scrollHeight - 1000) {
+
+    if (el.scrollTop + el.clientHeight > el.scrollHeight - 800) {
       setRange(r => ({
         start: r.start,
         end: Math.min(sections.length - 1, r.end + 2)
       }));
     }
-    if (el.scrollTop < 1000) {
+
+    if (el.scrollTop < 800) {
       setRange(r => ({
         start: Math.max(0, r.start - 2),
         end: r.end
@@ -226,31 +234,57 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
     }
   };
 
-  /* ---------------- PERFECT JUMPING ---------------- */
+  /* ---------------- FIXED JUMP ---------------- */
   const jumpTo = (i) => {
     setPage('reader');
-    setRange({ start: Math.max(0, i - 2), end: i + 6 });
+    setRange({
+      start: Math.max(0, i - 2),
+      end: i + 6
+    });
     setPendingJump(i);
   };
 
-  // Natively scroll to the exact header index once the data loads
   useEffect(() => {
     if (pendingJump === null || page !== 'reader') return;
 
-    const targetIndex = flatItems.findIndex(
-      item => item.type === 'header' && item.sectionIndex === pendingJump
-    );
+    let attempts = 0;
 
-    if (targetIndex !== -1) {
-      virtualizer.scrollToIndex(targetIndex, { align: 'start' });
-      setPendingJump(null);
-    }
-  }, [pendingJump, page, flatItems, virtualizer]);
+    const tryAlign = () => {
+      const container = scrollRef.current;
+      const el = rowRefs.current[pendingJump];
+
+      if (!container || !el) return;
+
+      const containerRect = container.getBoundingClientRect();
+      const elRect = el.getBoundingClientRect();
+
+      const targetTop = elRect.top - containerRect.top;
+
+      if (Math.abs(targetTop) > 1) {
+        container.scrollTop += targetTop;
+      }
+    };
+
+    const loop = () => {
+      attempts++;
+      tryAlign();
+
+      if (attempts < 15) {
+        requestAnimationFrame(loop);
+      } else {
+        setPendingJump(null); 
+      }
+    };
+
+    requestAnimationFrame(loop);
+
+  }, [pendingJump, page, range]); // Dependencies updated to match removed textMap
 
   /* ---------------- GROUP TOC ---------------- */
   const groupedSections = sections.reduce((acc, sec, index) => {
     const category = getCategory(sec.breadcrumb);
     if (!acc[category]) acc[category] = [];
+
     acc[category].push({ ...sec, originalIndex: index });
     return acc;
   }, {});
@@ -258,9 +292,6 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
   const categoryOrder = ['Shacharit', 'Mussaf', 'Mincha', "Ma'ariv / Arbit", 'Other'];
 
   /* ---------------- RENDER ---------------- */
-  const showEN = langMode !== 'he';
-  const showHB = langMode !== 'en';
-
   return (
     <div className="h-screen flex flex-col bg-slate-50 dark:bg-slate-950 overflow-hidden">
 
@@ -274,17 +305,23 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
               <p className="text-xs text-slate-500">{subtitle}</p>
             </div>
           </div>
+
           <a href={sefariaUrl} target="_blank" rel="noreferrer">
-            <Button size="sm" variant="outline"><ExternalLink className="w-4 h-4" /></Button>
+            <Button size="sm" variant="outline">
+              <ExternalLink className="w-4 h-4" />
+            </Button>
           </a>
         </div>
+
         <div className="px-4 flex gap-2 py-2">
           <Button size="sm" variant={langMode === 'en' ? "default" : "outline"} onClick={() => setLangMode('en')}>EN</Button>
           <Button size="sm" variant={langMode === 'he' ? "default" : "outline"} onClick={() => setLangMode('he')}>HB</Button>
           <Button size="sm" variant={langMode === 'both' ? "default" : "outline"} onClick={() => setLangMode('both')}>BOTH</Button>
+
           {page === 'reader' && (
             <Button size="sm" variant="outline" onClick={() => setPage('toc')}>
-              <ArrowLeft className="w-4 h-4 mr-1" /> Back
+              <ArrowLeft className="w-4 h-4 mr-1" />
+              Back
             </Button>
           )}
         </div>
@@ -293,7 +330,6 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
       {/* BODY */}
       <div className="flex-1 overflow-hidden">
 
-        {/* TOC VIEW */}
         {page === 'toc' && (
           <div className="h-full overflow-y-auto px-4 pb-24">
             {loading && (
@@ -333,83 +369,40 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
           </div>
         )}
 
-        {/* VIRTUALIZED READER VIEW */}
         {page === 'reader' && (
           <div
             className="h-full overflow-y-auto px-4 pb-24"
             onScroll={onScroll}
             ref={scrollRef}
           >
-            {/* The Virtualizer Wrapper */}
-            <div
-              style={{
-                height: `${virtualizer.getTotalSize()}px`,
-                width: '100%',
-                position: 'relative',
-              }}
-            >
-              {virtualizer.getVirtualItems().map((virtualItem) => {
-                const item = flatItems[virtualItem.index];
+            {sections.slice(range.start, range.end + 1).map((sec, i) => {
+              const index = range.start + i;
 
-                return (
-                  <div
-                    key={virtualItem.key}
-                    data-index={virtualItem.index}
-                    ref={virtualizer.measureElement} // Dynamic measurement magic!
-                    style={{
-                      position: 'absolute',
-                      top: 0,
-                      left: 0,
-                      width: '100%',
-                      transform: `translateY(${virtualItem.start}px)`, // Places the element dynamically
-                    }}
-                    className="py-2"
-                  >
-                    {/* Render Header */}
-                    {item.type === 'header' && (
-                      <div className="bg-white dark:bg-slate-900 py-2 border-b mb-4">
-                        <p className="font-semibold text-slate-700 dark:text-slate-100">
-                          {item.label}
-                        </p>
-                      </div>
-                    )}
+              const windowIndices = [index - 2, index - 1, index + 1, index + 2];
+              const slidingWindowRefs = windowIndices
+                .filter(idx => idx >= 0 && idx < sections.length)
+                .map(idx => sections[idx].ref);
 
-                    {/* Render Loading State */}
-                    {item.type === 'loading' && (
-                      <div className="py-6 flex justify-center">
-                        <Loader2 className="animate-spin text-blue-500" />
-                      </div>
-                    )}
-
-                    {/* Render Mapped Segment */}
-                    {item.type === 'segment' && (
-                      <div className="space-y-2 mb-6">
-                        {showHB && (
-                          <p
-                            className="text-right text-lg leading-loose text-slate-800 dark:text-slate-100 font-serif min-h-[1.5rem]"
-                            dir="rtl"
-                            dangerouslySetInnerHTML={{ __html: sanitizeHTML(item.he) }}
-                          />
-                        )}
-                        {showEN && (
-                          <p
-                            className="text-left text-sm leading-relaxed text-slate-500 dark:text-slate-400 min-h-[1.5rem]"
-                            dangerouslySetInnerHTML={{ __html: sanitizeHTML(item.en) }}
-                          />
-                        )}
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
+              return (
+                <Section
+                  key={index}
+                  index={index}
+                  sec={sec}
+                  langMode={langMode}
+                  prefetchRefs={slidingWindowRefs} 
+                  rowRef={(el) => {
+                    rowRefs.current[index] = el;
+                  }}
+                />
+              );
+            })}
           </div>
         )}
 
       </div>
 
       {/* --- SEFARIA ATTRIBUTION FOOTER --- */}
-      <div className="bg-slate-100 dark:bg-slate-900 border-t py-3 px-4 flex flex-col items-center justify-center gap-1 z-50 shrink-0">
+      <div className="bg-slate-100 dark:bg-slate-900 border-t py-3 px-4 flex flex-col items-center justify-center gap-1 z-50">
         <a
           href="https://www.sefaria.org/texts"
           target="_blank"
