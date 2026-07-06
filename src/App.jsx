@@ -45,32 +45,17 @@ const AuthenticatedApp = () => {
       <Route path="/Compass" element={<Compass />} />
       <Route path="/Settings" element={<Settings />} />
 
-      {/* SIDDUR ROUTES (NEW ARCHITECTURE) */}
-      <Route path="/SephardicSiddur/toc" element={<SephardicSiddur />} />
-      <Route path="/SephardicSiddur/section/:sectionId/:language" element={<SephardicSiddur />} />
+      {/* SIDDUR ROUTES — wildcard prevents remount on TOC↔section navigation */}
+      <Route path="/SephardicSiddur" element={<Navigate to="/SephardicSiddur/toc" replace />} />
+      <Route path="/SephardicSiddur/*" element={<SephardicSiddur />} />
 
-      <Route path="/AshkenaziSiddur/toc" element={<AshkenaziSiddur />} />
-      <Route path="/AshkenaziSiddur/section/:sectionId/:language" element={<AshkenaziSiddur />} />
+      <Route path="/AshkenaziSiddur" element={<Navigate to="/AshkenaziSiddur/toc" replace />} />
+      <Route path="/AshkenaziSiddur/*" element={<AshkenaziSiddur />} />
 
-      <Route path="/ChabadSiddur/toc" element={<ChabadSiddur />} />
-      <Route path="/ChabadSiddur/section/:sectionId/:language" element={<ChabadSiddur />} />
+      <Route path="/ChabadSiddur" element={<Navigate to="/ChabadSiddur/toc" replace />} />
+      <Route path="/ChabadSiddur/*" element={<ChabadSiddur />} />
 
       <Route path="*" element={<PageNotFound />} />
-
-      <Route
-      path="/SephardicSiddur"
-      element={<Navigate to="/SephardicSiddur/toc" replace />}
-      />
-
-      <Route
-      path="/AshkenaziSiddur"
-      element={<Navigate to="/AshkenaziSiddur/toc" replace />}
-      />
-
-      <Route
-      path="/ChabadSiddur"
-      element={<Navigate to="/ChabadSiddur/toc" replace />}
-      />
       </Routes>
   );
 };

@@ -21,6 +21,7 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { fetchAndZipSefaria } from "@/hooks/useSefaria";
 import { processSefariaSchema } from "@/lib/siddurSchema";
 import TocTree from "@/components/siddur/TocTree";
+import NavMenu from "@/components/NavMenu";
 import {
   SiddurHeader,
   SiddurSegment,
@@ -308,8 +309,8 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
       anchorRef.current = null; // clear anchor so restore doesn't fight the jump
       setPage("reader");
       setRange({
-        start: Math.max(0, i - 2),
-        end: Math.min(sections.length - 1, i + 6),
+        start: Math.max(0, i - 5),
+        end: Math.min(sections.length - 1, i + 10),
       });
       setPendingJump(i);
     },
@@ -350,11 +351,6 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
         );
       }
 
-      // Upward expansion — lock scroll so intermediate events don't fight restore
-      if (el.scrollTop < 1000 && range.start > 0) {
-        isProgrammaticScroll.current = true;
-        setRange((r) => ({ start: Math.max(0, r.start - 5), end: r.end }));
-      }
     },
     [
       captureAnchor,
@@ -364,7 +360,6 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
       langMode,
       navigate,
       sections.length,
-      range.start,
     ],
   );
 
@@ -376,9 +371,12 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
       {/* TOP BAR */}
       <div className="sticky top-0 z-50 border-b bg-white dark:bg-slate-950">
         <div className="flex justify-between items-center px-4 pt-4 pb-2">
-          <div>
-            <h1 className="text-lg font-bold">{title}</h1>
-            <p className="text-xs text-slate-500">{subtitle}</p>
+          <div className="flex items-center gap-3">
+            <NavMenu />
+            <div>
+              <h1 className="text-lg font-bold">{title}</h1>
+              <p className="text-xs text-slate-500">{subtitle}</p>
+            </div>
           </div>
           <a href={sefariaUrl} target="_blank" rel="noreferrer">
             <Button size="sm" variant="outline">
