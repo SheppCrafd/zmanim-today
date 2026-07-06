@@ -6,7 +6,6 @@ function TocNode({ node, onSelect, refToIndex, depth }) {
   const [open, setOpen] = useState(false);
   const isLeaf = node.children.length === 0;
 
-  // The base 0.5rem equals px-2. We add pr-2 via Tailwind to keep right-side padding consistent.
   const indent = { paddingLeft: `${depth * 1.25 + 0.5}rem` };
 
   if (isLeaf) {
