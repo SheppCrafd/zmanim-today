@@ -59,7 +59,6 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
   const restoreAnchorRef = useRef(null);
   const floatingHeaderRef = useRef(null);
 
-  // Scroll locking mechanism to prevent browser scroll events from fighting programmatic jumps
   const isProgrammaticScroll = useRef(false);
   const programmaticScrollTimeout = useRef(null);
   const lockScroll = useCallback(() => {
@@ -121,23 +120,19 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
       });
   }, [bookRef]);
 
-  // Handle programmatic JUMPS (from TOC or NavMenu)
-  const jumpTo = useCallback(
-    (i) => {
-      anchorRef.current = null; // Clear anchor so it doesn't fight the jump
-      setPage("reader");
-      // By starting exactly at 'i', we eliminate the need for the virtualizer to guess
-      // the height of previous unloaded items. This forces a perfect landing.
-      setRange({
-        start: i,
-        end: Math.min(sections.length - 1, i + 10),
-      });
-      setPendingJump(i);
-    },
-    [sections.length],
-  );
+  // Handle programmatic JUMPS (Restored to original mechanics)
+  const jumpTo = useCallback((i) => {
+    anchorRef.current = null;
+    setPage("reader");
+    // Keep everything touching scrolling the exact same: expand the range to load target
+    setRange((prev) => ({
+      start: 0,
+      end: Math.max(prev.end, i + 10),
+    }));
+    setPendingJump(i);
+  }, []);
 
-  // URL parsing (watches for back button / hard navigations)
+  // URL parsing
   useEffect(() => {
     if (!sections.length) return;
     const parts = location.pathname.split("/");
@@ -146,9 +141,7 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
       const lang = parts[4];
       if (["en", "he", "both"].includes(lang)) setLangMode(lang);
 
-      // Only jump if it's a new request, bypassing URL updates caused by our own scrolling
       if (!isNaN(sectionId) && pendingJump !== sectionId) {
-        // Check if we are already there to avoid unnecessary re-renders
         const isAlreadyThere = anchorRef.current?.sectionIndex === sectionId;
         if (!isAlreadyThere || page !== "reader") {
           jumpTo(sectionId);
@@ -248,7 +241,7 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
     overscan: 20,
   });
 
-  // Execute jump once items are loaded into the virtualizer
+  // THE "WRONG ONE" BUG FIX
   useEffect(() => {
     if (pendingJump === null || page !== "reader") return;
     lockScroll();
@@ -256,13 +249,18 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
       const idx = flatItemsRef.current.findIndex(
         (it) => it.type === "header" && it.sectionIndex === pendingJump,
       );
-      if (idx !== -1) virtualizer.scrollToIndex(idx, { align: "start" });
+      if (idx !== -1) {
+        virtualizer.scrollToIndex(idx, { align: "start" });
 
-      anchorRef.current = {
-        id: `hdr-${pendingJump}`,
-        offset: 0,
-        sectionIndex: pendingJump,
-      };
+        // Immediately lock this exact header as our anchor! As React Query finishes loading
+        // the items above this, restoreAnchor() will naturally adjust the scrollbar
+        // to keep this header exactly at a 0px offset. No jumping around.
+        anchorRef.current = {
+          id: `hdr-${pendingJump}`,
+          offset: 0,
+          sectionIndex: pendingJump,
+        };
+      }
     });
     setPendingJump(null);
   }, [pendingJump, page, virtualizer, lockScroll]);
@@ -326,7 +324,7 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
       const el = e.target;
       const scrollTop = el.scrollTop;
 
-      // 1. Sticky Header Push-Up Engine
+      // 1. Sticky Header Push-Up Engine (De-janked!)
       if (floatingHeaderRef.current && virtualizer) {
         const vItems = virtualizer.getVirtualItems();
         const nextHeader = vItems.find(
@@ -336,7 +334,8 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
         );
 
         if (nextHeader) {
-          const h = floatingHeaderRef.current.offsetHeight;
+          // Hardcoding an estimated height instead of offsetHeight prevents massive layout thrashing (jank)
+          const h = 48;
           const dist = nextHeader.start - scrollTop;
           if (dist < h) {
             floatingHeaderRef.current.style.transform = `translateY(${dist - h}px)`;
@@ -354,7 +353,7 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
       // 3. Keep Anchor current
       captureAnchor();
 
-      // 4. Silent URL sync (prevents React Router from re-rendering and clashing)
+      // 4. Silent URL sync
       clearTimeout(scrollDebounce.current);
       scrollDebounce.current = setTimeout(() => {
         const virtualItems = virtualizer.getVirtualItems();
@@ -505,10 +504,18 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
             {/* FLOATING STICKY HEADER ENGINE */}
             {(() => {
               const vItems = virtualizer.getVirtualItems();
-              if (!vItems.length) return null;
+              if (!vItems.length || !scrollRef.current) return null;
 
+              const scrollTop = scrollRef.current.scrollTop;
               let activeHeader = null;
-              for (let i = vItems[0].index; i >= 0; i--) {
+
+              // We must grab the header that is active based on the VISIBLE scroll position,
+              // not the top of the overscan area.
+              const visibleItem =
+                vItems.find((vi) => vi.start + vi.size > scrollTop) ||
+                vItems[0];
+
+              for (let i = visibleItem.index; i >= 0; i--) {
                 if (flatItems[i] && flatItems[i].type === "header") {
                   activeHeader = flatItems[i];
                   break;
