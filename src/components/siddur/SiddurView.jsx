@@ -94,6 +94,11 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
     }
   }, [fontScale]);
 
+  // Invalidate all cached heights when font scale changes (content grows/shrinks)
+  useLayoutEffect(() => {
+    setHeights({});
+  }, [fontScale]);
+
   // Clear measured heights on viewport resize (wrapping changes heights)
   useEffect(() => {
     const onResize = () => setHeights({});
