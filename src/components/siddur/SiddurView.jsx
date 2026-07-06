@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useLayoutEffect, useRef, useMemo } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { useQueries, useQueryClient } from '@tanstack/react-query';
-import { ExternalLink, Loader2, AlertCircle, ArrowLeft, ZoomIn, ZoomOut, Menu, X } from 'lucide-react';
+import { ExternalLink, Loader2, AlertCircle, ZoomIn, ZoomOut, Menu, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import NavMenu from '@/components/NavMenu';
 import { useNavigate, useLocation } from 'react-router-dom';
@@ -201,11 +201,9 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
 
   const onScroll = (e) => {
     const el = e.target;
-    
     if (el.scrollTop + el.clientHeight > el.scrollHeight - 1500) {
       setRange(r => ({ start: r.start, end: Math.min(sections.length - 1, r.end + 5) }));
     }
-    
     if (el.scrollTop < 1500 && range.start > 0) {
       lockAnchorSession(); 
       setRange(r => ({ ...r, start: Math.max(0, r.start - 5) }));
@@ -219,7 +217,7 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
       end: Math.min(sections.length - 1, i + 6) 
     });
     setPendingJump(i);
-    setIsSidebarOpen(false); // Close sidebar after selecting
+    setIsSidebarOpen(false); 
   };
 
   useEffect(() => {
@@ -354,7 +352,6 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
                 </Button>
               </div>
               
-              {/* Added Sidebar Toggle and removed "Back" button */}
               <Button size="sm" variant="outline" onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="ml-auto">
                 {isSidebarOpen ? <X className="w-4 h-4 mr-1" /> : <Menu className="w-4 h-4 mr-1" />}
                 TOC
@@ -367,7 +364,7 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
       {/* BODY */}
       <div className="flex-1 flex overflow-hidden relative">
         {page === 'toc' && (
-          <div className="flex-1 h-full overflow-y-auto px-4 pb-24 w-full">
+          <div className="flex-1 h-full overflow-y-auto pb-24 w-full [&_h1]:sticky [&_h1]:top-0 [&_h1]:z-10 [&_h1]:bg-white [&_h1]:dark:bg-slate-950 [&_h1]:px-4 [&_h1]:py-3 [&_h1]:border-b [&_h2]:sticky [&_h2]:top-0 [&_h2]:z-10 [&_h2]:bg-white [&_h2]:dark:bg-slate-950 [&_h2]:px-4 [&_h2]:py-2 [&_h2]:border-b [&_ul]:px-4 [&_div]:px-4 [&_button]:ml-4">
             {loading && <div className="py-10 flex justify-center"><Loader2 className="animate-spin text-blue-500" /></div>}
             {error && <div className="py-10 flex justify-center text-red-500"><AlertCircle className="w-8 h-8" /></div>}
             {!loading && !error && <TocTree nodes={tree} onSelect={jumpTo} refToIndex={refToIndex} />}
@@ -376,18 +373,9 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
 
         {page === 'reader' && (
           <>
-            {/* Sidebar Overlay for TOC */}
-            {isSidebarOpen && (
-              <div className="absolute inset-y-0 left-0 w-72 bg-white dark:bg-slate-950 border-r shadow-2xl z-40 flex flex-col transition-transform duration-300 md:relative md:shadow-none">
-                <div className="flex-1 overflow-y-auto p-4 pb-24">
-                  <TocTree nodes={tree} onSelect={jumpTo} refToIndex={refToIndex} />
-                </div>
-              </div>
-            )}
-            
             {/* Main Reader View */}
             <div
-              className="flex-1 h-full overflow-y-auto px-4 pb-24 bg-slate-50 dark:bg-slate-900"
+              className="flex-1 h-full overflow-y-auto px-4 pb-24 bg-slate-50 dark:bg-slate-900 relative"
               onScroll={onScroll}
               ref={scrollRef}
               style={{ overflowAnchor: 'none' }}
@@ -435,6 +423,15 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
                 })}
               </div>
             </div>
+
+            {/* Sidebar Overlay for TOC - Right Side, Flush Headers */}
+            {isSidebarOpen && (
+              <div className="absolute inset-y-0 right-0 w-72 bg-white dark:bg-slate-950 border-l shadow-2xl z-40 flex flex-col transition-transform duration-300 md:relative md:shadow-none">
+                <div className="flex-1 overflow-y-auto pb-24 [&_h1]:sticky [&_h1]:top-0 [&_h1]:z-10 [&_h1]:bg-white [&_h1]:dark:bg-slate-950 [&_h1]:px-4 [&_h1]:py-3 [&_h1]:border-b [&_h2]:sticky [&_h2]:top-0 [&_h2]:z-10 [&_h2]:bg-white [&_h2]:dark:bg-slate-950 [&_h2]:px-4 [&_h2]:py-2 [&_h2]:border-b [&_ul]:px-4 [&_div]:px-4 [&_button]:ml-4">
+                  <TocTree nodes={tree} onSelect={jumpTo} refToIndex={refToIndex} />
+                </div>
+              </div>
+            )}
           </>
         )}
       </div>
