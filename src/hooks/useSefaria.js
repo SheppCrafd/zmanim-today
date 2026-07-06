@@ -1,79 +1,92 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 
+// --- Helper: Flatten deeply nested arrays from Sefaria ---
+const flatten = (arr) => (Array.isArray(arr) ? arr.flat(Infinity) : [arr]);
+
 // --- Helper: Extract and Clean Text ---
 const extractText = (data, expectedLang) => {
   if (!data?.versions || data.versions.length === 0) return [];
 
-  // FIX: Find the first version that matches the language AND actually contains text
+  // Find the first version matching the language that actually has text
   const version = data.versions.find(
-    (v) => v.language === expectedLang && v.text && v.text.length > 0,
+    (v) =>
+      v.language === expectedLang &&
+      v.text &&
+      flatten(v.text).filter(Boolean).length > 0,
   );
+
   if (!version || !version.text) return [];
 
-  const rawArray = Array.isArray(version.text) ? version.text : [version.text];
+  // Flatten nested text arrays into a single continuous list of paragraphs
+  const rawArray = flatten(version.text);
 
   if (expectedLang === "en") {
     return rawArray.map((line) => {
-      const containsHebrew = /[\u0590-\u05FF]/.test(line || "");
-      return containsHebrew ? "" : line;
+      if (!line) return "";
+      // NEW LOGIC: Only erase the line if it contains NO English letters.
+      // This preserves lines that have both English and Hebrew (like transliterations)
+      // while safely removing Sefaria's duplicate pure-Hebrew placeholder arrays.
+      const hasEnglish = /[a-zA-Z]/.test(line);
+      return hasEnglish ? line : "";
     });
   }
+
   return rawArray;
 };
 
-// --- Exported Fetcher (Centralized Logic) ---
+// --- Exported Fetcher ---
 export const fetchAndZipSefaria = async (ref) => {
   if (!ref) return [];
 
-  const safeRef = encodeURIComponent(ref.replace(/ /g, "_")).replace(
-    /'/g,
-    "%27",
-  );
+  // Sefaria endpoints require spaces to be underscores
+  const safeRef = encodeURIComponent(ref.replace(/ /g, "_"));
 
-  // ATTEMPT 1: V3 API (Gets modern defaults)
-  let resp = await fetch(`https://www.sefaria.org/api/v3/texts/${safeRef}`);
-  let data = resp.ok ? await resp.json() : null;
+  try {
+    // ATTEMPT 1: V3 API
+    const resp = await fetch(`https://www.sefaria.org/api/v3/texts/${safeRef}`);
+    let data = resp.ok ? await resp.json() : null;
 
-  let heArr = extractText(data, "he");
-  let enArr = extractText(data, "en");
+    let heArr = extractText(data, "he");
+    let enArr = extractText(data, "en");
 
-  // ATTEMPT 2 (THE FALLBACK): V2 API
-  // If V3 yielded no Hebrew text, ask Sefaria's classic API as a catch-all.
-  if (heArr.length === 0) {
-    console.warn(`V3 API empty for ${ref}. Trying V2 Fallback...`);
-    const fallbackResp = await fetch(
-      `https://www.sefaria.org/api/texts/${safeRef}?context=0`,
-    );
+    // ATTEMPT 2: V2 API FALLBACK
+    if (heArr.length === 0) {
+      const fallbackResp = await fetch(
+        `https://www.sefaria.org/api/texts/${safeRef}?context=0`,
+      );
+      if (fallbackResp.ok) {
+        const fallbackData = await fallbackResp.json();
 
-    if (fallbackResp.ok) {
-      const fallbackData = await fallbackResp.json();
-
-      // The V2 API puts arrays directly on the root object, ignoring complex versioning
-      if (fallbackData.he && fallbackData.he.length > 0) {
-        heArr = fallbackData.he;
-      }
-      if (
-        fallbackData.text &&
-        fallbackData.text.length > 0 &&
-        enArr.length === 0
-      ) {
-        enArr = fallbackData.text; // Keep V3 English if we already found it, otherwise use V2
+        // V2 puts the arrays directly on the root object
+        if (fallbackData.he && fallbackData.he.length > 0) {
+          heArr = flatten(fallbackData.he);
+        }
+        if (
+          fallbackData.text &&
+          fallbackData.text.length > 0 &&
+          enArr.length === 0
+        ) {
+          enArr = flatten(fallbackData.text);
+        }
       }
     }
+
+    const maxLen = Math.max(heArr.length, enArr.length);
+    const segments = [];
+
+    for (let i = 0; i < maxLen; i++) {
+      segments.push({
+        segmentId: `${ref}-${i + 1}`,
+        he: heArr[i] || null,
+        en: enArr[i] || null,
+      });
+    }
+
+    return segments;
+  } catch (err) {
+    console.error(`Failed to fetch ${ref}:`, err);
+    return [];
   }
-
-  const maxLen = Math.max(heArr.length, enArr.length);
-  const segments = [];
-
-  for (let i = 0; i < maxLen; i++) {
-    segments.push({
-      segmentId: `${ref}-${i + 1}`,
-      he: heArr[i] || null,
-      en: enArr[i] || null,
-    });
-  }
-
-  return segments;
 };
 
 // --- Hook 1: Fetch the Table of Contents ---
