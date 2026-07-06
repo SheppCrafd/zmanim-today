@@ -151,7 +151,7 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location.pathname, sections.length]);
 
-  // Prefetch cache
+  // Prefetch cache (RESTORED PATCH 1: Cache-buster v2)
   useEffect(() => {
     if (!sections.length) return;
     (async () => {
@@ -159,7 +159,7 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
         await Promise.all(
           sections.slice(i, i + 5).map((sec) =>
             queryClient.prefetchQuery({
-              queryKey: ["sefaria-text", sec.ref],
+              queryKey: ["sefaria-text-v2", sec.ref], // <-- CACHE BUSTER ADDED HERE
               queryFn: () => fetchAndZipSefaria(sec.ref),
               staleTime: 86400000,
             }),
@@ -173,7 +173,7 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
 
   const sectionQueries = useQueries({
     queries: activeSections.map((sec) => ({
-      queryKey: ["sefaria-text", sec.ref],
+      queryKey: ["sefaria-text-v2", sec.ref], // <-- CACHE BUSTER ADDED HERE
       queryFn: () => fetchAndZipSefaria(sec.ref),
       staleTime: 86400000,
     })),
@@ -210,6 +210,21 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
         return;
       }
       if (query.data) {
+        // RESTORED PATCH 2: THE SAFETY CHECK
+        if (query.data.length === 0) {
+          items.push({
+            type: "segment",
+            id: `seg-${globalIndex}-empty`,
+            sanitizedHe: "",
+            sanitizedEn:
+              "<span class='italic opacity-50'>No text provided by Sefaria for this section.</span>",
+            hasH: false,
+            hasE: true,
+            sectionIndex: globalIndex,
+          });
+          return;
+        }
+
         query.data.forEach((seg, segIndex) => {
           const hasH =
             seg.he && seg.he.replace(/<[^>]*>/g, "").trim().length > 0;
