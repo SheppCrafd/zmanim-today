@@ -312,7 +312,7 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
   }, [page]);
 
   return (
-    <div className="h-screen flex flex-col bg-slate-50 dark:bg-slate-950 overflow-hidden">
+    <div className="h-screen flex flex-col bg-white dark:bg-slate-950 overflow-hidden">
       {/* TOP BAR */}
       <div className="sticky top-0 z-50 bg-white dark:bg-slate-950 border-b">
         <div className="flex items-center justify-between px-4 pt-4 pb-2">
@@ -354,7 +354,7 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
 
               <Button size="sm" variant="outline" onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="ml-auto">
                 {isSidebarOpen ? <X className="w-4 h-4 mr-1" /> : <Menu className="w-4 h-4 mr-1" />}
-                Menu
+                TOC
               </Button>
             </>
           )}
@@ -364,7 +364,7 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
       {/* BODY */}
       <div className="flex-1 flex overflow-hidden relative">
         {page === 'toc' && (
-          <div className="flex-1 h-full overflow-y-auto px-4 pb-24 w-full [&_h1]:sticky [&_h1]:top-0 [&_h1]:z-10 [&_h1]:bg-white [&_h1]:dark:bg-slate-950 [&_h1]:-mx-4 [&_h1]:px-2 [&_h1]:py-3 [&_h1]:border-b [&_h2]:sticky [&_h2]:top-0 [&_h2]:z-10 [&_h2]:bg-white [&_h2]:dark:bg-slate-950 [&_h2]:-mx-4 [&_h2]:px-2 [&_h2]:py-2 [&_h2]:border-b">
+          <div className="flex-1 h-full overflow-y-auto px-4 pb-24 w-full bg-white dark:bg-slate-950">
             {loading && <div className="py-10 flex justify-center"><Loader2 className="animate-spin text-blue-500" /></div>}
             {error && <div className="py-10 flex justify-center text-red-500"><AlertCircle className="w-8 h-8" /></div>}
             {!loading && !error && <TocTree nodes={tree} onSelect={jumpTo} refToIndex={refToIndex} />}
@@ -375,7 +375,7 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
           <>
             {/* Main Reader View */}
             <div
-              className="flex-1 h-full overflow-y-auto pb-24 bg-slate-50 dark:bg-slate-900 relative"
+              className="flex-1 h-full overflow-y-auto pb-24 bg-white dark:bg-slate-950 relative"
               onScroll={onScroll}
               ref={scrollRef}
               style={{ overflowAnchor: 'none' }}
@@ -427,7 +427,7 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
             {/* Sidebar Overlay for TOC */}
             {isSidebarOpen && (
               <div className="absolute inset-y-0 right-0 w-72 bg-white dark:bg-slate-950 border-l shadow-2xl z-40 flex flex-col transition-transform duration-300 md:relative md:shadow-none">
-                <div className="flex-1 overflow-y-auto px-4 pb-24 [&_h1]:sticky [&_h1]:top-0 [&_h1]:z-10 [&_h1]:bg-white [&_h1]:dark:bg-slate-950 [&_h1]:-mx-4 [&_h1]:px-2 [&_h1]:py-3 [&_h1]:border-b [&_h2]:sticky [&_h2]:top-0 [&_h2]:z-10 [&_h2]:bg-white [&_h2]:dark:bg-slate-950 [&_h2]:-mx-4 [&_h2]:px-2 [&_h2]:py-2 [&_h2]:border-b">
+                <div className="flex-1 overflow-y-auto px-4 pb-24 bg-white dark:bg-slate-950">
                   <TocTree nodes={tree} onSelect={jumpTo} refToIndex={refToIndex} />
                 </div>
               </div>
