@@ -494,55 +494,79 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
 
         {/* VIRTUALIZED READER VIEW */}
         {page === "reader" && (
-          <div
-            ref={scrollRef}
-            onScroll={onScroll}
-            className="h-full overflow-y-auto relative"
-            style={{
-              overflowAnchor: "none",
-              overscrollBehaviorY: "contain",
-              WebkitOverflowScrolling: "touch",
-            }}
-          >
+          <div className="h-full relative overflow-hidden">
+            {/* FLOATING STICKY HEADER ENGINE */}
+            {(() => {
+              const vItems = virtualizer.getVirtualItems();
+              if (!vItems.length) return null;
+
+              // Scan backwards from the top visible item to find its parent header
+              let activeHeader = null;
+              for (let i = vItems[0].index; i >= 0; i--) {
+                if (flatItems[i] && flatItems[i].type === "header") {
+                  activeHeader = flatItems[i];
+                  break;
+                }
+              }
+
+              return activeHeader ? (
+                <div className="absolute top-0 left-0 right-0 z-10 shadow-md">
+                  <SiddurHeader label={activeHeader.label} />
+                </div>
+              ) : null;
+            })()}
+
+            {/* SCROLL CONTAINER */}
             <div
+              ref={scrollRef}
+              onScroll={onScroll}
+              className="h-full overflow-y-auto relative"
               style={{
-                height: virtualizer.getTotalSize(),
-                position: "relative",
+                overflowAnchor: "none",
+                overscrollBehaviorY: "contain",
+                WebkitOverflowScrolling: "touch",
               }}
             >
-              {virtualizer.getVirtualItems().map((v) => {
-                const item = flatItems[v.index];
-                if (!item) return null;
-                return (
-                  <div
-                    key={v.key}
-                    data-index={v.index}
-                    ref={virtualizer.measureElement}
-                    style={{
-                      position: "absolute",
-                      transform: `translateY(${v.start}px)`,
-                      width: "100%",
-                    }}
-                  >
-                    {item.type === "header" && (
-                      <SiddurHeader label={item.label} />
-                    )}
-                    {item.type === "segment" && (
-                      <SiddurSegment
-                        sanitizedHe={item.sanitizedHe}
-                        sanitizedEn={item.sanitizedEn}
-                        hasH={item.hasH}
-                        hasE={item.hasE}
-                        showHB={showHB}
-                        showEN={showEN}
-                        fontScale={fontScale}
-                      />
-                    )}
-                    {item.type === "loading" && <SiddurLoading />}
-                    {item.type === "error" && <SiddurError />}
-                  </div>
-                );
-              })}
+              <div
+                style={{
+                  height: virtualizer.getTotalSize(),
+                  position: "relative",
+                }}
+              >
+                {virtualizer.getVirtualItems().map((v) => {
+                  const item = flatItems[v.index];
+                  if (!item) return null;
+                  return (
+                    <div
+                      key={v.key}
+                      data-index={v.index}
+                      ref={virtualizer.measureElement}
+                      style={{
+                        position: "absolute",
+                        transform: `translateY(${v.start}px)`,
+                        width: "100%",
+                      }}
+                    >
+                      {item.type === "header" && (
+                        <SiddurHeader label={item.label} />
+                      )}
+                      {item.type === "segment" && (
+                        <SiddurSegment
+                          sanitizedHe={item.sanitizedHe}
+                          sanitizedEn={item.sanitizedEn}
+                          hasH={item.hasH}
+                          hasE={item.hasE}
+                          showHB={showHB}
+                          showEN={showEN}
+                          fontScale={fontScale}
+                        />
+                      )}
+                      {item.type === "loading" && <SiddurLoading />}
+                      {item.type === "error" && <SiddurError />}
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           </div>
         )}
