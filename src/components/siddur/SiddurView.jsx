@@ -58,6 +58,8 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
   const anchorRef = useRef(null);
   const scrollDebounce = useRef(null);
   const restoreAnchorRef = useRef(null);
+  const itemRefs = useRef({});
+  const [heights, setHeights] = useState({});
 
   const [tree, setTree] = useState([]);
   const [sections, setSections] = useState([]);
@@ -91,6 +93,13 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
       /* ignore */
     }
   }, [fontScale]);
+
+  // Clear measured heights on viewport resize (wrapping changes heights)
+  useEffect(() => {
+    const onResize = () => setHeights({});
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
 
   // Load TOC
   useEffect(() => {
@@ -215,8 +224,27 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
   const virtualizer = useVirtualizer({
     count: flatItems.length,
     getScrollElement: () => scrollRef.current,
-    estimateSize: () => 180,
+    estimateSize: (i) => heights[flatItems[i]?.id] || 180,
     overscan: 20,
+  });
+
+  // Synchronously measure visible items before paint — gives the virtualizer real
+  // heights immediately (no ResizeObserver delay) so prepended sections don't stutter.
+  useLayoutEffect(() => {
+    const updates = {};
+    let changed = false;
+    for (const v of virtualizer.getVirtualItems()) {
+      const item = flatItems[v.index];
+      if (!item) continue;
+      const el = itemRefs.current[v.index];
+      if (!el) continue;
+      const h = Math.round(el.getBoundingClientRect().height);
+      if (heights[item.id] !== h) {
+        updates[item.id] = h;
+        changed = true;
+      }
+    }
+    if (changed) setHeights((prev) => ({ ...prev, ...updates }));
   });
 
   // -------------------------
@@ -513,7 +541,7 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
                   <div
                     key={v.key}
                     data-index={v.index}
-                    ref={virtualizer.measureElement}
+                    ref={(el) => { itemRefs.current[v.index] = el; }}
                     style={{
                       position: "absolute",
                       transform: `translateY(${v.start}px)`,
