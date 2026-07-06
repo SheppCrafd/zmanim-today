@@ -354,7 +354,7 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
 
               <Button size="sm" variant="outline" onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="ml-auto">
                 {isSidebarOpen ? <X className="w-4 h-4 mr-1" /> : <Menu className="w-4 h-4 mr-1" />}
-                TOC
+                Menu
               </Button>
             </>
           )}
