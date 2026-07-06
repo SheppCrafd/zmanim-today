@@ -15,6 +15,8 @@ import {
   ZoomIn,
   ZoomOut,
   ArrowLeft,
+  List,
+  X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useNavigate, useLocation } from "react-router-dom";
@@ -66,6 +68,7 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
   const [page, setPage] = useState("toc");
   const [langMode, setLangMode] = useState("both");
   const [pendingJump, setPendingJump] = useState(null);
+  const [tocOpen, setTocOpen] = useState(false);
 
   const [fontScale, setFontScale] = useState(() => {
     try {
@@ -351,8 +354,12 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
         );
       }
 
-    },
-    [
+      // Upward expansion — anchor engine restores scroll position after prepend
+      if (el.scrollTop < 1000 && range.start > 0) {
+        setRange((r) => ({ start: Math.max(0, r.start - 5), end: r.end }));
+      }
+      },
+      [
       captureAnchor,
       virtualizer,
       flatItems,
@@ -360,8 +367,9 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
       langMode,
       navigate,
       sections.length,
-    ],
-  );
+      range.start,
+      ],
+      );
 
   // -------------------------
   // RENDER
@@ -378,11 +386,16 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
               <p className="text-xs text-slate-500">{subtitle}</p>
             </div>
           </div>
-          <a href={sefariaUrl} target="_blank" rel="noreferrer">
-            <Button size="sm" variant="outline">
-              <ExternalLink className="w-4 h-4" />
+          <div className="flex items-center gap-2">
+            <Button size="sm" variant="outline" onClick={() => setTocOpen(true)}>
+              <List className="w-4 h-4" />
             </Button>
-          </a>
+            <a href={sefariaUrl} target="_blank" rel="noreferrer">
+              <Button size="sm" variant="outline">
+                <ExternalLink className="w-4 h-4" />
+              </Button>
+            </a>
+          </div>
         </div>
 
         {/* CONTROLS */}
@@ -532,6 +545,39 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
           </div>
         )}
       </div>
+
+      {/* RIGHT-SIDE TOC DRAWER */}
+      {tocOpen && (
+        <>
+          <div
+            className="fixed inset-0 bg-black/30 z-50 backdrop-blur-sm"
+            onClick={() => setTocOpen(false)}
+          />
+          <div className="fixed top-0 right-0 h-full w-80 bg-white dark:bg-slate-950 z-50 shadow-2xl overflow-y-auto">
+            <div className="flex items-center justify-between p-4 border-b border-slate-100 dark:border-slate-800 sticky top-0 bg-white dark:bg-slate-950 z-10">
+              <h2 className="text-lg font-bold">Contents</h2>
+              <Button
+                size="icon"
+                variant="ghost"
+                className="h-8 w-8"
+                onClick={() => setTocOpen(false)}
+              >
+                <X className="w-5 h-5" />
+              </Button>
+            </div>
+            <div className="p-4">
+              <TocTree
+                nodes={tree}
+                onSelect={(i) => {
+                  jumpTo(i);
+                  setTocOpen(false);
+                }}
+                refToIndex={refToIndex}
+              />
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }
