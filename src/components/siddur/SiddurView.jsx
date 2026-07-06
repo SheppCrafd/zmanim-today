@@ -57,6 +57,7 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
   const isProgrammaticScroll = useRef(false);
   const anchorRef = useRef(null);
   const scrollDebounce = useRef(null);
+  const restoreAnchorRef = useRef(null);
 
   const [tree, setTree] = useState([]);
   const [sections, setSections] = useState([]);
@@ -274,13 +275,14 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
       });
     }
   }, [virtualizer, flatItems]);
+  restoreAnchorRef.current = restoreAnchor;
 
   // Restore anchor synchronously after DOM commit (before paint) to prevent visible jumps.
-  // ResizeObserver fires later and re-triggers this effect for a fine-tuning correction.
+  // Ref avoids re-firing on every render (virtualizer identity changes each render).
   useLayoutEffect(() => {
     if (!anchorRef.current || page !== "reader") return;
-    restoreAnchor();
-  }, [fontScale, langMode, flatItems.length, page, restoreAnchor]);
+    restoreAnchorRef.current();
+  }, [fontScale, langMode, flatItems.length, page]);
 
   // -------------------------
   // PROGRAMMATIC JUMP
