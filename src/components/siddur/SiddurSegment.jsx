@@ -25,24 +25,25 @@ export const SiddurSegment = memo(function SiddurSegment({
       className="px-4 py-2 md:grid md:grid-cols-2 md:gap-4 space-y-4 md:space-y-0"
       style={{ fontSize: `${fontScale}em` }}
     >
-      {/* Hebrew always goes on the right if both are showing, but flex/grid order can handle this naturally.
-            Since grid defaults to LTR, we actually want Hebrew on the right side of the screen 
-            if both are present. Let's ensure the order is correct. */}
-      {showEN && hasE && (
-        <div className={`${showHB && hasH ? "order-2 md:order-1" : ""}`}>
-          <p
-            className="text-left leading-relaxed text-slate-600 dark:text-slate-400"
-            dangerouslySetInnerHTML={{ __html: sanitizedEn }}
-          />
-        </div>
-      )}
-
+      {/* Hebrew comes first in the DOM so it stacks on top for mobile. 
+            On desktop (md), we push it to the right side (order-2) if English is present. */}
       {showHB && hasH && (
-        <div className={`${showEN && hasE ? "order-1 md:order-2" : ""}`}>
+        <div className={showEN && hasE ? "md:order-2" : ""}>
           <p
             dir="rtl"
             className="text-right leading-loose font-serif"
             dangerouslySetInnerHTML={{ __html: sanitizedHe }}
+          />
+        </div>
+      )}
+
+      {/* English comes second in the DOM so it stacks below Hebrew for mobile. 
+            On desktop (md), we pull it to the left side (order-1) if Hebrew is present. */}
+      {showEN && hasE && (
+        <div className={showHB && hasH ? "md:order-1" : ""}>
+          <p
+            className="text-left leading-relaxed text-slate-600 dark:text-slate-400"
+            dangerouslySetInnerHTML={{ __html: sanitizedEn }}
           />
         </div>
       )}
