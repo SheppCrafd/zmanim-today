@@ -1,25 +1,46 @@
-import React, { useState, useEffect, useLayoutEffect, useRef, useMemo } from 'react';
-import { useVirtualizer } from '@tanstack/react-virtual';
-import { useQueries, useQueryClient } from '@tanstack/react-query';
-import { ExternalLink, Loader2, AlertCircle, ZoomIn, ZoomOut, Menu, X } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import NavMenu from '@/components/NavMenu';
-import { useNavigate, useLocation } from 'react-router-dom';
-import { fetchAndZipSefaria } from '@/hooks/useSefaria';
-import { processSefariaSchema } from '@/lib/siddurSchema';
-import TocTree from '@/components/siddur/TocTree';
+import React, {
+  useState,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useMemo,
+} from "react";
+import { useVirtualizer } from "@tanstack/react-virtual";
+import { useQueries, useQueryClient } from "@tanstack/react-query";
+import {
+  ExternalLink,
+  Loader2,
+  AlertCircle,
+  ZoomIn,
+  ZoomOut,
+  Menu,
+  X,
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+import NavMenu from "@/components/NavMenu";
+import { useNavigate, useLocation } from "react-router-dom";
+import { fetchAndZipSefaria } from "@/hooks/useSefaria";
+import { processSefariaSchema } from "@/lib/siddurSchema";
+import TocTree from "@/components/siddur/TocTree";
 
-const clampScale = (scale) => Math.max(0.5, Math.min(3, Math.round(scale * 100) / 100));
+const clampScale = (scale) =>
+  Math.max(0.5, Math.min(3, Math.round(scale * 100) / 100));
 
+// Step 2 & 6: Pre-compiled sanitization engine with asset stability guardrails
 function sanitizeHTML(htmlString) {
-  if (!htmlString) return '';
+  if (!htmlString) return "";
   const parser = new DOMParser();
-  const doc = parser.parseFromString(htmlString, 'text/html');
-  const badTags = doc.querySelectorAll('script, iframe, object, embed, style, link, meta, base');
-  badTags.forEach(el => el.remove());
-  const allElements = doc.querySelectorAll('*');
-  allElements.forEach(el => {
-    Array.from(el.attributes).forEach(attr => el.removeAttribute(attr.name));
+  const doc = parser.parseFromString(htmlString, "text/html");
+
+  // Stripping layout-breaking tags and images to avoid post-render layout shifts
+  const badTags = doc.querySelectorAll(
+    "script, iframe, object, embed, style, link, meta, base, img",
+  );
+  badTags.forEach((el) => el.remove());
+
+  const allElements = doc.querySelectorAll("*");
+  allElements.forEach((el) => {
+    Array.from(el.attributes).forEach((attr) => el.removeAttribute(attr.name));
   });
   return doc.body.innerHTML;
 }
@@ -35,38 +56,46 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
   const activeAnchorRef = useRef(null);
   const anchorTimeoutRef = useRef(null);
 
-  const [pendingJump, setPendingJump] = useState(null);
   const [tree, setTree] = useState([]);
   const [sections, setSections] = useState([]);
   const [refToIndex, setRefToIndex] = useState({});
-  const [range, setRange] = useState({ start: 0, end: 10 });
+
+  // Step 1: Replace unstable range states with an index-based viewport tracker
+  const [visibleRange, setVisibleRange] = useState({ start: 0, end: 4 });
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
-  const [page, setPage] = useState('toc');
-  const [langMode, setLangMode] = useState('both');
+  const [page, setPage] = useState("toc");
+  const [langMode, setLangMode] = useState("both");
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [fontScale, setFontScale] = useState(() => {
     try {
-      return parseFloat(localStorage.getItem('siddur-font-scale')) || 1;
+      return parseFloat(localStorage.getItem("siddur-font-scale")) || 1;
     } catch {
       return 1;
     }
   });
 
-  const showEN = langMode !== 'he';
-  const showHB = langMode !== 'en';
+  const showEN = langMode !== "he";
+  const showHB = langMode !== "en";
 
   useEffect(() => {
     fontScaleRef.current = fontScale;
-    try { localStorage.setItem('siddur-font-scale', String(fontScale)); } catch { /* ignore */ }
+    try {
+      localStorage.setItem("siddur-font-scale", String(fontScale));
+    } catch {
+      /* ignore */
+    }
   }, [fontScale]);
 
+  // Fetch structural schema
   useEffect(() => {
     fetch(`https://www.sefaria.org/api/index/${bookRef}`)
-      .then(r => r.json())
-      .then(data => {
-        const { tree, flat, refToIndex } = processSefariaSchema(data?.schema || {});
+      .then((r) => r.json())
+      .then((data) => {
+        const { tree, flat, refToIndex } = processSefariaSchema(
+          data?.schema || {},
+        );
         setTree(tree);
         setSections(flat);
         setRefToIndex(refToIndex);
@@ -78,164 +107,140 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
       });
   }, [bookRef]);
 
+  // Global background prefetch worker to fill cache smoothly
   useEffect(() => {
     if (sections.length === 0) return;
     const prefetchAllSections = async () => {
       const batchSize = 5;
       for (let i = 0; i < sections.length; i += batchSize) {
         await Promise.all(
-          sections.slice(i, i + batchSize).map(sec =>
+          sections.slice(i, i + batchSize).map((sec) =>
             queryClient.prefetchQuery({
-              queryKey: ['sefaria-text', sec.ref],
-              queryFn: () => fetchAndZipSefaria(sec.ref),
+              queryKey: ["sefaria-text", sec.ref],
+              queryFn: async () => {
+                const rawData = await fetchAndZipSefaria(sec.ref);
+                return rawData.map((seg) => ({
+                  ...seg,
+                  sanitizedHe: sanitizeHTML(seg.he),
+                  sanitizedEn: sanitizeHTML(seg.en),
+                  hasHebrew:
+                    (seg.he ? seg.he.replace(/<[^>]*>/g, "").trim() : "")
+                      .length > 0,
+                  hasEnglish:
+                    (seg.en ? seg.en.replace(/<[^>]*>/g, "").trim() : "")
+                      .length > 0,
+                }));
+              },
               staleTime: 1000 * 60 * 60 * 24,
-            })
-          )
+            }),
+          ),
         );
-        await new Promise(resolve => setTimeout(resolve, 500));
+        await new Promise((resolve) => setTimeout(resolve, 300));
       }
     };
     prefetchAllSections();
   }, [sections, queryClient]);
 
-  const activeSections = sections.slice(range.start, range.end + 1);
+  // Step 1: Compute target viewport query window (Overscan adjusted to protect memory)
+  const activeSectionWindow = useMemo(() => {
+    if (!sections.length) return [];
+    const start = Math.max(0, visibleRange.start - 3);
+    const end = Math.min(sections.length - 1, visibleRange.end + 3);
+    const targetSlice = [];
+    for (let i = start; i <= end; i++) {
+      targetSlice.push({ sec: sections[i], index: i });
+    }
+    return targetSlice;
+  }, [sections, visibleRange]);
+
+  // Step 2: Offload parsing routines into the cache execution lifecycle
   const sectionQueries = useQueries({
-    queries: activeSections.map(sec => ({
-      queryKey: ['sefaria-text', sec.ref],
-      queryFn: () => fetchAndZipSefaria(sec.ref),
+    queries: activeSectionWindow.map(({ sec }) => ({
+      queryKey: ["sefaria-text", sec.ref],
+      queryFn: async () => {
+        const rawData = await fetchAndZipSefaria(sec.ref);
+        if (!Array.isArray(rawData)) return [];
+        return rawData.map((seg) => ({
+          ...seg,
+          sanitizedHe: sanitizeHTML(seg.he),
+          sanitizedEn: sanitizeHTML(seg.en),
+          hasHebrew:
+            (seg.he ? seg.he.replace(/<[^>]*>/g, "").trim() : "").length > 0,
+          hasEnglish:
+            (seg.en ? seg.en.replace(/<[^>]*>/g, "").trim() : "").length > 0,
+        }));
+      },
       staleTime: 1000 * 60 * 60 * 24,
-    }))
+    })),
   });
 
-  const queryTracker = JSON.stringify(
-    sectionQueries.map(q => ({ status: q.status, updated: q.dataUpdatedAt }))
-  );
-
-  const flatItems = useMemo(() => {
-    const items = [];
-    activeSections.forEach((sec, i) => {
-      const currentSectionIndex = range.start + i;
-      const query = sectionQueries[i];
-
-      const hasNoEnglish = query.data ? !query.data.some(seg =>
-        (seg.en ? seg.en.replace(/<[^>]*>/g, '').trim() : '').length > 0
-      ) : false;
-
-      items.push({ type: 'header', id: `hdr-${currentSectionIndex}`, label: sec.label, sectionIndex: currentSectionIndex, hasNoEnglish });
-
-      if (query.isLoading) {
-        items.push({ type: 'loading', id: `load-${sec.ref}`, sectionIndex: currentSectionIndex });
-      } else if (query.isError) {
-        items.push({ type: 'error', id: `err-${sec.ref}`, sectionIndex: currentSectionIndex });
-      } else if (query.data) {
-        query.data.forEach((seg, segIndex) => {
-          const hasHebrew = (seg.he ? seg.he.replace(/<[^>]*>/g, '').trim() : '').length > 0;
-          const hasEnglish = (seg.en ? seg.en.replace(/<[^>]*>/g, '').trim() : '').length > 0;
-
-          const willShow = (showHB && hasHebrew) || (showEN && hasEnglish);
-          if (!willShow) return;
-
-          items.push({
-            type: 'segment',
-            id: `seg-${currentSectionIndex}-${segIndex}`,
-            ...seg,
-            sanitizedHe: sanitizeHTML(seg.he),
-            sanitizedEn: sanitizeHTML(seg.en),
-            hasHebrew,
-            hasEnglish,
-            sectionIndex: currentSectionIndex
-          });
-        });
-      }
+  // Map active query streams to static component indexes
+  const queriesMap = useMemo(() => {
+    const map = {};
+    activeSectionWindow.forEach(({ index }, i) => {
+      map[index] = sectionQueries[i];
     });
-    return items;
-  }, [activeSections, queryTracker, range.start, showHB, showEN]);
+    return map;
+  }, [activeSectionWindow, sectionQueries]);
 
+  // Step 1 & 4: Virtualizer tracking static document schemas
   const virtualizer = useVirtualizer({
-    count: flatItems.length,
+    count: sections.length,
     getScrollElement: () => scrollRef.current,
-    getItemKey: (index) => flatItems[index]?.id || index,
-    estimateSize: (index) => {
-      const item = flatItems[index];
-      if (!item) return 100;
-
-      if (item.type === 'header') return 45 * fontScale;
-      if (item.type === 'loading' || item.type === 'error') return 100;
-
-      if (item.type === 'segment') {
-        let chars = 0;
-        if (showHB && item.hasHebrew) chars += item.sanitizedHe.length;
-        if (showEN && item.hasEnglish) chars += item.sanitizedEn.length;
-
-        const lines = Math.max(1, chars / 60);
-        return (lines * 30 * fontScale) + 30;
-      }
-      return 100;
-    },
-    overscan: 15,
+    getItemKey: (index) => sections[index]?.ref || index,
+    estimateSize: () => 250,
+    overscan: 3,
     onChange: (instance) => {
-      if (page !== 'reader') return;
+      if (page !== "reader") return;
       const items = instance.getVirtualItems();
       if (!items.length) return;
 
-      const topItem = flatItems[items[0].index];
-      if (topItem && topItem.sectionIndex !== activeSectionRef.current) {
-        activeSectionRef.current = topItem.sectionIndex;
-        const basePath = '/' + location.pathname.split('/')[1];
+      const start = items[0].index;
+      const end = items[items.length - 1].index;
 
-        setTimeout(() => {
-          navigate(`${basePath}/section/${topItem.sectionIndex}/${langMode}`, { replace: true });
-        }, 0);
+      setVisibleRange((prev) => {
+        if (prev.start === start && prev.end === end) return prev;
+        return { start, end };
+      });
+
+      const topItem = items[0];
+      if (topItem && topItem.index !== activeSectionRef.current) {
+        activeSectionRef.current = topItem.index;
+        const basePath = "/" + location.pathname.split("/")[1];
+
+        if (anchorTimeoutRef.current) clearTimeout(anchorTimeoutRef.current);
+        anchorTimeoutRef.current = setTimeout(() => {
+          navigate(`${basePath}/section/${topItem.index}/${langMode}`, {
+            replace: true,
+          });
+        }, 120);
       }
-    }
+    },
   });
 
-  const measureRef = useRef(virtualizer.measure);
+  // Step 4: Clear size nodes globally when typography configurations change
   useEffect(() => {
-    measureRef.current = virtualizer.measure;
-  }, [virtualizer.measure]);
+    virtualizer.measure();
+  }, [fontScale, langMode, virtualizer]);
 
-  useEffect(() => {
-    measureRef.current();
-  }, [fontScale, langMode]);
-
-  const onScroll = (e) => {
-    const el = e.target;
-    if (el.scrollTop + el.clientHeight > el.scrollHeight - 1500) {
-      setRange(r => ({ start: r.start, end: Math.min(sections.length - 1, r.end + 5) }));
-    }
-    if (el.scrollTop < 1500 && range.start > 0) {
-      lockAnchorSession();
-      setRange(r => ({ ...r, start: Math.max(0, r.start - 5) }));
-    }
-  };
-
+  // Absolute instant-jump positioning mechanics
   const jumpTo = (i) => {
-    setPage('reader');
-    setRange({
-      start: Math.max(0, i - 2),
-      end: Math.min(sections.length - 1, i + 6)
-    });
-    setPendingJump(i);
+    setPage("reader");
     setIsSidebarOpen(false);
+    setTimeout(() => {
+      virtualizer.scrollToIndex(i, { align: "start" });
+    }, 16);
   };
 
-  useEffect(() => {
-    if (pendingJump === null || page !== 'reader') return;
-    const targetIndex = flatItems.findIndex(item => item.type === 'header' && item.sectionIndex === pendingJump);
-    if (targetIndex !== -1) {
-      virtualizer.scrollToIndex(targetIndex, { align: 'start' });
-      setPendingJump(null);
-    }
-  }, [pendingJump, page, flatItems, virtualizer]);
-
+  // Safe internal anchor matrix builders
   const captureAnchorData = () => {
     if (!scrollRef.current) return null;
     const items = virtualizer.getVirtualItems();
     if (items.length === 0) return null;
 
     const scrollTop = scrollRef.current.scrollTop;
-    const trueTopItem = items.find(item => item.start + item.size > scrollTop) || items[0];
+    const trueTopItem =
+      items.find((item) => item.start + item.size > scrollTop) || items[0];
     const offsetPx = scrollTop - trueTopItem.start;
 
     return {
@@ -247,31 +252,46 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
   const lockAnchorSession = () => {
     if (!activeAnchorRef.current) activeAnchorRef.current = captureAnchorData();
     if (anchorTimeoutRef.current) clearTimeout(anchorTimeoutRef.current);
-    anchorTimeoutRef.current = setTimeout(() => { activeAnchorRef.current = null; }, 500);
+    anchorTimeoutRef.current = setTimeout(() => {
+      activeAnchorRef.current = null;
+    }, 500);
   };
 
-  useEffect(() => () => { if (anchorTimeoutRef.current) clearTimeout(anchorTimeoutRef.current); }, []);
+  useEffect(
+    () => () => {
+      if (anchorTimeoutRef.current) clearTimeout(anchorTimeoutRef.current);
+    },
+    [],
+  );
 
   useLayoutEffect(() => {
-    if (!activeAnchorRef.current || page !== 'reader' || !scrollRef.current) return;
+    if (!activeAnchorRef.current || page !== "reader" || !scrollRef.current)
+      return;
     const { index, percentage } = activeAnchorRef.current;
 
-    const targetItem = virtualizer.getVirtualItems().find(it => it.index === index);
+    const targetItem = virtualizer
+      .getVirtualItems()
+      .find((it) => it.index === index);
     if (targetItem) {
-      const targetScrollTop = targetItem.start + (targetItem.size * percentage);
+      const targetScrollTop = targetItem.start + targetItem.size * percentage;
       virtualizer.scrollToOffset(targetScrollTop);
     } else {
-      virtualizer.scrollToIndex(index, { align: 'start' });
+      virtualizer.scrollToIndex(index, { align: "start" });
     }
   }, [fontScale, page]);
 
+  // Device Input Handlers
   useEffect(() => {
     const el = scrollRef.current;
-    if (!el || page !== 'reader') return;
+    if (!el || page !== "reader") return;
 
     let pinchStartDist = 0;
     let pinchStartScale = 1;
-    const getDist = (touches) => Math.hypot(touches[0].clientX - touches[1].clientX, touches[0].clientY - touches[1].clientY);
+    const getDist = (touches) =>
+      Math.hypot(
+        touches[0].clientX - touches[1].clientX,
+        touches[0].clientY - touches[1].clientY,
+      );
 
     const onTouchStart = (e) => {
       if (e.touches.length === 2) {
@@ -296,18 +316,18 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
       if (e.ctrlKey || e.metaKey) {
         e.preventDefault();
         lockAnchorSession();
-        setFontScale(s => clampScale(s + (e.deltaY > 0 ? -0.05 : 0.05)));
+        setFontScale((s) => clampScale(s + (e.deltaY > 0 ? -0.05 : 0.05)));
       }
     };
 
-    el.addEventListener('touchstart', onTouchStart, { passive: false });
-    el.addEventListener('touchmove', onTouchMove, { passive: false });
-    el.addEventListener('wheel', onWheel, { passive: false });
+    el.addEventListener("touchstart", onTouchStart, { passive: false });
+    el.addEventListener("touchmove", onTouchMove, { passive: false });
+    el.addEventListener("wheel", onWheel, { passive: false });
 
     return () => {
-      el.removeEventListener('touchstart', onTouchStart);
-      el.removeEventListener('touchmove', onTouchMove);
-      el.removeEventListener('wheel', onWheel);
+      el.removeEventListener("touchstart", onTouchStart);
+      el.removeEventListener("touchmove", onTouchMove);
+      el.removeEventListener("wheel", onWheel);
     };
   }, [page]);
 
@@ -324,36 +344,75 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
             </div>
           </div>
           <a href={sefariaUrl} target="_blank" rel="noreferrer">
-            <Button size="sm" variant="outline"><ExternalLink className="w-4 h-4" /></Button>
+            <Button size="sm" variant="outline">
+              <ExternalLink className="w-4 h-4" />
+            </Button>
           </a>
         </div>
         <div className="px-4 flex items-center gap-2 py-2 flex-wrap">
-          <Button size="sm" variant={langMode === 'en' ? "default" : "outline"} onClick={() => setLangMode('en')}>EN</Button>
-          <Button size="sm" variant={langMode === 'he' ? "default" : "outline"} onClick={() => setLangMode('he')}>HB</Button>
-          <Button size="sm" variant={langMode === 'both' ? "default" : "outline"} onClick={() => setLangMode('both')}>BOTH</Button>
+          <Button
+            size="sm"
+            variant={langMode === "en" ? "default" : "outline"}
+            onClick={() => setLangMode("en")}
+          >
+            EN
+          </Button>
+          <Button
+            size="sm"
+            variant={langMode === "he" ? "default" : "outline"}
+            onClick={() => setLangMode("he")}
+          >
+            HB
+          </Button>
+          <Button
+            size="sm"
+            variant={langMode === "both" ? "default" : "outline"}
+            onClick={() => setLangMode("both")}
+          >
+            BOTH
+          </Button>
 
-          {page === 'reader' && (
+          {page === "reader" && (
             <>
               <div className="flex items-center gap-1 ml-2">
-                <Button size="icon" variant="outline" className="h-8 w-8" onClick={() => {
-                  lockAnchorSession();
-                  setFontScale(s => clampScale(s - 0.05));
-                }}>
+                <Button
+                  size="icon"
+                  variant="outline"
+                  className="h-8 w-8"
+                  onClick={() => {
+                    lockAnchorSession();
+                    setFontScale((s) => clampScale(s - 0.05));
+                  }}
+                >
                   <ZoomOut className="w-4 h-4" />
                 </Button>
                 <span className="text-xs text-slate-500 w-10 text-center tabular-nums">
                   {Math.round(fontScale * 100)}%
                 </span>
-                <Button size="icon" variant="outline" className="h-8 w-8" onClick={() => {
-                  lockAnchorSession();
-                  setFontScale(s => clampScale(s + 0.05));
-                }}>
+                <Button
+                  size="icon"
+                  variant="outline"
+                  className="h-8 w-8"
+                  onClick={() => {
+                    lockAnchorSession();
+                    setFontScale((s) => clampScale(s + 0.05));
+                  }}
+                >
                   <ZoomIn className="w-4 h-4" />
                 </Button>
               </div>
 
-              <Button size="sm" variant="outline" onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="ml-auto">
-                {isSidebarOpen ? <X className="w-4 h-4 mr-1" /> : <Menu className="w-4 h-4 mr-1" />}
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+                className="ml-auto"
+              >
+                {isSidebarOpen ? (
+                  <X className="w-4 h-4 mr-1" />
+                ) : (
+                  <Menu className="w-4 h-4 mr-1" />
+                )}
                 TOC
               </Button>
             </>
@@ -363,59 +422,138 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
 
       {/* BODY */}
       <div className="flex-1 flex overflow-hidden relative">
-        {page === 'toc' && (
+        {page === "toc" && (
           <div className="flex-1 h-full overflow-y-auto px-4 pb-24 w-full bg-white dark:bg-slate-950">
-            {loading && <div className="py-10 flex justify-center"><Loader2 className="animate-spin text-blue-500" /></div>}
-            {error && <div className="py-10 flex justify-center text-red-500"><AlertCircle className="w-8 h-8" /></div>}
-            {!loading && !error && <TocTree nodes={tree} onSelect={jumpTo} refToIndex={refToIndex} />}
+            {loading && (
+              <div className="py-10 flex justify-center">
+                <Loader2 className="animate-spin text-blue-500" />
+              </div>
+            )}
+            {error && (
+              <div className="py-10 flex justify-center text-red-500">
+                <AlertCircle className="w-8 h-8" />
+              </div>
+            )}
+            {!loading && !error && (
+              <TocTree nodes={tree} onSelect={jumpTo} refToIndex={refToIndex} />
+            )}
           </div>
         )}
 
-        {page === 'reader' && (
+        {page === "reader" && (
           <>
             {/* Main Reader View */}
             <div
               className="flex-1 h-full overflow-y-auto pb-24 bg-white dark:bg-slate-950 relative"
-              onScroll={onScroll}
               ref={scrollRef}
-              style={{ overflowAnchor: 'none' }}
+              style={{ overflowAnchor: "none", willChange: "scroll-position" }}
             >
-              <div style={{ height: `${virtualizer.getTotalSize()}px`, width: '100%', position: 'relative' }}>
+              <div
+                style={{
+                  height: `${virtualizer.getTotalSize()}px`,
+                  width: "100%",
+                  position: "relative",
+                }}
+              >
                 {virtualizer.getVirtualItems().map((virtualItem) => {
-                  const item = flatItems[virtualItem.index];
+                  const sec = sections[virtualItem.index];
+                  const query = queriesMap[virtualItem.index];
+                  const hasNoEnglish = query?.data
+                    ? !query.data.some((seg) => seg.hasEnglish)
+                    : false;
 
                   return (
                     <div
                       key={virtualItem.key}
                       data-index={virtualItem.index}
                       ref={virtualizer.measureElement}
-                      style={{ position: 'absolute', top: 0, left: 0, width: '100%', transform: `translateY(${virtualItem.start}px)`, contain: 'content' }}
+                      style={{
+                        position: "absolute",
+                        top: 0,
+                        left: 0,
+                        width: "100%",
+                        transform: `translateY(${virtualItem.start}px)`,
+                        // Step 5: Native GPU Rendering Offload Optimization Layers
+                        contain: "layout paint style",
+                        contentVisibility: "auto",
+                        willChange: "transform",
+                      }}
                     >
-                      {item.type === 'header' && (
-                        <div className="bg-slate-50 dark:bg-slate-900 border-y border-slate-200 dark:border-slate-800 shadow-sm px-2" style={{ fontSize: `${Math.max(1, fontScale * 0.9)}em`, paddingTop: '0.75em', paddingBottom: '0.5em' }}>
-                          <p className="font-semibold text-slate-700 dark:text-slate-100">{item.label}</p>
-                          {showEN && !showHB && item.hasNoEnglish && <p className="mt-2 text-sm italic text-amber-600 dark:text-amber-400">This section has no English</p>}
+                      {/* Section Title Header Block */}
+                      <div
+                        className="bg-slate-50 dark:bg-slate-900 border-y border-slate-200 dark:border-slate-800 shadow-sm px-2"
+                        style={{
+                          fontSize: `${Math.max(1, fontScale * 0.9)}em`,
+                          paddingTop: "0.75em",
+                          paddingBottom: "0.5em",
+                        }}
+                      >
+                        <p className="font-semibold text-slate-700 dark:text-slate-100">
+                          {sec?.label}
+                        </p>
+                        {showEN && !showHB && hasNoEnglish && (
+                          <p className="mt-2 text-sm italic text-amber-600 dark:text-amber-400">
+                            This section has no English
+                          </p>
+                        )}
+                      </div>
+
+                      {/* Content Streaming States */}
+                      {(!query || query.isLoading) && (
+                        <div className="py-8 flex justify-center">
+                          <Loader2 className="animate-spin text-blue-500/70" />
                         </div>
                       )}
 
-                      {item.type === 'loading' && <div className="py-6 flex justify-center"><Loader2 className="animate-spin text-blue-500" /></div>}
+                      {query?.isError && (
+                        <div className="py-6 flex justify-center items-center gap-2 text-red-500 text-sm">
+                          <AlertCircle className="w-4 h-4" /> Error loading
+                          compilation segment.
+                        </div>
+                      )}
 
-                      {item.type === 'segment' && (
-                        <div className="px-4" style={{ fontSize: `${fontScale}em`, paddingTop: '0.25em', paddingBottom: '1.5em' }}>
-                          {showHB && item.hasHebrew && (
-                            <p
-                              className="text-right text-[1.125em] leading-loose text-slate-800 dark:text-slate-100 font-serif min-h-[1.5em]"
-                              dir="rtl"
-                              dangerouslySetInnerHTML={{ __html: item.sanitizedHe }}
-                            />
-                          )}
-                          {showEN && item.hasEnglish && (
-                            <p
-                              className="text-left text-[0.875em] leading-relaxed text-slate-500 dark:text-slate-400 min-h-[1.5em]"
-                              style={{ paddingTop: showHB ? '1em' : '0' }}
-                              dangerouslySetInnerHTML={{ __html: item.sanitizedEn }}
-                            />
-                          )}
+                      {query?.data && (
+                        <div className="flex flex-col">
+                          {query.data.map((seg, segIndex) => {
+                            const willShow =
+                              (showHB && seg.hasHebrew) ||
+                              (showEN && seg.hasEnglish);
+                            if (!willShow) return null;
+
+                            return (
+                              <div
+                                key={segIndex}
+                                className="px-4"
+                                style={{
+                                  fontSize: `${fontScale}em`,
+                                  paddingTop: "0.25em",
+                                  paddingBottom: "1.5em",
+                                }}
+                              >
+                                {showHB && seg.hasHebrew && (
+                                  <p
+                                    className="text-right text-[1.125em] leading-loose text-slate-800 dark:text-slate-100 font-serif min-h-[1.5em]"
+                                    dir="rtl"
+                                    dangerouslySetInnerHTML={{
+                                      __html: seg.sanitizedHe,
+                                    }}
+                                  />
+                                )}
+                                {showEN && seg.hasEnglish && (
+                                  <p
+                                    className="text-left text-[0.875em] leading-relaxed text-slate-500 dark:text-slate-400 min-h-[1.5em]"
+                                    style={{
+                                      paddingTop:
+                                        showHB && seg.hasHebrew ? "1em" : "0",
+                                    }}
+                                    dangerouslySetInnerHTML={{
+                                      __html: seg.sanitizedEn,
+                                    }}
+                                  />
+                                )}
+                              </div>
+                            );
+                          })}
                         </div>
                       )}
                     </div>
@@ -428,7 +566,11 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
             {isSidebarOpen && (
               <div className="absolute inset-y-0 right-0 w-72 bg-white dark:bg-slate-950 border-l shadow-2xl z-40 flex flex-col transition-transform duration-300 md:relative md:shadow-none">
                 <div className="flex-1 overflow-y-auto px-4 pb-24 bg-white dark:bg-slate-950">
-                  <TocTree nodes={tree} onSelect={jumpTo} refToIndex={refToIndex} />
+                  <TocTree
+                    nodes={tree}
+                    onSelect={jumpTo}
+                    refToIndex={refToIndex}
+                  />
                 </div>
               </div>
             )}
@@ -438,11 +580,28 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
 
       {/* FOOTER */}
       <div className="bg-slate-100 dark:bg-slate-900 border-t py-3 px-4 flex flex-col items-center justify-center gap-1 z-50 shrink-0">
-        <a href="https://www.sefaria.org/texts" target="_blank" rel="noreferrer" className="transition-transform hover:scale-105">
-          <img src="https://files.readme.io/dcee0a8-image.png" alt="Powered by Sefaria" className="h-11 w-auto rounded-md shadow-sm bg-white" />
+        <a
+          href="https://www.sefaria.org/texts"
+          target="_blank"
+          rel="noreferrer"
+          className="transition-transform hover:scale-105"
+        >
+          <img
+            src="https://files.readme.io/dcee0a8-image.png"
+            alt="Powered by Sefaria"
+            className="h-11 w-auto rounded-md shadow-sm bg-white"
+          />
         </a>
         <div className="text-[10px] text-slate-500">
-          and the{' '}<a href="https://developers.sefaria.org" target="_blank" rel="noreferrer" className="underline hover:text-slate-700 dark:hover:text-slate-300 transition-colors">Sefaria API</a>
+          and the{" "}
+          <a
+            href="https://developers.sefaria.org"
+            target="_blank"
+            rel="noreferrer"
+            className="underline hover:text-slate-700 dark:hover:text-slate-300 transition-colors"
+          >
+            Sefaria API
+          </a>
         </div>
       </div>
     </div>
