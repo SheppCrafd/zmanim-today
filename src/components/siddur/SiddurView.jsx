@@ -177,12 +177,12 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
       if (page !== 'reader') return;
       const items = instance.getVirtualItems();
       if (!items.length) return;
-      
+
       const topItem = flatItems[items[0].index];
       if (topItem && topItem.sectionIndex !== activeSectionRef.current) {
         activeSectionRef.current = topItem.sectionIndex;
         const basePath = '/' + location.pathname.split('/')[1];
-        
+
         setTimeout(() => {
           navigate(`${basePath}/section/${topItem.sectionIndex}/${langMode}`, { replace: true });
         }, 0);
@@ -205,19 +205,19 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
       setRange(r => ({ start: r.start, end: Math.min(sections.length - 1, r.end + 5) }));
     }
     if (el.scrollTop < 1500 && range.start > 0) {
-      lockAnchorSession(); 
+      lockAnchorSession();
       setRange(r => ({ ...r, start: Math.max(0, r.start - 5) }));
     }
   };
 
   const jumpTo = (i) => {
     setPage('reader');
-    setRange({ 
-      start: Math.max(0, i - 2), 
-      end: Math.min(sections.length - 1, i + 6) 
+    setRange({
+      start: Math.max(0, i - 2),
+      end: Math.min(sections.length - 1, i + 6)
     });
     setPendingJump(i);
-    setIsSidebarOpen(false); 
+    setIsSidebarOpen(false);
   };
 
   useEffect(() => {
@@ -351,7 +351,7 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
                   <ZoomIn className="w-4 h-4" />
                 </Button>
               </div>
-              
+
               <Button size="sm" variant="outline" onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="ml-auto">
                 {isSidebarOpen ? <X className="w-4 h-4 mr-1" /> : <Menu className="w-4 h-4 mr-1" />}
                 TOC
@@ -364,7 +364,7 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
       {/* BODY */}
       <div className="flex-1 flex overflow-hidden relative">
         {page === 'toc' && (
-          <div className="flex-1 h-full overflow-y-auto pb-24 w-full [&_h1]:sticky [&_h1]:top-0 [&_h1]:z-10 [&_h1]:bg-white [&_h1]:dark:bg-slate-950 [&_h1]:px-4 [&_h1]:py-3 [&_h1]:border-b [&_h2]:sticky [&_h2]:top-0 [&_h2]:z-10 [&_h2]:bg-white [&_h2]:dark:bg-slate-950 [&_h2]:px-4 [&_h2]:py-2 [&_h2]:border-b [&_ul]:px-4 [&_div]:px-4 [&_button]:ml-4">
+          <div className="flex-1 h-full overflow-y-auto px-4 pb-24 w-full [&_h1]:sticky [&_h1]:top-0 [&_h1]:z-10 [&_h1]:bg-white [&_h1]:dark:bg-slate-950 [&_h1]:-mx-4 [&_h1]:px-2 [&_h1]:py-3 [&_h1]:border-b [&_h2]:sticky [&_h2]:top-0 [&_h2]:z-10 [&_h2]:bg-white [&_h2]:dark:bg-slate-950 [&_h2]:-mx-4 [&_h2]:px-2 [&_h2]:py-2 [&_h2]:border-b">
             {loading && <div className="py-10 flex justify-center"><Loader2 className="animate-spin text-blue-500" /></div>}
             {error && <div className="py-10 flex justify-center text-red-500"><AlertCircle className="w-8 h-8" /></div>}
             {!loading && !error && <TocTree nodes={tree} onSelect={jumpTo} refToIndex={refToIndex} />}
@@ -375,7 +375,7 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
           <>
             {/* Main Reader View */}
             <div
-              className="flex-1 h-full overflow-y-auto px-4 pb-24 bg-slate-50 dark:bg-slate-900 relative"
+              className="flex-1 h-full overflow-y-auto pb-24 bg-slate-50 dark:bg-slate-900 relative"
               onScroll={onScroll}
               ref={scrollRef}
               style={{ overflowAnchor: 'none' }}
@@ -383,7 +383,7 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
               <div style={{ height: `${virtualizer.getTotalSize()}px`, width: '100%', position: 'relative' }}>
                 {virtualizer.getVirtualItems().map((virtualItem) => {
                   const item = flatItems[virtualItem.index];
-                  
+
                   return (
                     <div
                       key={virtualItem.key}
@@ -392,7 +392,7 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
                       style={{ position: 'absolute', top: 0, left: 0, width: '100%', transform: `translateY(${virtualItem.start}px)`, contain: 'content' }}
                     >
                       {item.type === 'header' && (
-                        <div className="bg-white dark:bg-slate-900 border-b px-2" style={{ fontSize: `${Math.max(1, fontScale * 0.9)}em`, paddingTop: '0.75em', paddingBottom: '0.5em' }}>
+                        <div className="bg-slate-50 dark:bg-slate-900 border-y border-slate-200 dark:border-slate-800 shadow-sm px-2" style={{ fontSize: `${Math.max(1, fontScale * 0.9)}em`, paddingTop: '0.75em', paddingBottom: '0.5em' }}>
                           <p className="font-semibold text-slate-700 dark:text-slate-100">{item.label}</p>
                           {showEN && !showHB && item.hasNoEnglish && <p className="mt-2 text-sm italic text-amber-600 dark:text-amber-400">This section has no English</p>}
                         </div>
@@ -401,7 +401,7 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
                       {item.type === 'loading' && <div className="py-6 flex justify-center"><Loader2 className="animate-spin text-blue-500" /></div>}
 
                       {item.type === 'segment' && (
-                        <div style={{ fontSize: `${fontScale}em`, paddingTop: '0.25em', paddingBottom: '1.5em' }}>
+                        <div className="px-4" style={{ fontSize: `${fontScale}em`, paddingTop: '0.25em', paddingBottom: '1.5em' }}>
                           {showHB && item.hasHebrew && (
                             <p
                               className="text-right text-[1.125em] leading-loose text-slate-800 dark:text-slate-100 font-serif min-h-[1.5em]"
@@ -424,10 +424,10 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
               </div>
             </div>
 
-            {/* Sidebar Overlay for TOC - Right Side, Flush Headers */}
+            {/* Sidebar Overlay for TOC */}
             {isSidebarOpen && (
               <div className="absolute inset-y-0 right-0 w-72 bg-white dark:bg-slate-950 border-l shadow-2xl z-40 flex flex-col transition-transform duration-300 md:relative md:shadow-none">
-                <div className="flex-1 overflow-y-auto pb-24 [&_h1]:sticky [&_h1]:top-0 [&_h1]:z-10 [&_h1]:bg-white [&_h1]:dark:bg-slate-950 [&_h1]:px-4 [&_h1]:py-3 [&_h1]:border-b [&_h2]:sticky [&_h2]:top-0 [&_h2]:z-10 [&_h2]:bg-white [&_h2]:dark:bg-slate-950 [&_h2]:px-4 [&_h2]:py-2 [&_h2]:border-b [&_ul]:px-4 [&_div]:px-4 [&_button]:ml-4">
+                <div className="flex-1 overflow-y-auto px-4 pb-24 [&_h1]:sticky [&_h1]:top-0 [&_h1]:z-10 [&_h1]:bg-white [&_h1]:dark:bg-slate-950 [&_h1]:-mx-4 [&_h1]:px-2 [&_h1]:py-3 [&_h1]:border-b [&_h2]:sticky [&_h2]:top-0 [&_h2]:z-10 [&_h2]:bg-white [&_h2]:dark:bg-slate-950 [&_h2]:-mx-4 [&_h2]:px-2 [&_h2]:py-2 [&_h2]:border-b">
                   <TocTree nodes={tree} onSelect={jumpTo} refToIndex={refToIndex} />
                 </div>
               </div>
