@@ -26,18 +26,14 @@ import TocTree from "@/components/siddur/TocTree";
 const clampScale = (scale) =>
   Math.max(0.5, Math.min(3, Math.round(scale * 100) / 100));
 
-// Step 2 & 6: Pre-compiled sanitization engine with asset stability guardrails
 function sanitizeHTML(htmlString) {
   if (!htmlString) return "";
   const parser = new DOMParser();
   const doc = parser.parseFromString(htmlString, "text/html");
-
-  // Stripping layout-breaking tags and images to avoid post-render layout shifts
   const badTags = doc.querySelectorAll(
-    "script, iframe, object, embed, style, link, meta, base, img",
+    "script, iframe, object, embed, style, link, meta, base",
   );
   badTags.forEach((el) => el.remove());
-
   const allElements = doc.querySelectorAll("*");
   allElements.forEach((el) => {
     Array.from(el.attributes).forEach((attr) => el.removeAttribute(attr.name));
@@ -56,12 +52,11 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
   const activeAnchorRef = useRef(null);
   const anchorTimeoutRef = useRef(null);
 
+  const [pendingJump, setPendingJump] = useState(null);
   const [tree, setTree] = useState([]);
   const [sections, setSections] = useState([]);
   const [refToIndex, setRefToIndex] = useState({});
-
-  // Step 1: Replace unstable range states with an index-based viewport tracker
-  const [visibleRange, setVisibleRange] = useState({ start: 0, end: 4 });
+  const [range, setRange] = useState({ start: 0, end: 10 });
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
@@ -88,7 +83,6 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
     }
   }, [fontScale]);
 
-  // Fetch structural schema
   useEffect(() => {
     fetch(`https://www.sefaria.org/api/index/${bookRef}`)
       .then((r) => r.json())
@@ -107,7 +101,6 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
       });
   }, [bookRef]);
 
-  // Global background prefetch worker to fill cache smoothly
   useEffect(() => {
     if (sections.length === 0) return;
     const prefetchAllSections = async () => {
@@ -117,122 +110,174 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
           sections.slice(i, i + batchSize).map((sec) =>
             queryClient.prefetchQuery({
               queryKey: ["sefaria-text", sec.ref],
-              queryFn: async () => {
-                const rawData = await fetchAndZipSefaria(sec.ref);
-                return rawData.map((seg) => ({
-                  ...seg,
-                  sanitizedHe: sanitizeHTML(seg.he),
-                  sanitizedEn: sanitizeHTML(seg.en),
-                  hasHebrew:
-                    (seg.he ? seg.he.replace(/<[^>]*>/g, "").trim() : "")
-                      .length > 0,
-                  hasEnglish:
-                    (seg.en ? seg.en.replace(/<[^>]*>/g, "").trim() : "")
-                      .length > 0,
-                }));
-              },
+              queryFn: () => fetchAndZipSefaria(sec.ref),
               staleTime: 1000 * 60 * 60 * 24,
             }),
           ),
         );
-        await new Promise((resolve) => setTimeout(resolve, 300));
+        await new Promise((resolve) => setTimeout(resolve, 500));
       }
     };
     prefetchAllSections();
   }, [sections, queryClient]);
 
-  // Step 1: Compute target viewport query window (Overscan adjusted to protect memory)
-  const activeSectionWindow = useMemo(() => {
-    if (!sections.length) return [];
-    const start = Math.max(0, visibleRange.start - 3);
-    const end = Math.min(sections.length - 1, visibleRange.end + 3);
-    const targetSlice = [];
-    for (let i = start; i <= end; i++) {
-      targetSlice.push({ sec: sections[i], index: i });
-    }
-    return targetSlice;
-  }, [sections, visibleRange]);
-
-  // Step 2: Offload parsing routines into the cache execution lifecycle
+  const activeSections = sections.slice(range.start, range.end + 1);
   const sectionQueries = useQueries({
-    queries: activeSectionWindow.map(({ sec }) => ({
+    queries: activeSections.map((sec) => ({
       queryKey: ["sefaria-text", sec.ref],
-      queryFn: async () => {
-        const rawData = await fetchAndZipSefaria(sec.ref);
-        if (!Array.isArray(rawData)) return [];
-        return rawData.map((seg) => ({
-          ...seg,
-          sanitizedHe: sanitizeHTML(seg.he),
-          sanitizedEn: sanitizeHTML(seg.en),
-          hasHebrew:
-            (seg.he ? seg.he.replace(/<[^>]*>/g, "").trim() : "").length > 0,
-          hasEnglish:
-            (seg.en ? seg.en.replace(/<[^>]*>/g, "").trim() : "").length > 0,
-        }));
-      },
+      queryFn: () => fetchAndZipSefaria(sec.ref),
       staleTime: 1000 * 60 * 60 * 24,
     })),
   });
 
-  // Map active query streams to static component indexes
-  const queriesMap = useMemo(() => {
-    const map = {};
-    activeSectionWindow.forEach(({ index }, i) => {
-      map[index] = sectionQueries[i];
-    });
-    return map;
-  }, [activeSectionWindow, sectionQueries]);
+  const queryTracker = JSON.stringify(
+    sectionQueries.map((q) => ({ status: q.status, updated: q.dataUpdatedAt })),
+  );
 
-  // Step 1 & 4: Virtualizer tracking static document schemas
+  const flatItems = useMemo(() => {
+    const items = [];
+    activeSections.forEach((sec, i) => {
+      const currentSectionIndex = range.start + i;
+      const query = sectionQueries[i];
+
+      const hasNoEnglish = query.data
+        ? !query.data.some(
+            (seg) =>
+              (seg.en ? seg.en.replace(/<[^>]*>/g, "").trim() : "").length > 0,
+          )
+        : false;
+
+      items.push({
+        type: "header",
+        id: `hdr-${currentSectionIndex}`,
+        label: sec.label,
+        sectionIndex: currentSectionIndex,
+        hasNoEnglish,
+      });
+
+      if (query.isLoading) {
+        items.push({
+          type: "loading",
+          id: `load-${sec.ref}`,
+          sectionIndex: currentSectionIndex,
+        });
+      } else if (query.isError) {
+        items.push({
+          type: "error",
+          id: `err-${sec.ref}`,
+          sectionIndex: currentSectionIndex,
+        });
+      } else if (query.data) {
+        query.data.forEach((seg, segIndex) => {
+          const hasHebrew =
+            (seg.he ? seg.he.replace(/<[^>]*>/g, "").trim() : "").length > 0;
+          const hasEnglish =
+            (seg.en ? seg.en.replace(/<[^>]*>/g, "").trim() : "").length > 0;
+
+          const willShow = (showHB && hasHebrew) || (showEN && hasEnglish);
+          if (!willShow) return;
+
+          items.push({
+            type: "segment",
+            id: `seg-${currentSectionIndex}-${segIndex}`,
+            ...seg,
+            sanitizedHe: sanitizeHTML(seg.he),
+            sanitizedEn: sanitizeHTML(seg.en),
+            hasHebrew,
+            hasEnglish,
+            sectionIndex: currentSectionIndex,
+          });
+        });
+      }
+    });
+    return items;
+  }, [activeSections, queryTracker, range.start, showHB, showEN]);
+
   const virtualizer = useVirtualizer({
-    count: sections.length,
+    count: flatItems.length,
     getScrollElement: () => scrollRef.current,
-    getItemKey: (index) => sections[index]?.ref || index,
-    estimateSize: () => 250,
-    overscan: 3,
+    getItemKey: (index) => flatItems[index]?.id || index,
+    estimateSize: (index) => {
+      const item = flatItems[index];
+      if (!item) return 100;
+
+      if (item.type === "header") return 45 * fontScale;
+      if (item.type === "loading" || item.type === "error") return 100;
+
+      if (item.type === "segment") {
+        let chars = 0;
+        if (showHB && item.hasHebrew) chars += item.sanitizedHe.length;
+        if (showEN && item.hasEnglish) chars += item.sanitizedEn.length;
+
+        const lines = Math.max(1, chars / 60);
+        return lines * 30 * fontScale + 30;
+      }
+      return 100;
+    },
+    overscan: 15,
     onChange: (instance) => {
       if (page !== "reader") return;
       const items = instance.getVirtualItems();
       if (!items.length) return;
 
-      const start = items[0].index;
-      const end = items[items.length - 1].index;
-
-      setVisibleRange((prev) => {
-        if (prev.start === start && prev.end === end) return prev;
-        return { start, end };
-      });
-
-      const topItem = items[0];
-      if (topItem && topItem.index !== activeSectionRef.current) {
-        activeSectionRef.current = topItem.index;
+      const topItem = flatItems[items[0].index];
+      if (topItem && topItem.sectionIndex !== activeSectionRef.current) {
+        activeSectionRef.current = topItem.sectionIndex;
         const basePath = "/" + location.pathname.split("/")[1];
 
-        if (anchorTimeoutRef.current) clearTimeout(anchorTimeoutRef.current);
-        anchorTimeoutRef.current = setTimeout(() => {
-          navigate(`${basePath}/section/${topItem.index}/${langMode}`, {
+        setTimeout(() => {
+          navigate(`${basePath}/section/${topItem.sectionIndex}/${langMode}`, {
             replace: true,
           });
-        }, 120);
+        }, 0);
       }
     },
   });
 
-  // Step 4: Clear size nodes globally when typography configurations change
+  const measureRef = useRef(virtualizer.measure);
   useEffect(() => {
-    virtualizer.measure();
-  }, [fontScale, langMode, virtualizer]);
+    measureRef.current = virtualizer.measure;
+  }, [virtualizer.measure]);
 
-  // Absolute instant-jump positioning mechanics
-  const jumpTo = (i) => {
-    setPage("reader");
-    setIsSidebarOpen(false);
-    setTimeout(() => {
-      virtualizer.scrollToIndex(i, { align: "start" });
-    }, 16);
+  useEffect(() => {
+    measureRef.current();
+  }, [fontScale, langMode]);
+
+  const onScroll = (e) => {
+    const el = e.target;
+    if (el.scrollTop + el.clientHeight > el.scrollHeight - 1500) {
+      setRange((r) => ({
+        start: r.start,
+        end: Math.min(sections.length - 1, r.end + 5),
+      }));
+    }
+    if (el.scrollTop < 1500 && range.start > 0) {
+      lockAnchorSession();
+      setRange((r) => ({ ...r, start: Math.max(0, r.start - 5) }));
+    }
   };
 
-  // Safe internal anchor matrix builders
+  const jumpTo = (i) => {
+    setPage("reader");
+    setRange({
+      start: Math.max(0, i - 2),
+      end: Math.min(sections.length - 1, i + 6),
+    });
+    setPendingJump(i);
+    setIsSidebarOpen(false);
+  };
+
+  useEffect(() => {
+    if (pendingJump === null || page !== "reader") return;
+    const targetIndex = flatItems.findIndex(
+      (item) => item.type === "header" && item.sectionIndex === pendingJump,
+    );
+    if (targetIndex !== -1) {
+      virtualizer.scrollToIndex(targetIndex, { align: "start" });
+      setPendingJump(null);
+    }
+  }, [pendingJump, page, flatItems, virtualizer]);
+
   const captureAnchorData = () => {
     if (!scrollRef.current) return null;
     const items = virtualizer.getVirtualItems();
@@ -280,7 +325,6 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
     }
   }, [fontScale, page]);
 
-  // Device Input Handlers
   useEffect(() => {
     const el = scrollRef.current;
     if (!el || page !== "reader") return;
@@ -445,8 +489,9 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
             {/* Main Reader View */}
             <div
               className="flex-1 h-full overflow-y-auto pb-24 bg-white dark:bg-slate-950 relative"
+              onScroll={onScroll}
               ref={scrollRef}
-              style={{ overflowAnchor: "none", willChange: "scroll-position" }}
+              style={{ overflowAnchor: "none" }}
             >
               <div
                 style={{
@@ -456,11 +501,7 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
                 }}
               >
                 {virtualizer.getVirtualItems().map((virtualItem) => {
-                  const sec = sections[virtualItem.index];
-                  const query = queriesMap[virtualItem.index];
-                  const hasNoEnglish = query?.data
-                    ? !query.data.some((seg) => seg.hasEnglish)
-                    : false;
+                  const item = flatItems[virtualItem.index];
 
                   return (
                     <div
@@ -473,87 +514,62 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
                         left: 0,
                         width: "100%",
                         transform: `translateY(${virtualItem.start}px)`,
-                        // Step 5: Native GPU Rendering Offload Optimization Layers
-                        contain: "layout paint style",
-                        contentVisibility: "auto",
-                        willChange: "transform",
+                        contain: "content",
                       }}
                     >
-                      {/* Section Title Header Block */}
-                      <div
-                        className="bg-slate-50 dark:bg-slate-900 border-y border-slate-200 dark:border-slate-800 shadow-sm px-2"
-                        style={{
-                          fontSize: `${Math.max(1, fontScale * 0.9)}em`,
-                          paddingTop: "0.75em",
-                          paddingBottom: "0.5em",
-                        }}
-                      >
-                        <p className="font-semibold text-slate-700 dark:text-slate-100">
-                          {sec?.label}
-                        </p>
-                        {showEN && !showHB && hasNoEnglish && (
-                          <p className="mt-2 text-sm italic text-amber-600 dark:text-amber-400">
-                            This section has no English
+                      {item.type === "header" && (
+                        <div
+                          className="bg-slate-50 dark:bg-slate-900 border-y border-slate-200 dark:border-slate-800 shadow-sm px-2"
+                          style={{
+                            fontSize: `${Math.max(1, fontScale * 0.9)}em`,
+                            paddingTop: "0.75em",
+                            paddingBottom: "0.5em",
+                          }}
+                        >
+                          <p className="font-semibold text-slate-700 dark:text-slate-100">
+                            {item.label}
                           </p>
-                        )}
-                      </div>
-
-                      {/* Content Streaming States */}
-                      {(!query || query.isLoading) && (
-                        <div className="py-8 flex justify-center">
-                          <Loader2 className="animate-spin text-blue-500/70" />
+                          {showEN && !showHB && item.hasNoEnglish && (
+                            <p className="mt-2 text-sm italic text-amber-600 dark:text-amber-400">
+                              This section has no English
+                            </p>
+                          )}
                         </div>
                       )}
 
-                      {query?.isError && (
-                        <div className="py-6 flex justify-center items-center gap-2 text-red-500 text-sm">
-                          <AlertCircle className="w-4 h-4" /> Error loading
-                          compilation segment.
+                      {item.type === "loading" && (
+                        <div className="py-6 flex justify-center">
+                          <Loader2 className="animate-spin text-blue-500" />
                         </div>
                       )}
 
-                      {query?.data && (
-                        <div className="flex flex-col">
-                          {query.data.map((seg, segIndex) => {
-                            const willShow =
-                              (showHB && seg.hasHebrew) ||
-                              (showEN && seg.hasEnglish);
-                            if (!willShow) return null;
-
-                            return (
-                              <div
-                                key={segIndex}
-                                className="px-4"
-                                style={{
-                                  fontSize: `${fontScale}em`,
-                                  paddingTop: "0.25em",
-                                  paddingBottom: "1.5em",
-                                }}
-                              >
-                                {showHB && seg.hasHebrew && (
-                                  <p
-                                    className="text-right text-[1.125em] leading-loose text-slate-800 dark:text-slate-100 font-serif min-h-[1.5em]"
-                                    dir="rtl"
-                                    dangerouslySetInnerHTML={{
-                                      __html: seg.sanitizedHe,
-                                    }}
-                                  />
-                                )}
-                                {showEN && seg.hasEnglish && (
-                                  <p
-                                    className="text-left text-[0.875em] leading-relaxed text-slate-500 dark:text-slate-400 min-h-[1.5em]"
-                                    style={{
-                                      paddingTop:
-                                        showHB && seg.hasHebrew ? "1em" : "0",
-                                    }}
-                                    dangerouslySetInnerHTML={{
-                                      __html: seg.sanitizedEn,
-                                    }}
-                                  />
-                                )}
-                              </div>
-                            );
-                          })}
+                      {item.type === "segment" && (
+                        <div
+                          className="px-4"
+                          style={{
+                            fontSize: `${fontScale}em`,
+                            paddingTop: "0.25em",
+                            paddingBottom: "1.5em",
+                          }}
+                        >
+                          {showHB && item.hasHebrew && (
+                            <p
+                              className="text-right text-[1.125em] leading-loose text-slate-800 dark:text-slate-100 font-serif min-h-[1.5em]"
+                              dir="rtl"
+                              dangerouslySetInnerHTML={{
+                                __html: item.sanitizedHe,
+                              }}
+                            />
+                          )}
+                          {showEN && item.hasEnglish && (
+                            <p
+                              className="text-left text-[0.875em] leading-relaxed text-slate-500 dark:text-slate-400 min-h-[1.5em]"
+                              style={{ paddingTop: showHB ? "1em" : "0" }}
+                              dangerouslySetInnerHTML={{
+                                __html: item.sanitizedEn,
+                              }}
+                            />
+                          )}
                         </div>
                       )}
                     </div>
