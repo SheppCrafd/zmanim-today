@@ -20,31 +20,38 @@ export const SiddurSegment = memo(function SiddurSegment({
   showEN,
   fontScale,
 }) {
+  // Check if BOTH languages are toggled on in the menu
+  const showBoth = showHB && showEN;
+
   return (
     <div
-      className="px-4 py-2 md:grid md:grid-cols-2 md:gap-4 space-y-4 md:space-y-0"
+      className={`px-4 py-2 ${
+        showBoth ? "md:grid md:grid-cols-2 md:gap-4 space-y-4 md:space-y-0" : ""
+      }`}
       style={{ fontSize: `${fontScale}em` }}
     >
-      {/* Hebrew comes first in the DOM so it stacks on top for mobile. 
-            On desktop (md), we push it to the right side (order-2) if English is present. */}
-      {showHB && hasH && (
-        <div className={showEN && hasE ? "md:order-2" : ""}>
-          <p
-            dir="rtl"
-            className="text-right leading-loose font-serif"
-            dangerouslySetInnerHTML={{ __html: sanitizedHe }}
-          />
+      {/* HEBREW COLUMN - Always renders on right (order-2) if Both are enabled */}
+      {showHB && (
+        <div className={showBoth ? "md:order-2" : ""}>
+          {hasH && (
+            <p
+              dir="rtl"
+              className="text-right leading-loose font-serif"
+              dangerouslySetInnerHTML={{ __html: sanitizedHe }}
+            />
+          )}
         </div>
       )}
 
-      {/* English comes second in the DOM so it stacks below Hebrew for mobile. 
-            On desktop (md), we pull it to the left side (order-1) if Hebrew is present. */}
-      {showEN && hasE && (
-        <div className={showHB && hasH ? "md:order-1" : ""}>
-          <p
-            className="text-left leading-relaxed text-slate-600 dark:text-slate-400"
-            dangerouslySetInnerHTML={{ __html: sanitizedEn }}
-          />
+      {/* ENGLISH COLUMN - Always renders on left (order-1) if Both are enabled */}
+      {showEN && (
+        <div className={showBoth ? "md:order-1" : ""}>
+          {hasE && (
+            <p
+              className="text-left leading-relaxed text-slate-600 dark:text-slate-400"
+              dangerouslySetInnerHTML={{ __html: sanitizedEn }}
+            />
+          )}
         </div>
       )}
     </div>
