@@ -2,7 +2,9 @@
 function buildTree(node, parentKeyPath, parentLabelPath) {
   const key = node.key || node.title;
   const fullKeyPath = parentKeyPath ? `${parentKeyPath}, ${key}` : key;
-  const fullLabelPath = parentLabelPath ? `${parentLabelPath} > ${node.title}` : node.title;
+  const fullLabelPath = parentLabelPath
+    ? `${parentLabelPath} > ${node.title}`
+    : node.title;
 
   return {
     title: node.title,
@@ -10,7 +12,9 @@ function buildTree(node, parentKeyPath, parentLabelPath) {
     key,
     ref: fullKeyPath,
     breadcrumb: fullLabelPath,
-    children: (node.nodes || []).map(child => buildTree(child, fullKeyPath, fullLabelPath))
+    children: (node.nodes || []).map((child) =>
+      buildTree(child, fullKeyPath, fullLabelPath),
+    ),
   };
 }
 
@@ -19,7 +23,9 @@ export function processSefariaSchema(schema) {
   const rootKey = schema.key || schema.title;
   const rootTitle = schema.title || rootKey;
 
-  const tree = (schema.nodes || []).map(child => buildTree(child, rootKey, rootTitle));
+  const tree = (schema.nodes || []).map((child) =>
+    buildTree(child, rootKey, rootTitle),
+  );
 
   const flat = [];
   const refToIndex = {};
@@ -31,7 +37,7 @@ export function processSefariaSchema(schema) {
         label: node.title,
         heLabel: node.heTitle,
         breadcrumb: node.breadcrumb,
-        ref: node.ref
+        ref: node.ref,
       });
     } else {
       node.children.forEach(collectLeaves);
