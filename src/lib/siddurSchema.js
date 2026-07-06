@@ -10,7 +10,8 @@ function buildTree(node, parentKeyPath, parentLabelPath) {
     title: node.title,
     heTitle: node.heTitle,
     key,
-    ref: fullKeyPath,
+    // Safely use Sefaria's native ref if it exists, otherwise fallback to our built path
+    ref: node.ref || node.wholeRef || fullKeyPath,
     breadcrumb: fullLabelPath,
     children: (node.nodes || []).map((child) =>
       buildTree(child, fullKeyPath, fullLabelPath),
