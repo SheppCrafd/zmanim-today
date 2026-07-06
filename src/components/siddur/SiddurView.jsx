@@ -58,8 +58,6 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
   const anchorRef = useRef(null);
   const scrollDebounce = useRef(null);
   const restoreAnchorRef = useRef(null);
-  const itemRefs = useRef({});
-  const [heights, setHeights] = useState({});
 
   const [tree, setTree] = useState([]);
   const [sections, setSections] = useState([]);
@@ -93,18 +91,6 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
       /* ignore */
     }
   }, [fontScale]);
-
-  // Invalidate all cached heights when font scale changes (content grows/shrinks)
-  useLayoutEffect(() => {
-    setHeights({});
-  }, [fontScale]);
-
-  // Clear measured heights on viewport resize (wrapping changes heights)
-  useEffect(() => {
-    const onResize = () => setHeights({});
-    window.addEventListener("resize", onResize);
-    return () => window.removeEventListener("resize", onResize);
-  }, []);
 
   // Load TOC
   useEffect(() => {
@@ -233,27 +219,8 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
   const virtualizer = useVirtualizer({
     count: flatItems.length,
     getScrollElement: () => scrollRef.current,
-    estimateSize: (i) => heights[flatItems[i]?.id] || 180,
+    estimateSize: () => 180, // Fallback, measureElement will handle exact sizing
     overscan: 20,
-  });
-
-  // Synchronously measure visible items before paint — gives the virtualizer real
-  // heights immediately (no ResizeObserver delay) so prepended sections don't stutter.
-  useLayoutEffect(() => {
-    const updates = {};
-    let changed = false;
-    for (const v of virtualizer.getVirtualItems()) {
-      const item = flatItems[v.index];
-      if (!item) continue;
-      const el = itemRefs.current[v.index];
-      if (!el) continue;
-      const h = Math.round(el.getBoundingClientRect().height);
-      if (heights[item.id] !== h) {
-        updates[item.id] = h;
-        changed = true;
-      }
-    }
-    if (changed) setHeights((prev) => ({ ...prev, ...updates }));
   });
 
   // -------------------------
@@ -285,8 +252,7 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
     // Fallback: find the section header (survives language toggle filtering)
     if (idx === -1 && anchor.sectionIndex !== undefined) {
       idx = flatItems.findIndex(
-        (it) =>
-          it.type === "header" && it.sectionIndex === anchor.sectionIndex,
+        (it) => it.type === "header" && it.sectionIndex === anchor.sectionIndex,
       );
     }
     if (idx === -1) return;
@@ -398,8 +364,8 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
       if (el.scrollTop < 1000 && range.start > 0) {
         setRange((r) => ({ start: Math.max(0, r.start - 5), end: r.end }));
       }
-      },
-      [
+    },
+    [
       captureAnchor,
       virtualizer,
       flatItems,
@@ -408,8 +374,8 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
       navigate,
       sections.length,
       range.start,
-      ],
-      );
+    ],
+  );
 
   // -------------------------
   // RENDER
@@ -427,7 +393,11 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <Button size="sm" variant="outline" onClick={() => setTocOpen(true)}>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setTocOpen(true)}
+            >
               <List className="w-4 h-4" />
             </Button>
             <a href={sefariaUrl} target="_blank" rel="noreferrer">
@@ -469,9 +439,7 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
                   size="icon"
                   variant="outline"
                   className="h-8 w-8"
-                  onClick={() =>
-                    setFontScale((s) => clampScale(s - 0.1))
-                  }
+                  onClick={() => setFontScale((s) => clampScale(s - 0.1))}
                 >
                   <ZoomOut className="w-4 h-4" />
                 </Button>
@@ -482,9 +450,7 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
                   size="icon"
                   variant="outline"
                   className="h-8 w-8"
-                  onClick={() =>
-                    setFontScale((s) => clampScale(s + 0.1))
-                  }
+                  onClick={() => setFontScale((s) => clampScale(s + 0.1))}
                 >
                   <ZoomIn className="w-4 h-4" />
                 </Button>
@@ -521,11 +487,7 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
               </div>
             )}
             {!loading && !error && (
-              <TocTree
-                nodes={tree}
-                onSelect={jumpTo}
-                refToIndex={refToIndex}
-              />
+              <TocTree nodes={tree} onSelect={jumpTo} refToIndex={refToIndex} />
             )}
           </div>
         )}
@@ -555,7 +517,7 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
                   <div
                     key={v.key}
                     data-index={v.index}
-                    ref={(el) => { itemRefs.current[v.index] = el; }}
+                    ref={virtualizer.measureElement}
                     style={{
                       position: "absolute",
                       transform: `translateY(${v.start}px)`,
