@@ -275,16 +275,11 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
     }
   }, [virtualizer, flatItems]);
 
-  // Restore anchor after layout-affecting changes
-  // Double rAF: wait for DOM paint + ResizeObserver measurement to settle
+  // Restore anchor synchronously after DOM commit (before paint) to prevent visible jumps.
+  // ResizeObserver fires later and re-triggers this effect for a fine-tuning correction.
   useLayoutEffect(() => {
     if (!anchorRef.current || page !== "reader") return;
-    let raf1 = requestAnimationFrame(() => {
-      raf1 = requestAnimationFrame(() => {
-        restoreAnchor();
-      });
-    });
-    return () => cancelAnimationFrame(raf1);
+    restoreAnchor();
   }, [fontScale, langMode, flatItems.length, page, restoreAnchor]);
 
   // -------------------------
