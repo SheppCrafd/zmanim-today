@@ -6,6 +6,7 @@ function TocNode({ node, onSelect, refToIndex, depth }) {
   const [open, setOpen] = useState(false);
   const isLeaf = node.children.length === 0;
 
+  // The base 0.5rem equals px-2. We add pr-2 via Tailwind to keep right-side padding consistent.
   const indent = { paddingLeft: `${depth * 1.25 + 0.5}rem` };
 
   if (isLeaf) {
@@ -13,7 +14,7 @@ function TocNode({ node, onSelect, refToIndex, depth }) {
     return (
       <button
         onClick={() => onSelect(index)}
-        className="w-full text-left py-2.5 border-b border-slate-100 dark:border-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-800 rounded-sm transition-colors text-sm"
+        className="w-full text-left py-2.5 pr-2 border-b border-slate-100 dark:border-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-800 rounded-sm transition-colors text-sm"
         style={indent}
       >
         {node.title}
@@ -25,7 +26,7 @@ function TocNode({ node, onSelect, refToIndex, depth }) {
     <div>
       <button
         onClick={() => setOpen(!open)}
-        className="w-full flex items-center gap-2 py-2.5 px-2 rounded-sm hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+        className="w-full flex items-center gap-2 py-2.5 pr-2 rounded-sm hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
         style={indent}
       >
         {open
@@ -53,10 +54,10 @@ export default function TocTree({ nodes, onSelect, refToIndex }) {
         if (node.children.length === 0) {
           const index = refToIndex[node.ref];
           return (
-            <div key={i} className="mb-6">
+            <div key={i} className="mb-4">
               <button
                 onClick={() => onSelect(index)}
-                className="w-full text-left font-bold text-xl text-slate-800 dark:text-slate-100 border-b-2 border-blue-500 pb-2"
+                className="w-full text-left font-semibold text-slate-700 dark:text-slate-100 bg-slate-50 dark:bg-slate-900 border-y border-slate-200 dark:border-slate-800 shadow-sm px-2 py-2.5 -mx-4 sticky top-0 z-10 transition-colors hover:bg-slate-100 dark:hover:bg-slate-800"
               >
                 {node.title}
               </button>
@@ -66,8 +67,8 @@ export default function TocTree({ nodes, onSelect, refToIndex }) {
 
         // Top-level category — always-visible header, children in dropdowns
         return (
-          <div key={i} className="mb-8">
-            <h2 className="font-bold text-xl text-slate-800 dark:text-slate-100 border-b-2 border-blue-500 pb-2 mb-2 mt-4 sticky top-0 bg-slate-50 dark:bg-slate-950 z-10">
+          <div key={i} className="mb-6">
+            <h2 className="font-semibold text-slate-700 dark:text-slate-100 bg-slate-50 dark:bg-slate-900 border-y border-slate-200 dark:border-slate-800 shadow-sm px-2 py-2 -mx-4 sticky top-0 z-10 mb-2">
               {node.title}
             </h2>
             <div className="flex flex-col">
