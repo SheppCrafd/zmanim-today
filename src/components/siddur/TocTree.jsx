@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { ChevronDown, ChevronRight } from 'lucide-react';
+import { useState } from "react";
+import { ChevronDown, ChevronRight } from "lucide-react";
 
 /* ---------------- RECURSIVE NODE (collapsible dropdown for all sub-levels) ---------------- */
 function TocNode({ node, onSelect, refToIndex, depth }) {
@@ -28,15 +28,25 @@ function TocNode({ node, onSelect, refToIndex, depth }) {
         className="w-full flex items-center gap-2 py-2.5 pr-2 rounded-sm hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
         style={indent}
       >
-        {open
-          ? <ChevronDown className="w-4 h-4 text-slate-400 shrink-0" />
-          : <ChevronRight className="w-4 h-4 text-slate-400 shrink-0" />}
-        <span className="font-semibold text-sm text-slate-800 dark:text-slate-100">{node.title}</span>
+        {open ? (
+          <ChevronDown className="w-4 h-4 text-slate-400 shrink-0" />
+        ) : (
+          <ChevronRight className="w-4 h-4 text-slate-400 shrink-0" />
+        )}
+        <span className="font-semibold text-sm text-slate-800 dark:text-slate-100">
+          {node.title}
+        </span>
       </button>
       {open && (
         <div className="border-l border-slate-200 dark:border-slate-700 ml-[0.625rem]">
           {node.children.map((child, i) => (
-            <TocNode key={i} node={child} onSelect={onSelect} refToIndex={refToIndex} depth={depth + 1} />
+            <TocNode
+              key={i}
+              node={child}
+              onSelect={onSelect}
+              refToIndex={refToIndex}
+              depth={depth + 1}
+            />
           ))}
         </div>
       )}
@@ -72,7 +82,13 @@ export default function TocTree({ nodes, onSelect, refToIndex }) {
             </h2>
             <div className="flex flex-col">
               {node.children.map((child, j) => (
-                <TocNode key={j} node={child} onSelect={onSelect} refToIndex={refToIndex} depth={0} />
+                <TocNode
+                  key={j}
+                  node={child}
+                  onSelect={onSelect}
+                  refToIndex={refToIndex}
+                  depth={0}
+                />
               ))}
             </div>
           </div>
