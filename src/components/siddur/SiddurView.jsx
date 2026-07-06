@@ -215,7 +215,7 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
   const virtualizer = useVirtualizer({
     count: flatItems.length,
     getScrollElement: () => scrollRef.current,
-    estimateSize: () => 80,
+    estimateSize: () => 180,
     overscan: 20,
   });
 
@@ -278,11 +278,12 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
   restoreAnchorRef.current = restoreAnchor;
 
   // Restore anchor synchronously after DOM commit (before paint) to prevent visible jumps.
-  // Ref avoids re-firing on every render (virtualizer identity changes each render).
+  // totalSize dep re-fires after ResizeObserver corrects dynamic measurements (fine-tuning pass).
+  const totalSize = virtualizer.getTotalSize();
   useLayoutEffect(() => {
     if (!anchorRef.current || page !== "reader") return;
     restoreAnchorRef.current();
-  }, [fontScale, langMode, flatItems.length, page]);
+  }, [fontScale, langMode, flatItems.length, page, totalSize]);
 
   // -------------------------
   // PROGRAMMATIC JUMP
