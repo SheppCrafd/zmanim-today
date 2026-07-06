@@ -218,6 +218,10 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
     return items;
   }, [activeSections, sectionQueries, showEN, showHB, range.start]);
 
+  // Ref to latest flatItems for use inside rAF closures (jump effect)
+  const flatItemsRef = useRef(flatItems);
+  flatItemsRef.current = flatItems;
+
   // -------------------------
   // VIRTUALIZER
   // -------------------------
@@ -318,20 +322,25 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
   // -------------------------
   useEffect(() => {
     if (pendingJump === null || page !== "reader") return;
-    const idx = flatItems.findIndex(
-      (it) => it.type === "header" && it.sectionIndex === pendingJump,
-    );
-    if (idx !== -1) {
-      isProgrammaticScroll.current = true;
+    isProgrammaticScroll.current = true;
+    requestAnimationFrame(() => {
+      // Use ref for latest flatItems — sections may load between render and rAF
+      const idx = flatItemsRef.current.findIndex(
+        (it) => it.type === "header" && it.sectionIndex === pendingJump,
+      );
+      if (idx !== -1) virtualizer.scrollToIndex(idx, { align: "start" });
+      // Anchor to the jump target so restoreAnchor holds it as heights settle
+      anchorRef.current = {
+        id: `hdr-${pendingJump}`,
+        offset: 0,
+        sectionIndex: pendingJump,
+      };
       requestAnimationFrame(() => {
-        virtualizer.scrollToIndex(idx, { align: "start" });
-        requestAnimationFrame(() => {
-          isProgrammaticScroll.current = false;
-        });
+        isProgrammaticScroll.current = false;
       });
-    }
+    });
     setPendingJump(null);
-  }, [pendingJump, page, flatItems, virtualizer]);
+  }, [pendingJump, page, virtualizer]);
 
   const jumpTo = useCallback(
     (i) => {
