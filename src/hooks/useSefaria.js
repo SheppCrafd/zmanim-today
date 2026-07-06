@@ -3,6 +3,8 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 // --- Helper: Extract and Clean Text ---
 const extractText = (data, expectedLang) => {
   if (!data?.versions || data.versions.length === 0) return [];
+
+  // Find the first version that matches the requested language
   const version = data.versions.find((v) => v.language === expectedLang);
   if (!version || !version.text) return [];
 
@@ -19,26 +21,30 @@ const extractText = (data, expectedLang) => {
 
 // --- Exported Fetcher (Centralized Logic) ---
 export const fetchAndZipSefaria = async (ref) => {
-  const encodedRef = encodeURIComponent(ref);
+  if (!ref) return [];
 
-  const [hebResp, engResp] = await Promise.all([
-    fetch(
-      `https://www.sefaria.org/api/v3/texts/${encodedRef}?version=source&context=0`,
-    ),
-    fetch(
-      `https://www.sefaria.org/api/v3/texts/${encodedRef}?version=english|Sefaria%20Community%20Translation&context=0`,
-    ),
-  ]);
+  // 1. Sefaria prefers underscores to spaces in API calls
+  // 2. We must manually encode apostrophes (%27) because JavaScript ignores them!
+  const safeRef = encodeURIComponent(ref.replace(/ /g, "_")).replace(
+    /'/g,
+    "%27",
+  );
 
-  // ONLY throw if the Hebrew source fails.
-  if (!hebResp.ok) throw new Error(`Failed to fetch Hebrew text for ${ref}`);
+  // Fetch the text WITHOUT forcing specific version names.
+  // Sefaria will automatically return the default Hebrew and English texts.
+  const resp = await fetch(`https://www.sefaria.org/api/v3/texts/${safeRef}`);
 
-  const hebData = await hebResp.json();
-  // Let English fail gracefully! Sefaria might not have this specific translation.
-  const engData = engResp.ok ? await engResp.json() : null;
+  // If the API completely rejects the request (e.g. 404), return an empty array
+  // instead of throwing an error. This prevents the red "Failed to load" UI crash!
+  if (!resp.ok) {
+    console.warn(`Sefaria API rejected ref: ${ref}`);
+    return [];
+  }
 
-  const heArr = extractText(hebData, "he");
-  const enArr = engData ? extractText(engData, "en") : [];
+  const data = await resp.json();
+
+  const heArr = extractText(data, "he");
+  const enArr = extractText(data, "en");
 
   const maxLen = Math.max(heArr.length, enArr.length);
   const segments = [];
@@ -71,7 +77,6 @@ export function useSefariaTOC(bookRef) {
 export function useSefariaText(ref) {
   return useQuery({
     queryKey: ["sefaria-text", ref],
-    // Re-use the centralized logic!
     queryFn: () => fetchAndZipSefaria(ref),
     enabled: !!ref,
   });
@@ -85,9 +90,8 @@ export function usePrefetchSefariaText() {
     if (!ref) return;
     queryClient.prefetchQuery({
       queryKey: ["sefaria-text", ref],
-      // Re-use the centralized logic!
       queryFn: () => fetchAndZipSefaria(ref),
-      staleTime: 1000 * 60 * 60 * 24,
+      staleTime: 1000 * 60 * 60 * 24, // 24 hours
     });
   };
 }
