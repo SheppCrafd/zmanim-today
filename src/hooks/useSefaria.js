@@ -7,7 +7,6 @@ const flatten = (arr) => (Array.isArray(arr) ? arr.flat(Infinity) : [arr]);
 const extractText = (data, expectedLang) => {
   if (!data?.versions || data.versions.length === 0) return [];
 
-  // Find the first version matching the language that actually has text
   const version = data.versions.find(
     (v) =>
       v.language === expectedLang &&
@@ -17,15 +16,12 @@ const extractText = (data, expectedLang) => {
 
   if (!version || !version.text) return [];
 
-  // Flatten nested text arrays into a single continuous list of paragraphs
   const rawArray = flatten(version.text);
 
   if (expectedLang === "en") {
     return rawArray.map((line) => {
       if (!line) return "";
-      // NEW LOGIC: Only erase the line if it contains NO English letters.
-      // This preserves lines that have both English and Hebrew (like transliterations)
-      // while safely removing Sefaria's duplicate pure-Hebrew placeholder arrays.
+      // Preserves lines with English letters (like transliterations)
       const hasEnglish = /[a-zA-Z]/.test(line);
       return hasEnglish ? line : "";
     });
@@ -38,8 +34,11 @@ const extractText = (data, expectedLang) => {
 export const fetchAndZipSefaria = async (ref) => {
   if (!ref) return [];
 
-  // Sefaria endpoints require spaces to be underscores
-  const safeRef = encodeURIComponent(ref.replace(/ /g, "_"));
+  // Sefaria endpoints require spaces to be underscores, and we safely encode apostrophes
+  const safeRef = encodeURIComponent(ref.replace(/ /g, "_")).replace(
+    /'/g,
+    "%27",
+  );
 
   try {
     // ATTEMPT 1: V3 API
@@ -57,7 +56,6 @@ export const fetchAndZipSefaria = async (ref) => {
       if (fallbackResp.ok) {
         const fallbackData = await fallbackResp.json();
 
-        // V2 puts the arrays directly on the root object
         if (fallbackData.he && fallbackData.he.length > 0) {
           heArr = flatten(fallbackData.he);
         }
@@ -85,14 +83,15 @@ export const fetchAndZipSefaria = async (ref) => {
     return segments;
   } catch (err) {
     console.error(`Failed to fetch ${ref}:`, err);
-    return [];
+    return []; // Return empty array so SiddurView can handle it gracefully
   }
 };
 
 // --- Hook 1: Fetch the Table of Contents ---
 export function useSefariaTOC(bookRef) {
   return useQuery({
-    queryKey: ["sefaria-toc", bookRef],
+    // Cache busted!
+    queryKey: ["sefaria-toc-v2", bookRef],
     queryFn: async () => {
       const res = await fetch(`https://www.sefaria.org/api/index/${bookRef}`);
       if (!res.ok) throw new Error("Failed to fetch TOC");
@@ -105,7 +104,8 @@ export function useSefariaTOC(bookRef) {
 // --- Hook 2: Fetch a Specific Text Section ---
 export function useSefariaText(ref) {
   return useQuery({
-    queryKey: ["sefaria-text", ref],
+    // Cache busted!
+    queryKey: ["sefaria-text-v2", ref],
     queryFn: () => fetchAndZipSefaria(ref),
     enabled: !!ref,
   });
@@ -118,9 +118,10 @@ export function usePrefetchSefariaText() {
   return (ref) => {
     if (!ref) return;
     queryClient.prefetchQuery({
-      queryKey: ["sefaria-text", ref],
+      // Cache busted!
+      queryKey: ["sefaria-text-v2", ref],
       queryFn: () => fetchAndZipSefaria(ref),
-      staleTime: 1000 * 60 * 60 * 24, // 24 hours
+      staleTime: 1000 * 60 * 60 * 24,
     });
   };
 }
