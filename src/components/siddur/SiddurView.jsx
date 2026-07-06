@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useLayoutEffect, useRef, useMemo } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { useQueries, useQueryClient } from '@tanstack/react-query';
-import { ExternalLink, Loader2, AlertCircle, ArrowLeft, ZoomIn, ZoomOut } from 'lucide-react';
+import { ExternalLink, Loader2, AlertCircle, ArrowLeft, ZoomIn, ZoomOut, Menu, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import NavMenu from '@/components/NavMenu';
 import { useNavigate, useLocation } from 'react-router-dom';
@@ -45,6 +45,7 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
   const [error, setError] = useState(false);
   const [page, setPage] = useState('toc');
   const [langMode, setLangMode] = useState('both');
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [fontScale, setFontScale] = useState(() => {
     try {
       return parseFloat(localStorage.getItem('siddur-font-scale')) || 1;
@@ -106,7 +107,6 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
     }))
   });
 
-  // 1. Create a stable tracker that only changes when query statuses change (Fixes DOMParser CPU loop)
   const queryTracker = JSON.stringify(
     sectionQueries.map(q => ({ status: q.status, updated: q.dataUpdatedAt }))
   );
@@ -132,13 +132,12 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
           const hasHebrew = (seg.he ? seg.he.replace(/<[^>]*>/g, '').trim() : '').length > 0;
           const hasEnglish = (seg.en ? seg.en.replace(/<[^>]*>/g, '').trim() : '').length > 0;
 
-          // 2. Filter out 0-height items entirely so the virtualizer doesn't choke!
           const willShow = (showHB && hasHebrew) || (showEN && hasEnglish);
           if (!willShow) return;
 
           items.push({
             type: 'segment',
-            id: `seg-${currentSectionIndex}-${segIndex}`, // Bulletproof key
+            id: `seg-${currentSectionIndex}-${segIndex}`,
             ...seg,
             sanitizedHe: sanitizeHTML(seg.he),
             sanitizedEn: sanitizeHTML(seg.en),
@@ -150,7 +149,7 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
       }
     });
     return items;
-  }, [activeSections, queryTracker, range.start, showHB, showEN]); // Use stable trackers!
+  }, [activeSections, queryTracker, range.start, showHB, showEN]);
 
   const virtualizer = useVirtualizer({
     count: flatItems.length,
@@ -174,7 +173,6 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
       return 100;
     },
     overscan: 15,
-    // 3. Move the scroll-tracking logic here to avoid React useEffect render loops
     onChange: (instance) => {
       if (page !== 'reader') return;
       const items = instance.getVirtualItems();
@@ -185,7 +183,6 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
         activeSectionRef.current = topItem.sectionIndex;
         const basePath = '/' + location.pathname.split('/')[1];
         
-        // Defer state updates to avoid React render conflicts
         setTimeout(() => {
           navigate(`${basePath}/section/${topItem.sectionIndex}/${langMode}`, { replace: true });
         }, 0);
@@ -202,30 +199,27 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
     measureRef.current();
   }, [fontScale, langMode]);
 
-  // 4. Implement bi-directional scroll detection
   const onScroll = (e) => {
     const el = e.target;
     
-    // Scroll Down Detection
     if (el.scrollTop + el.clientHeight > el.scrollHeight - 1500) {
       setRange(r => ({ start: r.start, end: Math.min(sections.length - 1, r.end + 5) }));
     }
     
-    // Scroll Up Detection
     if (el.scrollTop < 1500 && range.start > 0) {
-      lockAnchorSession(); // Must lock before injecting items above to stop violent snapping
+      lockAnchorSession(); 
       setRange(r => ({ ...r, start: Math.max(0, r.start - 5) }));
     }
   };
 
   const jumpTo = (i) => {
     setPage('reader');
-    // 5. Window the jump! Do not load the entire book at once (0 to i)
     setRange({ 
       start: Math.max(0, i - 2), 
       end: Math.min(sections.length - 1, i + 6) 
     });
     setPendingJump(i);
+    setIsSidebarOpen(false); // Close sidebar after selecting
   };
 
   useEffect(() => {
@@ -359,8 +353,11 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
                   <ZoomIn className="w-4 h-4" />
                 </Button>
               </div>
-              <Button size="sm" variant="outline" onClick={() => setPage('toc')}>
-                <ArrowLeft className="w-4 h-4 mr-1" /> Back
+              
+              {/* Added Sidebar Toggle and removed "Back" button */}
+              <Button size="sm" variant="outline" onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="ml-auto">
+                {isSidebarOpen ? <X className="w-4 h-4 mr-1" /> : <Menu className="w-4 h-4 mr-1" />}
+                TOC
               </Button>
             </>
           )}
@@ -368,9 +365,9 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
       </div>
 
       {/* BODY */}
-      <div className="flex-1 overflow-hidden">
+      <div className="flex-1 flex overflow-hidden relative">
         {page === 'toc' && (
-          <div className="h-full overflow-y-auto px-4 pb-24">
+          <div className="flex-1 h-full overflow-y-auto px-4 pb-24 w-full">
             {loading && <div className="py-10 flex justify-center"><Loader2 className="animate-spin text-blue-500" /></div>}
             {error && <div className="py-10 flex justify-center text-red-500"><AlertCircle className="w-8 h-8" /></div>}
             {!loading && !error && <TocTree nodes={tree} onSelect={jumpTo} refToIndex={refToIndex} />}
@@ -378,57 +375,67 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
         )}
 
         {page === 'reader' && (
-          <div
-            className="h-full overflow-y-auto px-4 pb-24"
-            onScroll={onScroll}
-            ref={scrollRef}
-            style={{ overflowAnchor: 'none' }}
-          >
-            <div style={{ height: `${virtualizer.getTotalSize()}px`, width: '100%', position: 'relative' }}>
-              {virtualizer.getVirtualItems().map((virtualItem) => {
-                const item = flatItems[virtualItem.index];
-                
-                return (
-                  <div
-                    key={virtualItem.key}
-                    data-index={virtualItem.index}
-                    ref={virtualizer.measureElement}
-                    // contain: content ensures the browser cleanly locks the height of this node
-                    style={{ position: 'absolute', top: 0, left: 0, width: '100%', transform: `translateY(${virtualItem.start}px)`, contain: 'content' }}
-                  >
-                    {item.type === 'header' && (
-                      <div className="bg-white dark:bg-slate-900 border-b px-2" style={{ fontSize: `${Math.max(1, fontScale * 0.9)}em`, paddingTop: '0.75em', paddingBottom: '0.5em' }}>
-                        <p className="font-semibold text-slate-700 dark:text-slate-100">{item.label}</p>
-                        {showEN && !showHB && item.hasNoEnglish && <p className="mt-2 text-sm italic text-amber-600 dark:text-amber-400">This section has no English</p>}
-                      </div>
-                    )}
+          <>
+            {/* Sidebar Overlay for TOC */}
+            {isSidebarOpen && (
+              <div className="absolute inset-y-0 left-0 w-72 bg-white dark:bg-slate-950 border-r shadow-2xl z-40 flex flex-col transition-transform duration-300 md:relative md:shadow-none">
+                <div className="flex-1 overflow-y-auto p-4 pb-24">
+                  <TocTree nodes={tree} onSelect={jumpTo} refToIndex={refToIndex} />
+                </div>
+              </div>
+            )}
+            
+            {/* Main Reader View */}
+            <div
+              className="flex-1 h-full overflow-y-auto px-4 pb-24 bg-slate-50 dark:bg-slate-900"
+              onScroll={onScroll}
+              ref={scrollRef}
+              style={{ overflowAnchor: 'none' }}
+            >
+              <div style={{ height: `${virtualizer.getTotalSize()}px`, width: '100%', position: 'relative' }}>
+                {virtualizer.getVirtualItems().map((virtualItem) => {
+                  const item = flatItems[virtualItem.index];
+                  
+                  return (
+                    <div
+                      key={virtualItem.key}
+                      data-index={virtualItem.index}
+                      ref={virtualizer.measureElement}
+                      style={{ position: 'absolute', top: 0, left: 0, width: '100%', transform: `translateY(${virtualItem.start}px)`, contain: 'content' }}
+                    >
+                      {item.type === 'header' && (
+                        <div className="bg-white dark:bg-slate-900 border-b px-2" style={{ fontSize: `${Math.max(1, fontScale * 0.9)}em`, paddingTop: '0.75em', paddingBottom: '0.5em' }}>
+                          <p className="font-semibold text-slate-700 dark:text-slate-100">{item.label}</p>
+                          {showEN && !showHB && item.hasNoEnglish && <p className="mt-2 text-sm italic text-amber-600 dark:text-amber-400">This section has no English</p>}
+                        </div>
+                      )}
 
-                    {item.type === 'loading' && <div className="py-6 flex justify-center"><Loader2 className="animate-spin text-blue-500" /></div>}
+                      {item.type === 'loading' && <div className="py-6 flex justify-center"><Loader2 className="animate-spin text-blue-500" /></div>}
 
-                    {item.type === 'segment' && (
-                      <div style={{ fontSize: `${fontScale}em`, paddingTop: '0.25em', paddingBottom: '1.5em' }}>
-                        {showHB && item.hasHebrew && (
-                          <p
-                            className="text-right text-[1.125em] leading-loose text-slate-800 dark:text-slate-100 font-serif min-h-[1.5em]"
-                            dir="rtl"
-                            dangerouslySetInnerHTML={{ __html: item.sanitizedHe }}
-                          />
-                        )}
-                        {showEN && item.hasEnglish && (
-                          <p
-                            // Margins collapsed out of the measurement boundary. Converted to padding!
-                            className="text-left text-[0.875em] leading-relaxed text-slate-500 dark:text-slate-400 min-h-[1.5em]"
-                            style={{ paddingTop: showHB ? '1em' : '0' }}
-                            dangerouslySetInnerHTML={{ __html: item.sanitizedEn }}
-                          />
-                        )}
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
+                      {item.type === 'segment' && (
+                        <div style={{ fontSize: `${fontScale}em`, paddingTop: '0.25em', paddingBottom: '1.5em' }}>
+                          {showHB && item.hasHebrew && (
+                            <p
+                              className="text-right text-[1.125em] leading-loose text-slate-800 dark:text-slate-100 font-serif min-h-[1.5em]"
+                              dir="rtl"
+                              dangerouslySetInnerHTML={{ __html: item.sanitizedHe }}
+                            />
+                          )}
+                          {showEN && item.hasEnglish && (
+                            <p
+                              className="text-left text-[0.875em] leading-relaxed text-slate-500 dark:text-slate-400 min-h-[1.5em]"
+                              style={{ paddingTop: showHB ? '1em' : '0' }}
+                              dangerouslySetInnerHTML={{ __html: item.sanitizedEn }}
+                            />
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
             </div>
-          </div>
+          </>
         )}
       </div>
 
