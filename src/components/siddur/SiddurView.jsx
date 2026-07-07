@@ -15,7 +15,6 @@ import {
   ArrowLeft,
   List,
   X,
-  Search,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useNavigate, useLocation } from "react-router-dom";
@@ -70,9 +69,6 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
   const [jumpTargetSection, setJumpTargetSection] = useState(null);
   const [tocOpen, setTocOpen] = useState(false);
 
-  // Search state
-  const [searchQuery, setSearchQuery] = useState("");
-
   const [fontScale, setFontScale] = useState(() => {
     try {
       return parseFloat(localStorage.getItem("siddur-font-scale")) || 1;
@@ -115,7 +111,6 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
   const jumpTo = useCallback((i) => {
     setPage("reader");
     setJumpTargetSection(i);
-    setSearchQuery(""); // Clear search on jump
   }, []);
 
   // URL parsing
@@ -170,15 +165,6 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
   const currentQueriesLoading = useMemo(() => {
     return sectionQueries.some((q) => q.isLoading);
   }, [sectionQueries]);
-
-  // Search Results
-  const searchResults = useMemo(() => {
-    if (!searchQuery.trim()) return [];
-    const query = searchQuery.toLowerCase();
-    return sections
-      .map((sec, index) => ({ ...sec, originalIndex: index }))
-      .filter((sec) => sec.label.toLowerCase().includes(query));
-  }, [searchQuery, sections]);
 
   // DOM Items
   const flatItems = useMemo(() => {
@@ -290,7 +276,7 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
 
       if (jumpTargetSection !== null) return;
 
-      // 2. Native URL Sync
+      // 2. Native URL Sync (Checks which header is currently at the top of the screen)
       clearTimeout(scrollDebounce.current);
       scrollDebounce.current = setTimeout(() => {
         const headerElements = document.querySelectorAll(
@@ -300,6 +286,7 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
 
         for (let i = 0; i < headerElements.length; i++) {
           const rect = headerElements[i].getBoundingClientRect();
+          // If the header is near the top of the viewport
           if (rect.top >= 0 && rect.top < 300) {
             activeIndex = headerElements[i].getAttribute("data-section-index");
             break;
@@ -322,59 +309,8 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
     ],
   );
 
-  // Reusable TOC & Search view
-  const renderTocOrSearch = (onSelectAction) => (
-    <div className="flex flex-col h-full overflow-hidden">
-      <div className="relative mb-4 shrink-0 mt-1">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-        <input
-          type="text"
-          placeholder="Search contents..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          className="w-full pl-9 pr-9 py-2 bg-slate-100 dark:bg-slate-900 border border-transparent focus:border-blue-500 rounded-md outline-none transition-all text-sm"
-        />
-        {searchQuery && (
-          <button
-            onClick={() => setSearchQuery("")}
-            className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
-          >
-            <X className="w-4 h-4" />
-          </button>
-        )}
-      </div>
-
-      <div className="flex-1 overflow-y-auto pb-6">
-        {searchQuery.trim() ? (
-          searchResults.length > 0 ? (
-            <div className="flex flex-col gap-1">
-              {searchResults.map((res) => (
-                <button
-                  key={res.originalIndex}
-                  onClick={() => onSelectAction(res.originalIndex)}
-                  className="text-left px-3 py-2 text-sm rounded-md hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors border border-transparent hover:border-slate-200 dark:hover:border-slate-700"
-                >
-                  {res.label}
-                </button>
-              ))}
-            </div>
-          ) : (
-            <p className="text-sm text-slate-500 text-center py-8">
-              No results found for "{searchQuery}"
-            </p>
-          )
-        ) : (
-          <TocTree
-            nodes={tree}
-            onSelect={onSelectAction}
-            refToIndex={refToIndex}
-          />
-        )}
-      </div>
-    </div>
-  );
-
   return (
+    // Changed "h-screen" to "h-[100dvh]" so mobile URL bars don't push the bottom off-screen
     <div className="h-[100dvh] flex flex-col bg-white dark:bg-slate-950 overflow-hidden">
       {/* TOP BAR */}
       <div className="sticky top-0 z-50 border-b bg-white dark:bg-slate-950">
@@ -390,10 +326,7 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
             <Button
               size="sm"
               variant="outline"
-              onClick={() => {
-                setSearchQuery("");
-                setTocOpen(true);
-              }}
+              onClick={() => setTocOpen(true)}
             >
               <List className="w-4 h-4" />
             </Button>
@@ -458,7 +391,6 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
                 onClick={() => {
                   const base = location.pathname.split("/")[1];
                   navigate(`/${base}/toc`, { replace: true });
-                  setSearchQuery("");
                   setPage("toc");
                 }}
               >
@@ -472,7 +404,7 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
       {/* BODY */}
       <div className="flex-1 overflow-hidden">
         {page === "toc" && (
-          <div className="h-full flex flex-col px-4 pt-2">
+          <div className="h-full overflow-y-auto px-4 pb-4 overscroll-y-contain">
             {loading && (
               <div className="py-10 flex justify-center">
                 <Loader2 className="animate-spin text-blue-500" />
@@ -483,7 +415,9 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
                 <AlertCircle className="w-8 h-8" />
               </div>
             )}
-            {!loading && !error && renderTocOrSearch(jumpTo)}
+            {!loading && !error && (
+              <TocTree nodes={tree} onSelect={jumpTo} refToIndex={refToIndex} />
+            )}
           </div>
         )}
 
@@ -508,6 +442,7 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
                 WebkitOverflowScrolling: "touch",
               }}
             >
+              {/* PURE NATIVE DOM RENDERING (No Virtualizer!) */}
               <div className="pb-8">
                 {flatItems.map((item) => (
                   <div
@@ -515,11 +450,13 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
                     id={item.id}
                     data-section-index={item.sectionIndex}
                   >
+                    {/* CSS POSITION: STICKY replaces the Javascript header math! */}
                     {item.type === "header" && (
                       <div className="sticky top-0 z-10 shadow-sm bg-white dark:bg-slate-950">
                         <SiddurHeader label={item.label} />
                       </div>
                     )}
+
                     {item.type === "segment" && (
                       <SiddurSegment
                         sanitizedHe={item.sanitizedHe}
@@ -542,10 +479,12 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
       </div>
 
       {/* --- SEFARIA ATTRIBUTION FOOTER --- */}
+      {/* Added `shrink-0` and safe-area-inset-bottom inline style */}
       <div
         className="shrink-0 bg-slate-100 dark:bg-slate-900 border-t pt-3 px-4 flex flex-col items-center justify-center gap-1 z-40"
         style={{ paddingBottom: "calc(0.75rem + env(safe-area-inset-bottom))" }}
       >
+        {/* Clickable Badge Linking to Sefaria Library */}
         <a
           href="https://www.sefaria.org/texts"
           target="_blank"
@@ -558,6 +497,8 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
             className="h-10 w-auto rounded-md shadow-sm bg-white"
           />
         </a>
+
+        {/* Technical Credit Linking to API Portal */}
         <div className="text-[10px] text-slate-500 leading-none">
           and the{" "}
           <a
@@ -578,8 +519,8 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
             className="fixed inset-0 bg-black/30 z-50 backdrop-blur-sm"
             onClick={() => setTocOpen(false)}
           />
-          <div className="fixed top-0 right-0 h-full w-80 bg-white dark:bg-slate-950 z-50 shadow-2xl flex flex-col">
-            <div className="shrink-0 flex items-center justify-between p-4 border-b border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-950">
+          <div className="fixed top-0 right-0 h-full w-80 bg-white dark:bg-slate-950 z-50 shadow-2xl overflow-y-auto">
+            <div className="flex items-center justify-between p-4 border-b border-slate-100 dark:border-slate-800 sticky top-0 bg-white dark:bg-slate-950 z-10">
               <h2 className="text-lg font-bold">Contents</h2>
               <Button
                 size="icon"
@@ -590,11 +531,15 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
                 <X className="w-5 h-5" />
               </Button>
             </div>
-            <div className="flex-1 overflow-hidden p-4 pt-2">
-              {renderTocOrSearch((i) => {
-                jumpTo(i);
-                setTocOpen(false);
-              })}
+            <div className="p-4">
+              <TocTree
+                nodes={tree}
+                onSelect={(i) => {
+                  jumpTo(i);
+                  setTocOpen(false);
+                }}
+                refToIndex={refToIndex}
+              />
             </div>
           </div>
         </>
