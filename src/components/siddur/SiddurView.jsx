@@ -1,7 +1,6 @@
 import React, {
   useState,
   useEffect,
-  useLayoutEffect,
   useRef,
   useMemo,
   useCallback,
@@ -53,10 +52,7 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
   const queryClient = useQueryClient();
 
   const scrollRef = useRef(null);
-  const fontScaleRef = useRef(1);
-  const anchorRef = useRef(null);
   const scrollDebounce = useRef(null);
-  const restoreAnchorRef = useRef(null);
 
   // Background measuring for the sticky header
   const floatingHeaderRef = useRef(null);
@@ -89,7 +85,7 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
     clearTimeout(programmaticScrollTimeout.current);
     programmaticScrollTimeout.current = setTimeout(() => {
       isProgrammaticScroll.current = false;
-    }, 200);
+    }, 250);
   }, []);
 
   const [tree, setTree] = useState([]);
@@ -116,7 +112,6 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
   const showHB = langMode !== "en";
 
   useEffect(() => {
-    fontScaleRef.current = fontScale;
     try {
       localStorage.setItem("siddur-font-scale", String(fontScale));
     } catch {
@@ -144,11 +139,10 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
   }, [bookRef]);
 
   const jumpTo = useCallback((i) => {
-    anchorRef.current = null;
     setPage("reader");
     setRange((prev) => ({
-      start: 0,
-      end: Math.max(prev.end, i + 10),
+      start: Math.max(0, i - 2),
+      end: Math.max(prev.end, i + 5),
     }));
     setPendingJump(i);
   }, []);
@@ -162,11 +156,8 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
       const lang = parts[4];
       if (["en", "he", "both"].includes(lang)) setLangMode(lang);
 
-      if (!isNaN(sectionId) && pendingJump !== sectionId) {
-        const isAlreadyThere = anchorRef.current?.sectionIndex === sectionId;
-        if (!isAlreadyThere || page !== "reader") {
-          jumpTo(sectionId);
-        }
+      if (!isNaN(sectionId) && pendingJump !== sectionId && page !== "reader") {
+        jumpTo(sectionId);
       }
     }
   }, [location.pathname, sections.length, pendingJump, page, jumpTo]);
@@ -269,108 +260,55 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
   flatItemsRef.current = flatItems;
 
   // -------------------------
-  // VIRTUALIZER (Now with strict measureElement!)
+  // OPTIMIZED VIRTUALIZER
   // -------------------------
   const virtualizer = useVirtualizer({
     count: flatItems.length,
     getScrollElement: () => scrollRef.current,
     estimateSize: () => 180,
-    overscan: 20,
-    measureElement: (el) => {
-      if (!el) return 0;
-      return el.getBoundingClientRect().height;
-    },
+    overscan: 10,
+    // Note: We removed the custom measureElement override!
+    // Tanstack Virtual has a built-in ResizeObserver that works perfectly as long
+    // as we pass ref={virtualizer.measureElement} to the rendered item div below.
   });
 
-  // Smooth jump engine
+  // Force virtualizer to remeasure when font sizes or languages change globally
+  useEffect(() => {
+    if (virtualizer) {
+      virtualizer.measure();
+    }
+  }, [fontScale, langMode, virtualizer]);
+
+  // Handle Jumps securely
   useEffect(() => {
     if (pendingJump === null || page !== "reader") return;
-    lockScroll();
-    requestAnimationFrame(() => {
-      const idx = flatItemsRef.current.findIndex(
-        (it) => it.type === "header" && it.sectionIndex === pendingJump,
-      );
-      if (idx !== -1) {
-        virtualizer.scrollToIndex(idx, { align: "start" });
-        anchorRef.current = {
-          id: `hdr-${pendingJump}`,
-          offset: 0,
-          sectionIndex: pendingJump,
-        };
-      }
-    });
-    setPendingJump(null);
-  }, [pendingJump, page, virtualizer, lockScroll]);
 
-  // -------------------------
-  // ANCHOR ENGINE (Fixed dependencies)
-  // -------------------------
-  const captureAnchor = useCallback(() => {
-    if (!scrollRef.current) return;
-    const scrollTop = scrollRef.current.scrollTop;
-    const virtualItems = virtualizer.getVirtualItems();
-    if (!virtualItems.length) return;
-    const topVI =
-      virtualItems.find((vi) => vi.start + vi.size > scrollTop) ||
-      virtualItems[0];
-    const item = flatItemsRef.current[topVI.index];
-    if (!item) return;
-    anchorRef.current = {
-      id: item.id,
-      offset: scrollTop - topVI.start,
-      sectionIndex: item.sectionIndex,
-    };
-  }, [virtualizer]);
+    const targetIdx = flatItemsRef.current.findIndex(
+      (it) => it.type === "header" && it.sectionIndex === pendingJump,
+    );
 
-  const restoreAnchor = useCallback(() => {
-    const anchor = anchorRef.current;
-    if (!anchor || !scrollRef.current) return;
-
-    let idx = flatItemsRef.current.findIndex((it) => it.id === anchor.id);
-    if (idx === -1 && anchor.sectionIndex !== undefined) {
-      idx = flatItemsRef.current.findIndex(
-        (it) => it.type === "header" && it.sectionIndex === anchor.sectionIndex,
-      );
-    }
-    if (idx === -1) return;
-
-    const virtualItems = virtualizer.getVirtualItems();
-    const vi = virtualItems.find((v) => v.index === idx);
-
-    if (!vi) {
+    if (targetIdx !== -1) {
       lockScroll();
-      virtualizer.scrollToIndex(idx, { align: "start" });
-      return;
+      requestAnimationFrame(() => {
+        virtualizer.scrollToIndex(targetIdx, { align: "start" });
+      });
+      setPendingJump(null);
     }
-
-    const target = vi.start + anchor.offset;
-    if (Math.abs(scrollRef.current.scrollTop - target) > 1) {
-      lockScroll();
-      scrollRef.current.scrollTop = target;
-    }
-  }, [virtualizer, lockScroll]);
-
-  restoreAnchorRef.current = restoreAnchor;
-
-  const totalSize = virtualizer.getTotalSize();
-  useLayoutEffect(() => {
-    if (!anchorRef.current || page !== "reader") return;
-    restoreAnchorRef.current();
-  }, [fontScale, langMode, flatItems.length, page, totalSize]);
+  }, [pendingJump, page, virtualizer, lockScroll, flatItems.length]); // Depends on length so it fires after data loads
 
   // -------------------------
-  // JANK-FREE SCROLL HANDLER
+  // CLEAN SCROLL HANDLER
   // -------------------------
   const onScroll = useCallback(
     (e) => {
       const el = e.target;
       const scrollTop = el.scrollTop;
 
-      // 1. O(1) DOM READ PHASE - NO LAYOUT THRASHING!
+      // 1. O(1) DOM READ PHASE - NO LAYOUT THRASHING
       const headerEl = floatingHeaderRef.current;
       const headerHeight = headerHeightRef.current;
 
-      // 2. LOGIC & WRITE PHASE
+      // 2. STICKY HEADER LOGIC
       if (headerEl && virtualizer) {
         const vItems = virtualizer.getVirtualItems();
         const nextHeader = vItems.find(
@@ -392,8 +330,8 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
       }
 
       if (isProgrammaticScroll.current) return;
-      captureAnchor();
 
+      // 3. SILENT URL SYNC
       clearTimeout(scrollDebounce.current);
       scrollDebounce.current = setTimeout(() => {
         const virtualItems = virtualizer.getVirtualItems();
@@ -407,6 +345,7 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
         window.history.replaceState(null, "", newUrl);
       }, 150);
 
+      // 4. INFINITE SCROLL DATA LOADING
       if (scrollTop + el.clientHeight > el.scrollHeight - 1500) {
         if (range.end < sections.length - 1) {
           setRange((r) => ({
@@ -419,14 +358,7 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
         setRange((r) => ({ start: Math.max(0, r.start - 5), end: r.end }));
       }
     },
-    [
-      captureAnchor,
-      virtualizer,
-      location.pathname,
-      langMode,
-      sections.length,
-      range,
-    ],
+    [virtualizer, location.pathname, langMode, sections.length, range],
   );
 
   return (
@@ -575,7 +507,8 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
               onScroll={onScroll}
               className="h-full overflow-y-auto relative"
               style={{
-                overflowAnchor: "none",
+                // CRITICAL FIX: Re-enabling the browser's native scroll smoothing!
+                overflowAnchor: "auto",
                 overscrollBehaviorY: "contain",
                 WebkitOverflowScrolling: "touch",
               }}
