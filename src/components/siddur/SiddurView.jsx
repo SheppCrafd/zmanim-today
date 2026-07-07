@@ -57,7 +57,30 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
   const anchorRef = useRef(null);
   const scrollDebounce = useRef(null);
   const restoreAnchorRef = useRef(null);
+
+  // NEW: Background measuring variables to eliminate layout thrashing
   const floatingHeaderRef = useRef(null);
+  const headerHeightRef = useRef(48); // Fallback starter height
+  const headerObserver = useRef(null);
+
+  // NEW: Background measuring engine (Gets the real height without freezing the scroll)
+  const setFloatingHeaderRef = useCallback((node) => {
+    floatingHeaderRef.current = node;
+    if (node) {
+      headerHeightRef.current = node.offsetHeight;
+      if (!headerObserver.current) {
+        headerObserver.current = new ResizeObserver((entries) => {
+          headerHeightRef.current = entries[0].target.offsetHeight;
+        });
+      }
+      headerObserver.current.observe(node);
+    } else {
+      if (headerObserver.current) {
+        headerObserver.current.disconnect();
+        headerObserver.current = null;
+      }
+    }
+  }, []);
 
   const isProgrammaticScroll = useRef(false);
   const programmaticScrollTimeout = useRef(null);
@@ -249,9 +272,16 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
   const virtualizer = useVirtualizer({
     count: flatItems.length,
     getScrollElement: () => scrollRef.current,
-    estimateSize: () => 180,
+    estimateSize: () => 150,
     overscan: 20,
   });
+
+  // Force virtualizer to recalculate ALL sizes immediately when layout changes
+  useEffect(() => {
+    if (virtualizer) {
+      virtualizer.measure();
+    }
+  }, [fontScale, langMode, virtualizer]);
 
   // Smooth jump engine
   useEffect(() => {
@@ -327,13 +357,18 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
     restoreAnchorRef.current();
   }, [fontScale, langMode, flatItems.length, page, totalSize]);
 
-  // JANK-FREE SCROLL HANDLER
+  // JANK-FREE SCROLL HANDLER (Now with dynamic, anti-thrashing height calculation)
   const onScroll = useCallback(
     (e) => {
       const el = e.target;
       const scrollTop = el.scrollTop;
 
-      if (floatingHeaderRef.current && virtualizer) {
+      // 1. O(1) DOM READ PHASE - NO LAYOUT THRASHING!
+      const headerEl = floatingHeaderRef.current;
+      const headerHeight = headerHeightRef.current;
+
+      // 2. LOGIC & WRITE PHASE
+      if (headerEl && virtualizer) {
         const vItems = virtualizer.getVirtualItems();
         const nextHeader = vItems.find(
           (vi) =>
@@ -342,15 +377,14 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
         );
 
         if (nextHeader) {
-          const h = 48;
           const dist = nextHeader.start - scrollTop;
-          if (dist < h) {
-            floatingHeaderRef.current.style.transform = `translateY(${dist - h}px)`;
+          if (dist < headerHeight) {
+            headerEl.style.transform = `translateY(${dist - headerHeight}px)`;
           } else {
-            floatingHeaderRef.current.style.transform = `translateY(0px)`;
+            headerEl.style.transform = `translateY(0px)`;
           }
         } else {
-          floatingHeaderRef.current.style.transform = `translateY(0px)`;
+          headerEl.style.transform = `translateY(0px)`;
         }
       }
 
@@ -370,7 +404,6 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
         window.history.replaceState(null, "", newUrl);
       }, 150);
 
-      // Controlled state updates to prevent layout thrashing (Fixes scrolling jank!)
       if (scrollTop + el.clientHeight > el.scrollHeight - 1500) {
         if (range.end < sections.length - 1) {
           setRange((r) => ({
@@ -526,7 +559,7 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
 
               return activeHeader ? (
                 <div
-                  ref={floatingHeaderRef}
+                  ref={setFloatingHeaderRef} // <--- ATTACHES THE MEASURING TOOL HERE
                   className="absolute top-0 left-0 right-0 z-10 shadow-md will-change-transform"
                 >
                   <SiddurHeader label={activeHeader.label} />
