@@ -21,7 +21,7 @@ const extractText = (data, expectedLang) => {
   if (expectedLang === "en") {
     return rawArray.map((line) => {
       if (!line) return "";
-      // Preserves lines with English letters (like transliterations)
+      // Preserves lines with English letters
       const hasEnglish = /[a-zA-Z]/.test(line);
       return hasEnglish ? line : "";
     });
@@ -34,7 +34,6 @@ const extractText = (data, expectedLang) => {
 export const fetchAndZipSefaria = async (ref) => {
   if (!ref) return [];
 
-  // Sefaria endpoints require spaces to be underscores, and we safely encode apostrophes
   const safeRef = encodeURIComponent(ref.replace(/ /g, "_")).replace(
     /'/g,
     "%27",
@@ -48,7 +47,7 @@ export const fetchAndZipSefaria = async (ref) => {
     let heArr = extractText(data, "he");
     let enArr = extractText(data, "en");
 
-    // ATTEMPT 2: V2 API FALLBACK
+    // ATTEMPT 2: V2 API FALLBACK (THIS IS WHAT FIXES MOURNER'S KADDISH!)
     if (heArr.length === 0) {
       const fallbackResp = await fetch(
         `https://www.sefaria.org/api/texts/${safeRef}?context=0`,
@@ -83,14 +82,13 @@ export const fetchAndZipSefaria = async (ref) => {
     return segments;
   } catch (err) {
     console.error(`Failed to fetch ${ref}:`, err);
-    return []; // Return empty array so SiddurView can handle it gracefully
+    return [];
   }
 };
 
 // --- Hook 1: Fetch the Table of Contents ---
 export function useSefariaTOC(bookRef) {
   return useQuery({
-    // Cache busted!
     queryKey: ["sefaria-toc-v2", bookRef],
     queryFn: async () => {
       const res = await fetch(`https://www.sefaria.org/api/index/${bookRef}`);
@@ -104,7 +102,6 @@ export function useSefariaTOC(bookRef) {
 // --- Hook 2: Fetch a Specific Text Section ---
 export function useSefariaText(ref) {
   return useQuery({
-    // Cache busted!
     queryKey: ["sefaria-text-v2", ref],
     queryFn: () => fetchAndZipSefaria(ref),
     enabled: !!ref,
@@ -118,7 +115,6 @@ export function usePrefetchSefariaText() {
   return (ref) => {
     if (!ref) return;
     queryClient.prefetchQuery({
-      // Cache busted!
       queryKey: ["sefaria-text-v2", ref],
       queryFn: () => fetchAndZipSefaria(ref),
       staleTime: 1000 * 60 * 60 * 24,
