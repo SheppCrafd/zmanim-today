@@ -310,7 +310,8 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
   );
 
   return (
-    <div className="h-screen flex flex-col bg-white dark:bg-slate-950 overflow-hidden">
+    // Changed "h-screen" to "h-[100dvh]" so mobile URL bars don't push the bottom off-screen
+    <div className="h-[100dvh] flex flex-col bg-white dark:bg-slate-950 overflow-hidden">
       {/* TOP BAR */}
       <div className="sticky top-0 z-50 border-b bg-white dark:bg-slate-950">
         <div className="flex justify-between items-center px-4 pt-4 pb-2">
@@ -403,7 +404,7 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
       {/* BODY */}
       <div className="flex-1 overflow-hidden">
         {page === "toc" && (
-          <div className="h-full overflow-y-auto px-4 pb-24 overscroll-y-contain">
+          <div className="h-full overflow-y-auto px-4 pb-4 overscroll-y-contain">
             {loading && (
               <div className="py-10 flex justify-center">
                 <Loader2 className="animate-spin text-blue-500" />
@@ -442,7 +443,7 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
               }}
             >
               {/* PURE NATIVE DOM RENDERING (No Virtualizer!) */}
-              <div className="pb-32">
+              <div className="pb-8">
                 {flatItems.map((item) => (
                   <div
                     key={item.id}
@@ -475,6 +476,40 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
             </div>
           </div>
         )}
+      </div>
+
+      {/* --- SEFARIA ATTRIBUTION FOOTER --- */}
+      {/* Added `shrink-0` and safe-area-inset-bottom inline style */}
+      <div
+        className="shrink-0 bg-slate-100 dark:bg-slate-900 border-t pt-3 px-4 flex flex-col items-center justify-center gap-1 z-40"
+        style={{ paddingBottom: "calc(0.75rem + env(safe-area-inset-bottom))" }}
+      >
+        {/* Clickable Badge Linking to Sefaria Library */}
+        <a
+          href="https://www.sefaria.org/texts"
+          target="_blank"
+          rel="noreferrer"
+          className="transition-transform hover:scale-105"
+        >
+          <img
+            src="https://files.readme.io/dcee0a8-image.png"
+            alt="Powered by Sefaria"
+            className="h-10 w-auto rounded-md shadow-sm bg-white"
+          />
+        </a>
+
+        {/* Technical Credit Linking to API Portal */}
+        <div className="text-[10px] text-slate-500 leading-none">
+          and the{" "}
+          <a
+            href="https://developers.sefaria.org"
+            target="_blank"
+            rel="noreferrer"
+            className="underline hover:text-slate-700 dark:hover:text-slate-300 transition-colors"
+          >
+            Sefaria API
+          </a>
+        </div>
       </div>
 
       {/* DRAWER */}
