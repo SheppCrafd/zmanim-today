@@ -1,6 +1,7 @@
 import React, {
   useState,
   useEffect,
+  useLayoutEffect,
   useRef,
   useMemo,
   useCallback,
@@ -52,6 +53,8 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
   const queryClient = useQueryClient();
 
   const scrollRef = useRef(null);
+  const fontScaleRef = useRef(1);
+  const anchorRef = useRef(null);
   const scrollDebounce = useRef(null);
 
   // Background measuring for the sticky header
@@ -85,13 +88,15 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
     clearTimeout(programmaticScrollTimeout.current);
     programmaticScrollTimeout.current = setTimeout(() => {
       isProgrammaticScroll.current = false;
-    }, 250);
+    }, 200);
   }, []);
 
   const [tree, setTree] = useState([]);
   const [sections, setSections] = useState([]);
   const [refToIndex, setRefToIndex] = useState({});
-  const [range, setRange] = useState({ start: 0, end: 10 });
+
+  // THE FIX: We only track how far down we have rendered. We ALWAYS start at 0.
+  const [renderCount, setRenderCount] = useState(10);
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
@@ -112,6 +117,7 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
   const showHB = langMode !== "en";
 
   useEffect(() => {
+    fontScaleRef.current = fontScale;
     try {
       localStorage.setItem("siddur-font-scale", String(fontScale));
     } catch {
@@ -139,11 +145,10 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
   }, [bookRef]);
 
   const jumpTo = useCallback((i) => {
+    anchorRef.current = null;
     setPage("reader");
-    setRange((prev) => ({
-      start: Math.max(0, i - 2),
-      end: Math.max(prev.end, i + 5),
-    }));
+    // Expand the render limit to cover the jump target
+    setRenderCount((prev) => Math.max(prev, i + 5));
     setPendingJump(i);
   }, []);
 
@@ -156,8 +161,11 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
       const lang = parts[4];
       if (["en", "he", "both"].includes(lang)) setLangMode(lang);
 
-      if (!isNaN(sectionId) && pendingJump !== sectionId && page !== "reader") {
-        jumpTo(sectionId);
+      if (!isNaN(sectionId) && pendingJump !== sectionId) {
+        const isAlreadyThere = anchorRef.current?.sectionIndex === sectionId;
+        if (!isAlreadyThere || page !== "reader") {
+          jumpTo(sectionId);
+        }
       }
     }
   }, [location.pathname, sections.length, pendingJump, page, jumpTo]);
@@ -170,7 +178,7 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
         await Promise.all(
           sections.slice(i, i + 5).map((sec) =>
             queryClient.prefetchQuery({
-              queryKey: ["sefaria-text-v2", sec.ref],
+              queryKey: ["sefaria-text-v3", sec.ref],
               queryFn: () => fetchAndZipSefaria(sec.ref),
               staleTime: 86400000,
             }),
@@ -180,11 +188,12 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
     })();
   }, [sections, queryClient]);
 
-  const activeSections = sections.slice(range.start, range.end + 1);
+  // ALWAYS slice from 0. This prevents shifting indices and cache corruption!
+  const activeSections = sections.slice(0, renderCount + 1);
 
   const sectionQueries = useQueries({
     queries: activeSections.map((sec) => ({
-      queryKey: ["sefaria-text-v2", sec.ref],
+      queryKey: ["sefaria-text-v3", sec.ref],
       queryFn: () => fetchAndZipSefaria(sec.ref),
       staleTime: 86400000,
     })),
@@ -194,43 +203,34 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
   const flatItems = useMemo(() => {
     const items = [];
     activeSections.forEach((sec, i) => {
-      const globalIndex = range.start + i;
       const query = sectionQueries[i];
 
       items.push({
         type: "header",
-        id: `hdr-${globalIndex}`,
+        id: `hdr-${i}`,
         label: sec.label,
-        sectionIndex: globalIndex,
+        sectionIndex: i,
       });
 
       if (query.isLoading) {
-        items.push({
-          type: "loading",
-          id: `load-${sec.ref}`,
-          sectionIndex: globalIndex,
-        });
+        items.push({ type: "loading", id: `load-${sec.ref}`, sectionIndex: i });
         return;
       }
       if (query.isError) {
-        items.push({
-          type: "error",
-          id: `err-${sec.ref}`,
-          sectionIndex: globalIndex,
-        });
+        items.push({ type: "error", id: `err-${sec.ref}`, sectionIndex: i });
         return;
       }
       if (query.data) {
         if (query.data.length === 0) {
           items.push({
             type: "segment",
-            id: `seg-${globalIndex}-empty`,
+            id: `seg-${i}-empty`,
             sanitizedHe: "",
             sanitizedEn:
               "<span class='italic opacity-50'>No text provided by Sefaria for this section.</span>",
             hasH: false,
             hasE: true,
-            sectionIndex: globalIndex,
+            sectionIndex: i,
           });
           return;
         }
@@ -243,18 +243,18 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
           if (!(showHB && hasH) && !(showEN && hasE)) return;
           items.push({
             type: "segment",
-            id: `seg-${globalIndex}-${segIndex}`,
+            id: `seg-${i}-${segIndex}`,
             sanitizedHe: sanitizeHTML(seg.he),
             sanitizedEn: sanitizeHTML(seg.en),
             hasH,
             hasE,
-            sectionIndex: globalIndex,
+            sectionIndex: i,
           });
         });
       }
     });
     return items;
-  }, [activeSections, sectionQueries, showEN, showHB, range.start]);
+  }, [activeSections, sectionQueries, showEN, showHB]);
 
   const flatItemsRef = useRef(flatItems);
   flatItemsRef.current = flatItems;
@@ -267,19 +267,18 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
     getScrollElement: () => scrollRef.current,
     estimateSize: () => 180,
     overscan: 10,
-    // Note: We removed the custom measureElement override!
-    // Tanstack Virtual has a built-in ResizeObserver that works perfectly as long
-    // as we pass ref={virtualizer.measureElement} to the rendered item div below.
+    // THE SECOND FIX: Bind cache to IDs instead of index!
+    getItemKey: (index) => flatItems[index]?.id || index,
   });
 
-  // Force virtualizer to remeasure when font sizes or languages change globally
+  // Force remeasure on font scale change
   useEffect(() => {
     if (virtualizer) {
       virtualizer.measure();
     }
   }, [fontScale, langMode, virtualizer]);
 
-  // Handle Jumps securely
+  // Jump Target Engine
   useEffect(() => {
     if (pendingJump === null || page !== "reader") return;
 
@@ -294,7 +293,47 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
       });
       setPendingJump(null);
     }
-  }, [pendingJump, page, virtualizer, lockScroll, flatItems.length]); // Depends on length so it fires after data loads
+  }, [pendingJump, page, virtualizer, lockScroll, flatItems.length]);
+
+  // -------------------------
+  // STABILIZING ANCHOR ENGINE
+  // -------------------------
+  const captureAnchor = useCallback(() => {
+    if (!scrollRef.current || isProgrammaticScroll.current) return;
+    const scrollTop = scrollRef.current.scrollTop;
+    const virtualItems = virtualizer.getVirtualItems();
+    if (!virtualItems.length) return;
+
+    const topVI =
+      virtualItems.find((vi) => vi.start + vi.size > scrollTop) ||
+      virtualItems[0];
+    const item = flatItemsRef.current[topVI.index];
+    if (!item) return;
+
+    anchorRef.current = {
+      id: item.id,
+      offset: scrollTop - topVI.start,
+      sectionIndex: item.sectionIndex,
+    };
+  }, [virtualizer]);
+
+  useLayoutEffect(() => {
+    const anchor = anchorRef.current;
+    if (!anchor || !scrollRef.current || isProgrammaticScroll.current) return;
+
+    const idx = flatItemsRef.current.findIndex((it) => it.id === anchor.id);
+    if (idx === -1) return;
+
+    const virtualItems = virtualizer.getVirtualItems();
+    const vi = virtualItems.find((v) => v.index === idx);
+
+    if (!vi) return;
+
+    const target = vi.start + anchor.offset;
+    if (Math.abs(scrollRef.current.scrollTop - target) > 1) {
+      scrollRef.current.scrollTop = target;
+    }
+  }, [virtualizer.getTotalSize(), flatItems.length]); // Triggers when items above load/change height
 
   // -------------------------
   // CLEAN SCROLL HANDLER
@@ -304,7 +343,7 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
       const el = e.target;
       const scrollTop = el.scrollTop;
 
-      // 1. O(1) DOM READ PHASE - NO LAYOUT THRASHING
+      // 1. O(1) DOM READ PHASE
       const headerEl = floatingHeaderRef.current;
       const headerHeight = headerHeightRef.current;
 
@@ -330,6 +369,7 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
       }
 
       if (isProgrammaticScroll.current) return;
+      captureAnchor();
 
       // 3. SILENT URL SYNC
       clearTimeout(scrollDebounce.current);
@@ -345,20 +385,21 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
         window.history.replaceState(null, "", newUrl);
       }, 150);
 
-      // 4. INFINITE SCROLL DATA LOADING
+      // 4. INFINITE SCROLL DOWN ONLY (No Upwards Prepending = No Hyperspace!)
       if (scrollTop + el.clientHeight > el.scrollHeight - 1500) {
-        if (range.end < sections.length - 1) {
-          setRange((r) => ({
-            ...r,
-            end: Math.min(sections.length - 1, r.end + 5),
-          }));
+        if (renderCount < sections.length - 1) {
+          setRenderCount((prev) => Math.min(sections.length - 1, prev + 5));
         }
       }
-      if (scrollTop < 1000 && range.start > 0) {
-        setRange((r) => ({ start: Math.max(0, r.start - 5), end: r.end }));
-      }
     },
-    [virtualizer, location.pathname, langMode, sections.length, range],
+    [
+      virtualizer,
+      location.pathname,
+      langMode,
+      sections.length,
+      renderCount,
+      captureAnchor,
+    ],
   );
 
   return (
@@ -507,8 +548,8 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
               onScroll={onScroll}
               className="h-full overflow-y-auto relative"
               style={{
-                // CRITICAL FIX: Re-enabling the browser's native scroll smoothing!
-                overflowAnchor: "auto",
+                // Prevent browser from fighting our stable Anchor Engine
+                overflowAnchor: "none",
                 overscrollBehaviorY: "contain",
                 WebkitOverflowScrolling: "touch",
               }}
