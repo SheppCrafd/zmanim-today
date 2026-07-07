@@ -24,7 +24,6 @@ import { processSefariaSchema } from "@/lib/siddurSchema";
 import TocTree from "@/components/siddur/TocTree";
 import NavMenu from "@/components/NavMenu";
 import {
-  SiddurHeader,
   SiddurSegment,
   SiddurLoading,
   SiddurError,
@@ -378,12 +377,18 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
     <div className="h-[100dvh] w-full flex flex-col bg-white dark:bg-slate-950 overflow-hidden">
       {/* TOP BAR */}
       <div className="sticky top-0 z-50 border-b bg-white dark:bg-slate-950 w-full">
-        <div className="flex justify-between items-center px-4 pt-4 pb-2 w-full">
-          <div className="flex items-center gap-3">
-            <NavMenu />
-            <div>
-              <h1 className="text-lg font-bold">{title}</h1>
-              <p className="text-xs text-slate-500">{subtitle}</p>
+        <div className="flex justify-between items-start px-4 pt-4 pb-2 w-full gap-4">
+          <div className="flex items-start gap-3 flex-1 min-w-0">
+            <div className="mt-0.5 shrink-0">
+              <NavMenu />
+            </div>
+            <div className="flex-1 min-w-0">
+              <h1 className="text-lg font-bold leading-tight break-words whitespace-normal text-slate-900 dark:text-slate-100">
+                {title}
+              </h1>
+              <p className="text-xs text-slate-500 mt-0.5 break-words whitespace-normal">
+                {subtitle}
+              </p>
             </div>
           </div>
           <div className="flex items-center gap-2 shrink-0">
@@ -502,7 +507,6 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
             <div
               ref={scrollRef}
               onScroll={onScroll}
-              // Added overflow-x-hidden and w-full here to completely kill the horizontal scroll!
               className="h-full overflow-y-auto overflow-x-hidden relative w-full"
               style={{
                 overscrollBehaviorY: "contain",
@@ -518,9 +522,11 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
                     className="w-full max-w-full"
                   >
                     {item.type === "header" && (
-                      // Added break-words and overflow-hidden to headers
-                      <div className="sticky top-0 z-10 shadow-sm bg-white dark:bg-slate-950 w-full break-words overflow-hidden">
-                        <SiddurHeader label={item.label} />
+                      /* --- FIXED HEADER (No flex-center clipping!) --- */
+                      <div className="sticky top-0 z-10 shadow-md bg-slate-100 dark:bg-slate-900 border-y border-slate-200 dark:border-slate-800 w-full px-4 py-2 block">
+                        <h3 className="text-sm md:text-base font-bold text-slate-800 dark:text-slate-200 text-center break-words whitespace-normal leading-snug">
+                          {item.label}
+                        </h3>
                       </div>
                     )}
                     {item.type === "segment" && (
