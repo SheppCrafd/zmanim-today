@@ -24,6 +24,7 @@ import { processSefariaSchema } from "@/lib/siddurSchema";
 import TocTree from "@/components/siddur/TocTree";
 import NavMenu from "@/components/NavMenu";
 import {
+  SiddurHeader,
   SiddurSegment,
   SiddurLoading,
   SiddurError,
@@ -323,7 +324,7 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
 
   // Reusable TOC & Search view
   const renderTocOrSearch = (onSelectAction) => (
-    <div className="flex flex-col h-full overflow-hidden w-full">
+    <div className="flex flex-col h-full overflow-hidden">
       <div className="relative mb-4 shrink-0 mt-1">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
         <input
@@ -343,15 +344,15 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
         )}
       </div>
 
-      <div className="flex-1 overflow-y-auto pb-6 w-full overflow-x-hidden">
+      <div className="flex-1 overflow-y-auto pb-6">
         {searchQuery.trim() ? (
           searchResults.length > 0 ? (
-            <div className="flex flex-col gap-1 w-full">
+            <div className="flex flex-col gap-1">
               {searchResults.map((res) => (
                 <button
                   key={res.originalIndex}
                   onClick={() => onSelectAction(res.originalIndex)}
-                  className="text-left px-3 py-2 text-sm rounded-md hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors border border-transparent hover:border-slate-200 dark:hover:border-slate-700 w-full truncate"
+                  className="text-left px-3 py-2 text-sm rounded-md hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors border border-transparent hover:border-slate-200 dark:hover:border-slate-700"
                 >
                   {res.label}
                 </button>
@@ -374,24 +375,18 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
   );
 
   return (
-    <div className="h-[100dvh] w-full flex flex-col bg-white dark:bg-slate-950 overflow-hidden">
+    <div className="h-[100dvh] flex flex-col bg-white dark:bg-slate-950 overflow-hidden">
       {/* TOP BAR */}
-      <div className="sticky top-0 z-50 border-b bg-white dark:bg-slate-950 w-full">
-        <div className="flex justify-between items-start px-4 pt-4 pb-2 w-full gap-4">
-          <div className="flex items-start gap-3 flex-1 min-w-0">
-            <div className="mt-0.5 shrink-0">
-              <NavMenu />
-            </div>
-            <div className="flex-1 min-w-0">
-              <h1 className="text-lg font-bold leading-tight break-words whitespace-normal text-slate-900 dark:text-slate-100">
-                {title}
-              </h1>
-              <p className="text-xs text-slate-500 mt-0.5 break-words whitespace-normal">
-                {subtitle}
-              </p>
+      <div className="sticky top-0 z-50 border-b bg-white dark:bg-slate-950">
+        <div className="flex justify-between items-center px-4 pt-4 pb-2">
+          <div className="flex items-center gap-3">
+            <NavMenu />
+            <div>
+              <h1 className="text-lg font-bold">{title}</h1>
+              <p className="text-xs text-slate-500">{subtitle}</p>
             </div>
           </div>
-          <div className="flex items-center gap-2 shrink-0">
+          <div className="flex items-center gap-2">
             <Button
               size="sm"
               variant="outline"
@@ -410,7 +405,7 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
           </div>
         </div>
 
-        <div className="px-4 flex items-center gap-2 py-2 flex-wrap w-full">
+        <div className="px-4 flex items-center gap-2 py-2 flex-wrap">
           <Button
             size="sm"
             variant={langMode === "en" ? "default" : "outline"}
@@ -475,16 +470,16 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
       </div>
 
       {/* BODY */}
-      <div className="flex-1 overflow-hidden w-full">
+      <div className="flex-1 overflow-hidden">
         {page === "toc" && (
-          <div className="h-full flex flex-col px-4 pt-2 w-full">
+          <div className="h-full flex flex-col px-4 pt-2">
             {loading && (
-              <div className="py-10 flex justify-center w-full">
+              <div className="py-10 flex justify-center">
                 <Loader2 className="animate-spin text-blue-500" />
               </div>
             )}
             {error && (
-              <div className="py-10 flex justify-center text-red-500 w-full">
+              <div className="py-10 flex justify-center text-red-500">
                 <AlertCircle className="w-8 h-8" />
               </div>
             )}
@@ -493,10 +488,10 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
         )}
 
         {page === "reader" && (
-          <div className="h-full relative overflow-hidden w-full">
+          <div className="h-full relative overflow-hidden">
             {/* OVERLAY ENGINE */}
             {jumpTargetSection !== null && (
-              <div className="absolute inset-0 bg-white/95 dark:bg-slate-950/95 z-40 flex flex-col items-center justify-center gap-3 w-full">
+              <div className="absolute inset-0 bg-white/95 dark:bg-slate-950/95 z-40 flex flex-col items-center justify-center gap-3">
                 <Loader2 className="w-9 h-9 animate-spin text-blue-600" />
                 <p className="text-sm font-medium text-slate-500 dark:text-slate-400">
                   Preparing text layers...
@@ -507,26 +502,22 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
             <div
               ref={scrollRef}
               onScroll={onScroll}
-              className="h-full overflow-y-auto overflow-x-hidden relative w-full"
+              className="h-full overflow-y-auto relative"
               style={{
                 overscrollBehaviorY: "contain",
                 WebkitOverflowScrolling: "touch",
               }}
             >
-              <div className="pb-8 w-full max-w-full">
+              <div className="pb-8">
                 {flatItems.map((item) => (
                   <div
                     key={item.id}
                     id={item.id}
                     data-section-index={item.sectionIndex}
-                    className="w-full max-w-full"
                   >
                     {item.type === "header" && (
-                      /* --- FIXED HEADER (No flex-center clipping!) --- */
-                      <div className="sticky top-0 z-10 shadow-md bg-slate-100 dark:bg-slate-900 border-y border-slate-200 dark:border-slate-800 w-full px-4 py-2 block">
-                        <h3 className="text-sm md:text-base font-bold text-slate-800 dark:text-slate-200 text-center break-words whitespace-normal leading-snug">
-                          {item.label}
-                        </h3>
+                      <div className="sticky top-0 z-10 shadow-sm bg-white dark:bg-slate-950">
+                        <SiddurHeader label={item.label} />
                       </div>
                     )}
                     {item.type === "segment" && (
@@ -552,7 +543,7 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
 
       {/* --- SEFARIA ATTRIBUTION FOOTER --- */}
       <div
-        className="shrink-0 bg-slate-100 dark:bg-slate-900 border-t pt-3 px-4 flex flex-col items-center justify-center gap-1 z-40 w-full"
+        className="shrink-0 bg-slate-100 dark:bg-slate-900 border-t pt-3 px-4 flex flex-col items-center justify-center gap-1 z-40"
         style={{ paddingBottom: "calc(0.75rem + env(safe-area-inset-bottom))" }}
       >
         <a
@@ -587,7 +578,7 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
             className="fixed inset-0 bg-black/30 z-50 backdrop-blur-sm"
             onClick={() => setTocOpen(false)}
           />
-          <div className="fixed top-0 right-0 h-full w-80 max-w-[90vw] bg-white dark:bg-slate-950 z-50 shadow-2xl flex flex-col">
+          <div className="fixed top-0 right-0 h-full w-80 bg-white dark:bg-slate-950 z-50 shadow-2xl flex flex-col">
             <div className="shrink-0 flex items-center justify-between p-4 border-b border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-950">
               <h2 className="text-lg font-bold">Contents</h2>
               <Button
