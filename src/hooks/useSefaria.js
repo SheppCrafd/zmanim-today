@@ -54,7 +54,8 @@ const extractAndMergeText = (data, expectedLang) => {
   return mergedArr;
 };
 
-// --- Exported Fetcher ---
+// ... keep your existing flatten and extractAndMergeText helpers ...
+
 export const fetchAndZipSefaria = async (ref) => {
   if (!ref) return [];
 
@@ -64,15 +65,14 @@ export const fetchAndZipSefaria = async (ref) => {
   );
 
   try {
-    // ATTEMPT 1: V3 API
-    const resp = await fetch(`https://www.sefaria.org/api/v3/texts/${safeRef}`);
+    // ATTEMPT 1: V3 API (Now with Sefaria's native missing-segment filler!)
+    const resp = await fetch(`https://www.sefaria.org/api/v3/texts/${safeRef}?fill_in_missing_segments=1`);
     let data = resp.ok ? await resp.json() : null;
 
-    // Use the new line-by-line fallback merger
     let heArr = extractAndMergeText(data, "he");
     let enArr = extractAndMergeText(data, "en");
 
-    // ATTEMPT 2: V2 API FALLBACK (Catches anything V3 completely missed)
+    // ATTEMPT 2: V2 API FALLBACK
     const needsHeFallback = heArr.length === 0 || heArr.includes("");
     const needsEnFallback = enArr.length === 0 || enArr.includes("");
 
@@ -83,7 +83,7 @@ export const fetchAndZipSefaria = async (ref) => {
       if (fallbackResp.ok) {
         const fallbackData = await fallbackResp.json();
 
-        // Patch missing Hebrew segments
+        // Patch Hebrew
         if (needsHeFallback && fallbackData.he && fallbackData.he.length > 0) {
           const flatFallbackHe = flatten(fallbackData.he);
           const maxLen = Math.max(heArr.length, flatFallbackHe.length);
@@ -92,7 +92,7 @@ export const fetchAndZipSefaria = async (ref) => {
           }
         }
 
-        // Patch missing English segments
+        // Patch English
         if (needsEnFallback && fallbackData.text && fallbackData.text.length > 0) {
           const flatFallbackEn = flatten(fallbackData.text);
           const maxLen = Math.max(enArr.length, flatFallbackEn.length);
@@ -107,17 +107,28 @@ export const fetchAndZipSefaria = async (ref) => {
     const segments = [];
 
     for (let i = 0; i < maxLen; i++) {
+      // 💣 BLOWING UP THE ERROR: We guarantee there is ALWAYS text.
+      // If Sefaria literally has zero translation in their DB, we provide a clean fallback string.
+      // Note: If you want it to just look clean and blank instead of showing text, change the fallback to " " (a space).
+      const finalHe = heArr[i]?.trim() ? heArr[i] : "(טקסט חסר בספריא)";
+      const finalEn = enArr[i]?.trim() ? enArr[i] : "(Translation currently unavailable on Sefaria)";
+
       segments.push({
         segmentId: `${ref}-${i + 1}`,
-        he: heArr[i] || null,
-        en: enArr[i] || null,
+        he: finalHe,
+        en: finalEn,
       });
     }
 
     return segments;
   } catch (err) {
     console.error(`Failed to fetch ${ref}:`, err);
-    return [];
+    // Even in a total crash, return a safe fallback so the UI doesn't blow up
+    return [{
+      segmentId: `${ref}-error`,
+      he: "(שגיאת תקשורת)",
+      en: "Failed to connect to Sefaria.",
+    }];
   }
 };
 
