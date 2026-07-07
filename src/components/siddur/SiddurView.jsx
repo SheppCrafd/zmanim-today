@@ -58,12 +58,11 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
   const scrollDebounce = useRef(null);
   const restoreAnchorRef = useRef(null);
 
-  // NEW: Background measuring variables to eliminate layout thrashing
+  // Background measuring for the sticky header
   const floatingHeaderRef = useRef(null);
-  const headerHeightRef = useRef(48); // Fallback starter height
+  const headerHeightRef = useRef(48);
   const headerObserver = useRef(null);
 
-  // NEW: Background measuring engine (Gets the real height without freezing the scroll)
   const setFloatingHeaderRef = useCallback((node) => {
     floatingHeaderRef.current = node;
     if (node) {
@@ -200,7 +199,7 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
     })),
   });
 
-  // FLAT ITEMS (With empty text safety net)
+  // FLAT ITEMS
   const flatItems = useMemo(() => {
     const items = [];
     activeSections.forEach((sec, i) => {
@@ -269,19 +268,19 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
   const flatItemsRef = useRef(flatItems);
   flatItemsRef.current = flatItems;
 
+  // -------------------------
+  // VIRTUALIZER (Now with strict measureElement!)
+  // -------------------------
   const virtualizer = useVirtualizer({
     count: flatItems.length,
     getScrollElement: () => scrollRef.current,
-    estimateSize: () => 150,
+    estimateSize: () => 180,
     overscan: 20,
+    measureElement: (el) => {
+      if (!el) return 0;
+      return el.getBoundingClientRect().height;
+    },
   });
-
-  // Force virtualizer to recalculate ALL sizes immediately when layout changes
-  useEffect(() => {
-    if (virtualizer) {
-      virtualizer.measure();
-    }
-  }, [fontScale, langMode, virtualizer]);
 
   // Smooth jump engine
   useEffect(() => {
@@ -303,7 +302,9 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
     setPendingJump(null);
   }, [pendingJump, page, virtualizer, lockScroll]);
 
-  // Anchor engine
+  // -------------------------
+  // ANCHOR ENGINE (Fixed dependencies)
+  // -------------------------
   const captureAnchor = useCallback(() => {
     if (!scrollRef.current) return;
     const scrollTop = scrollRef.current.scrollTop;
@@ -325,9 +326,9 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
     const anchor = anchorRef.current;
     if (!anchor || !scrollRef.current) return;
 
-    let idx = flatItems.findIndex((it) => it.id === anchor.id);
+    let idx = flatItemsRef.current.findIndex((it) => it.id === anchor.id);
     if (idx === -1 && anchor.sectionIndex !== undefined) {
-      idx = flatItems.findIndex(
+      idx = flatItemsRef.current.findIndex(
         (it) => it.type === "header" && it.sectionIndex === anchor.sectionIndex,
       );
     }
@@ -347,7 +348,7 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
       lockScroll();
       scrollRef.current.scrollTop = target;
     }
-  }, [virtualizer, flatItems, lockScroll]);
+  }, [virtualizer, lockScroll]);
 
   restoreAnchorRef.current = restoreAnchor;
 
@@ -357,7 +358,9 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
     restoreAnchorRef.current();
   }, [fontScale, langMode, flatItems.length, page, totalSize]);
 
-  // JANK-FREE SCROLL HANDLER (Now with dynamic, anti-thrashing height calculation)
+  // -------------------------
+  // JANK-FREE SCROLL HANDLER
+  // -------------------------
   const onScroll = useCallback(
     (e) => {
       const el = e.target;
@@ -559,7 +562,7 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
 
               return activeHeader ? (
                 <div
-                  ref={setFloatingHeaderRef} // <--- ATTACHES THE MEASURING TOOL HERE
+                  ref={setFloatingHeaderRef}
                   className="absolute top-0 left-0 right-0 z-10 shadow-md will-change-transform"
                 >
                   <SiddurHeader label={activeHeader.label} />
@@ -593,6 +596,8 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
                       ref={virtualizer.measureElement}
                       style={{
                         position: "absolute",
+                        top: 0,
+                        left: 0,
                         transform: `translateY(${v.start}px)`,
                         width: "100%",
                       }}
