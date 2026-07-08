@@ -43,7 +43,7 @@ function sanitizeHTML(htmlString) {
   return doc.body.innerHTML;
 }
 
-const clampScale = (s) => Math.max(0.5, Math.min(3, Math.round(s * 100) / 100));
+const clampScale = (s) => Math.max(0.5, Math.min(3, Math.round(s * 20) / 20));
 
 // A section is "empty" if Sefaria returned no usable Hebrew or English text
 const segmentsHaveText = (segs) =>
@@ -166,12 +166,26 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
       }
     };
 
+    // rAF coalescing: high-frequency pinch/wheel events update state at most
+    // once per animation frame — no wasted renders, ~16ms latency.
+    let rafId = 0;
+    let pending = null;
+    const flush = () => {
+      rafId = 0;
+      if (pending != null) setFontScale(pending);
+      pending = null;
+    };
+    const commit = (next) => {
+      pending = next;
+      if (!rafId) rafId = requestAnimationFrame(flush);
+    };
+
     const onTouchMove = (e) => {
       if (!pinchRef.current.active || e.touches.length !== 2) return;
       e.preventDefault();
       const ratio =
         dist(e.touches[0], e.touches[1]) / (pinchRef.current.startDist || 1);
-      setFontScale(clampScale(pinchRef.current.startScale * ratio));
+      commit(clampScale(pinchRef.current.startScale * ratio));
     };
 
     const endPinch = (e) => {
@@ -181,7 +195,8 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
     const onWheel = (e) => {
       if (!e.ctrlKey) return; // trackpad pinch fires ctrl+wheel
       e.preventDefault();
-      setFontScale((s) => clampScale(s - e.deltaY * 0.003));
+      const base = pending != null ? pending : fontScaleRef.current;
+      commit(clampScale(base - e.deltaY * 0.003));
     };
 
     el.addEventListener("touchstart", onTouchStart, { passive: false });
@@ -191,6 +206,7 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
     el.addEventListener("wheel", onWheel, { passive: false });
 
     return () => {
+      if (rafId) cancelAnimationFrame(rafId);
       el.removeEventListener("touchstart", onTouchStart);
       el.removeEventListener("touchmove", onTouchMove);
       el.removeEventListener("touchend", endPinch);
@@ -571,7 +587,7 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
                   size="icon"
                   variant="outline"
                   className="h-8 w-8"
-                  onClick={() => setFontScale((s) => clampScale(s - 0.1))}
+                  onClick={() => setFontScale((s) => clampScale(s - 0.05))}
                 >
                   <ZoomOut className="w-4 h-4" />
                 </Button>
@@ -582,7 +598,7 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
                   size="icon"
                   variant="outline"
                   className="h-8 w-8"
-                  onClick={() => setFontScale((s) => clampScale(s + 0.1))}
+                  onClick={() => setFontScale((s) => clampScale(s + 0.05))}
                 >
                   <ZoomIn className="w-4 h-4" />
                 </Button>
