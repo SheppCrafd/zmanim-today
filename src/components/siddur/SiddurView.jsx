@@ -22,6 +22,7 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { fetchAndZipSefaria } from "@/hooks/useSefaria";
 import { processSefariaSchema } from "@/lib/siddurSchema";
 import TocTree from "@/components/siddur/TocTree";
+import NavMenu from "@/components/NavMenu";
 import {
   SiddurHeader,
   SiddurSegment,
@@ -462,6 +463,7 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
       <div className="sticky top-0 z-50 border-b bg-white dark:bg-slate-950">
         <div className="flex justify-between items-center px-4 pt-4 pb-2">
           <div className="flex items-center gap-3">
+            <NavMenu />
             <div>
               <h1 className="text-lg font-bold">{title}</h1>
               <p className="text-xs text-slate-500">{subtitle}</p>
