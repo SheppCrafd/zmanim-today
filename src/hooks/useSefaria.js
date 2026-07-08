@@ -16,16 +16,31 @@ const looksHebrew = (line) => {
   return /[\u0590-\u05FF\uFB1D-\uFB4F]/.test(s);
 };
 
+// High-frequency English words (incl. archaic prayer forms) — absent from
+// Portuguese/Spanish/other Latin-letter languages. Their presence confirms the
+// line is genuinely English.
+const ENGLISH_MARKERS =
+  /\b(the|and|of|to|is|it|that|was|for|on|are|with|this|have|from|they|not|but|his|her|she|you|your|all|been|will|there|when|who|its|into|our|two|more|these|may|then|them|would|had|has|their|him|which|where|why|now|did|here|each|same|both|most|other|such|because|should|those|being|every|made|find|my|one|can|out|up|way|could|over|than|after|back|down|off|just|also|only|very|much|like|well|even|own|while|thee|thou|thy|thine|hath|doth|art|shalt|ye|unto|wherefore|thereof|therein|thereon|wert|hast)\b/i;
+
+// Distinctive Portuguese/Spanish words — their presence rejects the line as
+// non-English. Chosen to avoid collisions with real English words.
+const IBERIAN_MARKERS =
+  /\b(que|con|una|unas|unos|para|del|los|las|por|más|mas|pero|como|esto|este|estos|estas|ese|esos|esas|esa|fue|ser|tener|tiene|tienen|puede|pueden|soy|somos|eres|está|están|estão|também|muy|mucho|muchos|muito|muitos|él|ela|ella|nosotros|vosotros|ellos|ellas|nuestro|nuestra|vuestro|vuestra|suyo|suya|aquí|allí|después|ahora|todavía|siempre|nunca|todo|todos|todas|cada|otro|otra|hacer|hace|digo|dice|vamos|seja|não|com|das|pelos|pelas|aos|sou|tem|podem|então|depois|ainda|nós|nosso|nossa|você|vocês|seus|suas|lhe|lhes|meu|minha|teu|tua|vosso|vossa|são|amém|senhor|señor|deus|dios|graças|santo|santos|santa|sagrado|santificado|abençoado|bendito|bendita|oração|glória|aleluia|oramos|rezamos|agradecemos)\b/i;
+
 const looksEnglish = (line) => {
   const s = stripHtml(line);
   if (!s || !s.trim()) return false;
+  if (!/[a-zA-Z]/.test(s)) return false; // no Latin at all → not English
   const latin = (s.match(/[a-zA-Z]/g) || []).length;
-  if (latin === 0) return false; // no Latin at all → not English
   const hebrew = (s.match(/[\u0590-\u05FF\uFB1D-\uFB4F]/g) || []).length;
-  // Reject lines dominated by Hebrew script (the main pollution case);
-  // Latin-only transliterations still pass and stay readable.
-  if (hebrew > latin) return false;
-  return true;
+  if (hebrew > latin) return false; // Hebrew-dominated → not English
+  if (IBERIAN_MARKERS.test(s)) return false; // Portuguese/Spanish
+  if (ENGLISH_MARKERS.test(s)) return true; // confirmed English
+  // Very short lines (e.g. "Amen.", "Selah.", "Forever.") have no stopwords —
+  // keep them as long as no Iberian marker is present.
+  const words = s.trim().split(/\s+/).filter(Boolean);
+  if (words.length <= 2) return true;
+  return false; // Latin text with no English evidence → reject
 };
 
 // --- Helper: Extract and Merge Text from ALL versions ---

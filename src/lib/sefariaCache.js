@@ -4,7 +4,7 @@
 // Falls back gracefully (no-ops) when IndexedDB is unavailable.
 
 const DB_NAME = "sefaria-text-cache";
-const DB_VERSION = 2;
+const DB_VERSION = 3;
 const STORE = "texts";
 
 let dbPromise = null;
