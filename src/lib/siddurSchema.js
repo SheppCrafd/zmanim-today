@@ -1,10 +1,16 @@
 /* ---------------- BUILD HIERARCHICAL TREE FROM SEFARIA SCHEMA ---------------- */
+// Sefaria sometimes embeds a foreign-language gloss in parentheses inside a
+// node's English title (e.g. "Tikun Rachel (Correção de Raquel)"). Strip those
+// parenthetical subtitles from DISPLAY titles; raw refs/keys stay untouched.
+const cleanTitle = (t) => (t || "").replace(/\s*\([^)]*\)\s*/g, "").trim();
+
 function buildTree(node, parentKeyPath, parentLabelPath) {
   const key = node.key || node.title;
   const fullKeyPath = parentKeyPath ? `${parentKeyPath}, ${key}` : key;
+  const displayTitle = cleanTitle(node.title);
   const fullLabelPath = parentLabelPath
-    ? `${parentLabelPath} > ${node.title}`
-    : node.title;
+    ? `${parentLabelPath} > ${displayTitle}`
+    : displayTitle;
 
   // Siddur leaves are often references to other Sefaria texts rather than
   // stored sub-texts (e.g. an "Ashrei" node → "Psalm 145"; a "Psalm 146" node
@@ -18,7 +24,7 @@ function buildTree(node, parentKeyPath, parentLabelPath) {
     : [];
 
   return {
-    title: node.title,
+    title: displayTitle,
     heTitle: node.heTitle,
     key,
     // Safely use Sefaria's native ref if it exists, otherwise fallback to our built path
@@ -34,7 +40,7 @@ function buildTree(node, parentKeyPath, parentLabelPath) {
 /* ---------------- PROCESS SCHEMA: tree (for TOC) + flat leaves (for reader) ---------------- */
 export function processSefariaSchema(schema) {
   const rootKey = schema.key || schema.title;
-  const rootTitle = schema.title || rootKey;
+  const rootTitle = cleanTitle(schema.title || rootKey);
 
   const tree = (schema.nodes || []).map((child) =>
     buildTree(child, rootKey, rootTitle),
