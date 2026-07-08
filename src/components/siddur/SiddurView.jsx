@@ -51,6 +51,33 @@ const segmentsHaveText = (segs) =>
   Array.isArray(segs) &&
   segs.some((s) => (s.he && s.he.trim()) || (s.en && s.en.trim()));
 
+// Fetch every section (concurrency-limited) and return the set of empty refs.
+// Runs once on cold start so the TOC/reader never show empty entries.
+async function sweepEmpties(sections, queryClient, concurrency = 8) {
+  const empty = new Set();
+  let idx = 0;
+  const run = async () => {
+    while (idx < sections.length) {
+      const i = idx++;
+      const sec = sections[i];
+      try {
+        const data = await queryClient.fetchQuery({
+          queryKey: ["sefaria-text-v3", sec.ref],
+          queryFn: () => fetchAndZipSefaria(sec.ref, sec.altRefs),
+          staleTime: 86400000,
+        });
+        if (!segmentsHaveText(data)) empty.add(sec.ref);
+      } catch {
+        /* skip — leave visible rather than hide on error */
+      }
+    }
+  };
+  await Promise.all(
+    Array.from({ length: Math.min(concurrency, sections.length) }, run),
+  );
+  return empty;
+}
+
 export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
   const navigate = useNavigate();
   const location = useLocation();
@@ -80,6 +107,16 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
       return raw ? new Set(JSON.parse(raw)) : new Set();
     } catch {
       return new Set();
+    }
+  });
+
+  // True only on a cold start (no persisted empties): block the TOC until the
+  // one-time sweep finishes so empty entries never flash in.
+  const [pruning, setPruning] = useState(() => {
+    try {
+      return !localStorage.getItem(emptyRefsKey);
+    } catch {
+      return true;
     }
   });
 
@@ -226,40 +263,21 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
     }
   }, [location.pathname, sections.length, jumpTargetSection, page, jumpTo]);
 
-  // Prefetch every section in batches and record which refs have no text
+  // First-start emptiness sweep: only runs when there's no persisted set, so
+  // warm loads stay instant. Gates the TOC until empty entries are detected.
   useEffect(() => {
-    if (!sections.length) return;
+    if (!sections.length || !pruning) return;
     let cancelled = false;
-    // Start from the persisted set so already-known empties never flash back in
-    const known = new Set(emptyRefs);
     (async () => {
-      for (let i = 0; i < sections.length; i += 5) {
-        const batch = sections.slice(i, i + 5);
-        const results = await Promise.all(
-          batch.map((sec) =>
-            queryClient
-              .fetchQuery({
-                queryKey: ["sefaria-text-v3", sec.ref],
-                queryFn: () => fetchAndZipSefaria(sec.ref, sec.altRefs),
-                staleTime: 86400000,
-              })
-              .then((data) => ({ ref: sec.ref, data }))
-              .catch(() => ({ ref: sec.ref, data: null })),
-          ),
-        );
-        if (cancelled) return;
-        results.forEach(({ ref, data }) => {
-          if (!data) return; // errored — leave existing status unchanged
-          if (segmentsHaveText(data)) known.delete(ref);
-          else known.add(ref);
-        });
-        setEmptyRefs(new Set(known));
-      }
+      const empty = await sweepEmpties(sections, queryClient);
+      if (cancelled) return;
+      setEmptyRefs(empty);
+      setPruning(false);
     })();
     return () => {
       cancelled = true;
     };
-  }, [sections, queryClient]);
+  }, [sections, queryClient, pruning]);
 
   // Sliced queries starting from 0
   const activeSections = visibleSections.slice(0, renderCount + 1);
@@ -536,7 +554,7 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
           <div className="h-full flex flex-col overflow-hidden">
             {renderSearchBar()}
             <div className="flex-1 overflow-y-auto px-4 pb-4 overscroll-y-contain">
-              {loading && (
+              {(loading || pruning) && (
                 <div className="py-10 flex justify-center">
                   <Loader2 className="animate-spin text-blue-500" />
                 </div>
@@ -546,7 +564,7 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
                   <AlertCircle className="w-8 h-8" />
                 </div>
               )}
-              {!loading && !error && (
+              {!loading && !error && !pruning && (
                 <TocTree
                   nodes={filteredTree}
                   onSelect={jumpTo}
@@ -561,7 +579,7 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
         {page === "reader" && (
           <div className="h-full relative overflow-hidden">
             {/* OVERLAY ENGINE */}
-            {jumpTargetSection !== null && (
+            {(jumpTargetSection !== null || pruning) && (
               <div className="absolute inset-0 bg-white/95 dark:bg-slate-950/95 z-40 flex flex-col items-center justify-center gap-3">
                 <Loader2 className="w-9 h-9 animate-spin text-blue-600" />
                 <p className="text-sm font-medium text-slate-500 dark:text-slate-400">
