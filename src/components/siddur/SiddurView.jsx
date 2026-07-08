@@ -140,13 +140,42 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
   // Text size is driven entirely through refs + direct DOM mutation so that
   // pinch / wheel / button zoom NEVER triggers a React re-render of the reader
   // (which would recreate hundreds of segment elements and cause jank).
+  // Zoom is anchored to the top visible text row (excluding sticky headers):
+  // we snapshot that row's viewport position, change font size, then nudge
+  // scrollTop so the row stays put.
   const applyScale = useCallback((next) => {
     const s = clampScale(next);
+    const container = scrollRef.current;
+    const content = contentRef.current;
+
+    // Find the text row currently at the top of the reader viewport.
+    let anchorEl = null;
+    if (container && content) {
+      const cRect = container.getBoundingClientRect();
+      const x = cRect.left + cRect.width / 2;
+      for (const y of [cRect.top + 52, cRect.top + 72, cRect.top + 100]) {
+        const hit = document.elementFromPoint(x, y);
+        if (hit) {
+          const seg = hit.closest && hit.closest('[id^="seg-"]');
+          if (seg) {
+            anchorEl = seg;
+            break;
+          }
+        }
+      }
+    }
+    const beforeTop = anchorEl ? anchorEl.getBoundingClientRect().top : null;
+
     scaleRef.current = s;
-    if (contentRef.current)
-      contentRef.current.style.fontSize = `${s}rem`;
+    if (content) content.style.fontSize = `${s}rem`;
     if (labelRef.current)
       labelRef.current.textContent = `${Math.round(s * 100)}%`;
+
+    if (anchorEl && beforeTop != null && container) {
+      const afterTop = anchorEl.getBoundingClientRect().top;
+      container.scrollTop += afterTop - beforeTop;
+    }
+
     clearTimeout(persistTimer.current);
     persistTimer.current = setTimeout(() => {
       try {
