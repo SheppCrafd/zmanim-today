@@ -676,7 +676,14 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
                 {activeSections.map((sec, i) => {
                   const sectionItems = itemsBySection[i] || [];
                   return (
-                    <div key={i} className="relative">
+                    <div
+                      key={i}
+                      className="relative"
+                      style={{
+                        contentVisibility: "auto",
+                        containIntrinsicSize: "auto 600px",
+                      }}
+                    >
                       {sectionItems.map((item) => {
                         if (item.type === "header") {
                           return (
