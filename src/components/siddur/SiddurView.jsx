@@ -416,8 +416,21 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
         query.data.forEach((seg, segIndex) => {
           const hasH =
             seg.he && seg.he.replace(/<[^>]*>/g, "").trim().length > 0;
+          // Drop English segments that are just a transliterated title with a
+          // foreign-language parenthetical gloss (e.g. "Tikum Rachel
+          // (Correção de Raquel)"). The header already shows the section title.
+          const isGlossTitle = (en) => {
+            const s = (en || "")
+              .replace(/<[^>]*>/g, " ")
+              .trim();
+            if (!s || !/\([^)]*\)/.test(s)) return false;
+            if (s.split(/\s+/).filter(Boolean).length > 10) return false;
+            return !/\b(the|and|of|to|is|it|that|was|for|on|are|with|this|have|from|they|not|but|his|her|she|you|your|all|been|will|there|when|who|its|into|our|may|then|them|would|had|has|their|him|which|where|why|now|did|here|each|same|both|most|other|such|should|those|every|made|my|one|can|out|up|way|could|over|than|after|back|down|off|just|also|only|very|much|like|well|even|own|while|thee|thou|thy|thine|hath|doth|art|shalt|ye|unto|wherefore|thereof|therein|thereon|wert|hast)\b/i.test(s);
+          };
           const hasE =
-            seg.en && seg.en.replace(/<[^>]*>/g, "").trim().length > 0;
+            seg.en &&
+            seg.en.replace(/<[^>]*>/g, "").trim().length > 0 &&
+            !isGlossTitle(seg.en);
           if (!(showHB && hasH) && !(showEN && hasE)) return;
           items.push({
             type: "segment",
