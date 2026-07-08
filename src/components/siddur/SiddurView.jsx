@@ -84,6 +84,8 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
 
   const scrollRef = useRef(null);
   const scrollDebounce = useRef(null);
+  const pinchRef = useRef({ active: false, startDist: 0, startScale: 1 });
+  const fontScaleRef = useRef(1);
 
   const [tree, setTree] = useState([]);
   const [sections, setSections] = useState([]);
@@ -137,12 +139,65 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
   const showHB = langMode !== "en";
 
   useEffect(() => {
+    fontScaleRef.current = fontScale;
     try {
       localStorage.setItem("siddur-font-scale", String(fontScale));
     } catch {
       /* ignore */
     }
   }, [fontScale]);
+
+  // Pinch-to-zoom (touch) + trackpad pinch (ctrl+wheel) drive text size
+  useEffect(() => {
+    if (page !== "reader") return;
+    const el = scrollRef.current;
+    if (!el) return;
+
+    const dist = (a, b) =>
+      Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
+
+    const onTouchStart = (e) => {
+      if (e.touches.length === 2) {
+        pinchRef.current = {
+          active: true,
+          startDist: dist(e.touches[0], e.touches[1]),
+          startScale: fontScaleRef.current,
+        };
+      }
+    };
+
+    const onTouchMove = (e) => {
+      if (!pinchRef.current.active || e.touches.length !== 2) return;
+      e.preventDefault();
+      const ratio =
+        dist(e.touches[0], e.touches[1]) / (pinchRef.current.startDist || 1);
+      setFontScale(clampScale(pinchRef.current.startScale * ratio));
+    };
+
+    const endPinch = (e) => {
+      if (e.touches.length < 2) pinchRef.current.active = false;
+    };
+
+    const onWheel = (e) => {
+      if (!e.ctrlKey) return; // trackpad pinch fires ctrl+wheel
+      e.preventDefault();
+      setFontScale((s) => clampScale(s - e.deltaY * 0.003));
+    };
+
+    el.addEventListener("touchstart", onTouchStart, { passive: false });
+    el.addEventListener("touchmove", onTouchMove, { passive: false });
+    el.addEventListener("touchend", endPinch);
+    el.addEventListener("touchcancel", endPinch);
+    el.addEventListener("wheel", onWheel, { passive: false });
+
+    return () => {
+      el.removeEventListener("touchstart", onTouchStart);
+      el.removeEventListener("touchmove", onTouchMove);
+      el.removeEventListener("touchend", endPinch);
+      el.removeEventListener("touchcancel", endPinch);
+      el.removeEventListener("wheel", onWheel);
+    };
+  }, [page]);
 
   // Persist the known-empty refs so next load prunes instantly
   useEffect(() => {
