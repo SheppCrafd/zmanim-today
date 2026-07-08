@@ -1,4 +1,5 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { cacheGet, cacheSet } from "@/lib/sefariaCache";
 
 // --- Helper: Flatten deeply nested arrays from Sefaria ---
 const flatten = (arr) => (Array.isArray(arr) ? arr.flat(Infinity) : [arr]);
@@ -135,8 +136,17 @@ const segmentsHaveText = (segs) =>
   segs.some((s) => (s.he && s.he.trim()) || (s.en && s.en.trim()));
 
 export const fetchAndZipSefaria = async (ref, altRefs = []) => {
+  // Persistent cache (IndexedDB) — survives reloads, so a section that was
+  // fetched once loads instantly on every subsequent visit without re-hitting
+  // the network.
+  const cached = await cacheGet(ref);
+  if (cached) return cached;
+
   const primary = await fetchSegmentsForRef(ref);
-  if (segmentsHaveText(primary)) return primary;
+  if (segmentsHaveText(primary)) {
+    cacheSet(ref, primary);
+    return primary;
+  }
 
   // Some siddur nodes are references to other Sefaria texts (e.g. "Ashrei" →
   // "Psalm 145"). Their own path returns nothing, so try the node's alternate
@@ -144,9 +154,14 @@ export const fetchAndZipSefaria = async (ref, altRefs = []) => {
   for (const alt of altRefs || []) {
     if (!alt || alt === ref) continue;
     const segs = await fetchSegmentsForRef(alt);
-    if (segmentsHaveText(segs)) return segs;
+    if (segmentsHaveText(segs)) {
+      cacheSet(ref, segs);
+      return segs;
+    }
   }
 
+  // Cache empty results too, so empty refs never re-hit the network.
+  cacheSet(ref, primary);
   return primary;
 };
 
