@@ -15,7 +15,7 @@ import {
   ArrowLeft,
   List,
   X,
-  Search, // <-- Added Search icon
+  Search,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useNavigate, useLocation } from "react-router-dom";
@@ -342,32 +342,33 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
     ],
   );
 
-  // Reusable Search Bar Component logic so we don't repeat the HTML twice
+  // Styled Search Bar Component matching the header/footer row treatment
   const renderSearchBar = () => (
-    <div className="relative mb-4 sticky top-0 z-20 bg-white dark:bg-slate-950 pt-2 pb-2">
-      <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none">
-        <Search className="h-4 w-4 text-slate-400" />
+    <div className="shrink-0 bg-slate-50 dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 px-4 py-2.5 shadow-sm">
+      <div className="relative">
+        <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none">
+          <Search className="h-4 w-4 text-slate-400" />
+        </div>
+        <input
+          type="text"
+          placeholder="Search sections..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="w-full pl-9 pr-4 py-2 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-md text-sm focus:ring-2 focus:ring-blue-500 outline-none transition-all dark:text-slate-200"
+        />
+        {searchQuery && (
+          <button
+            onClick={() => setSearchQuery("")}
+            className="absolute inset-y-0 right-3 flex items-center"
+          >
+            <X className="h-4 w-4 text-slate-400 hover:text-slate-600" />
+          </button>
+        )}
       </div>
-      <input
-        type="text"
-        placeholder="Search sections..."
-        value={searchQuery}
-        onChange={(e) => setSearchQuery(e.target.value)}
-        className="w-full pl-9 pr-4 py-2 bg-slate-100 dark:bg-slate-900 border-none rounded-md text-sm focus:ring-2 focus:ring-blue-500 outline-none transition-all dark:text-slate-200"
-      />
-      {searchQuery && (
-        <button
-          onClick={() => setSearchQuery("")}
-          className="absolute inset-y-0 right-3 flex items-center"
-        >
-          <X className="h-4 w-4 text-slate-400 hover:text-slate-600" />
-        </button>
-      )}
     </div>
   );
 
   return (
-    // Changed "h-screen" to "h-[100dvh]" so mobile URL bars don't push the bottom off-screen
     <div className="h-[100dvh] flex flex-col bg-white dark:bg-slate-950 overflow-hidden">
       {/* TOP BAR */}
       <div className="sticky top-0 z-50 border-b bg-white dark:bg-slate-950">
@@ -461,28 +462,28 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
       {/* BODY */}
       <div className="flex-1 overflow-hidden">
         {page === "toc" && (
-          <div className="h-full overflow-y-auto px-4 pb-4 overscroll-y-contain">
-            {loading && (
-              <div className="py-10 flex justify-center">
-                <Loader2 className="animate-spin text-blue-500" />
-              </div>
-            )}
-            {error && (
-              <div className="py-10 flex justify-center text-red-500">
-                <AlertCircle className="w-8 h-8" />
-              </div>
-            )}
-            {!loading && !error && (
-              <>
-                {renderSearchBar()}
+          <div className="h-full flex flex-col overflow-hidden">
+            {renderSearchBar()}
+            <div className="flex-1 overflow-y-auto px-4 pb-4 overscroll-y-contain">
+              {loading && (
+                <div className="py-10 flex justify-center">
+                  <Loader2 className="animate-spin text-blue-500" />
+                </div>
+              )}
+              {error && (
+                <div className="py-10 flex justify-center text-red-500">
+                  <AlertCircle className="w-8 h-8" />
+                </div>
+              )}
+              {!loading && !error && (
                 <TocTree
                   nodes={filteredTree}
                   onSelect={jumpTo}
                   refToIndex={refToIndex}
                   isSearching={searchQuery.length > 0}
                 />
-              </>
-            )}
+              )}
+            </div>
           </div>
         )}
 
@@ -507,7 +508,7 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
                 WebkitOverflowScrolling: "touch",
               }}
             >
-              {/* PURE NATIVE DOM RENDERING (No Virtualizer!) */}
+              {/* PURE NATIVE DOM RENDERING */}
               <div className="pb-8">
                 {flatItems.map((item) => (
                   <div
@@ -515,7 +516,6 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
                     id={item.id}
                     data-section-index={item.sectionIndex}
                   >
-                    {/* CSS POSITION: STICKY replaces the Javascript header math! */}
                     {item.type === "header" && (
                       <div className="sticky top-0 z-10 shadow-sm bg-white dark:bg-slate-950">
                         <SiddurHeader label={item.label} />
@@ -544,12 +544,10 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
       </div>
 
       {/* --- SEFARIA ATTRIBUTION FOOTER --- */}
-      {/* Added `shrink-0` and safe-area-inset-bottom inline style */}
       <div
         className="shrink-0 bg-slate-100 dark:bg-slate-900 border-t pt-3 px-4 flex flex-col items-center justify-center gap-1 z-40"
         style={{ paddingBottom: "calc(0.75rem + env(safe-area-inset-bottom))" }}
       >
-        {/* Clickable Badge Linking to Sefaria Library */}
         <a
           href="https://www.sefaria.org/texts"
           target="_blank"
@@ -563,7 +561,6 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
           />
         </a>
 
-        {/* Technical Credit Linking to API Portal */}
         <div className="text-[10px] text-slate-500 leading-none">
           and the{" "}
           <a
@@ -584,8 +581,8 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
             className="fixed inset-0 bg-black/30 z-50 backdrop-blur-sm"
             onClick={() => setTocOpen(false)}
           />
-          <div className="fixed top-0 right-0 h-full w-80 bg-white dark:bg-slate-950 z-50 shadow-2xl overflow-y-auto">
-            <div className="flex items-center justify-between p-4 border-b border-slate-100 dark:border-slate-800 sticky top-0 bg-white dark:bg-slate-950 z-10">
+          <div className="fixed top-0 right-0 h-full w-80 bg-white dark:bg-slate-950 z-50 shadow-2xl flex flex-col overflow-hidden">
+            <div className="flex items-center justify-between p-4 border-b border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-950 shrink-0">
               <h2 className="text-lg font-bold">Contents</h2>
               <Button
                 size="icon"
@@ -596,8 +593,10 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
                 <X className="w-5 h-5" />
               </Button>
             </div>
-            <div className="p-4">
-              {renderSearchBar()}
+
+            {renderSearchBar()}
+
+            <div className="flex-1 p-4 overflow-y-auto">
               <TocTree
                 nodes={filteredTree}
                 onSelect={(i) => {
