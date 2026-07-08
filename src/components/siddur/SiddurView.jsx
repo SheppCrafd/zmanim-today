@@ -13,7 +13,6 @@ import {
   ZoomIn,
   ZoomOut,
   ArrowLeft,
-  List,
   X,
   Search,
 } from "lucide-react";
@@ -122,7 +121,6 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
 
   // Step-loading state
   const [jumpTargetSection, setJumpTargetSection] = useState(null);
-  const [tocOpen, setTocOpen] = useState(false);
 
   // Search State
   const [searchQuery, setSearchQuery] = useState("");
@@ -470,13 +468,6 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => setTocOpen(true)}
-            >
-              <List className="w-4 h-4" />
-            </Button>
             <a href={sefariaUrl} target="_blank" rel="noreferrer">
               <Button size="sm" variant="outline">
                 <ExternalLink className="w-4 h-4" />
@@ -681,42 +672,6 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
         </div>
       </div>
 
-      {/* DRAWER */}
-      {tocOpen && (
-        <>
-          <div
-            className="fixed inset-0 bg-black/30 z-50 backdrop-blur-sm"
-            onClick={() => setTocOpen(false)}
-          />
-          <div className="fixed top-0 right-0 h-full w-80 bg-white dark:bg-slate-950 z-50 shadow-2xl flex flex-col overflow-hidden">
-            <div className="flex items-center justify-between p-4 border-b border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-950 shrink-0">
-              <h2 className="text-lg font-bold">Contents</h2>
-              <Button
-                size="icon"
-                variant="ghost"
-                className="h-8 w-8"
-                onClick={() => setTocOpen(false)}
-              >
-                <X className="w-5 h-5" />
-              </Button>
-            </div>
-
-            {renderSearchBar()}
-
-            <div className="flex-1 p-4 overflow-y-auto">
-              <TocTree
-                nodes={filteredTree}
-                onSelect={(i) => {
-                  jumpTo(i);
-                  setTocOpen(false);
-                }}
-                refToIndex={visibleRefToIndex}
-                isSearching={searchQuery.length > 0}
-              />
-            </div>
-          </div>
-        </>
-      )}
     </div>
   );
 }
