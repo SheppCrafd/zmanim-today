@@ -59,10 +59,11 @@ export default function Zmanim() {
 
         try {
             const dateStr = format(currentDate, 'yyyy-MM-dd');
-            
-            // 1. Direct HTTP request to Hebcal's API
+            const tzid = location.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone;
+
+            // 1. Direct HTTP request to Hebcal's API (tzid is required by Hebcal)
             const response = await fetch(
-                `https://www.hebcal.com/zmanim?cfg=json&latitude=${location.latitude}&longitude=${location.longitude}&date=${dateStr}`
+                `https://www.hebcal.com/zmanim?cfg=json&latitude=${location.latitude}&longitude=${location.longitude}&date=${dateStr}&tzid=${encodeURIComponent(tzid)}`
             );
 
             if (!response.ok) {

@@ -42,7 +42,9 @@ export function useSavedLocation() {
         navigator.geolocation.getCurrentPosition(
             (pos) => {
                 clearTimeout(hardTimeout);
-                const loc = { latitude: pos.coords.latitude, longitude: pos.coords.longitude };
+                // Device timezone matches the GPS location (user is physically here)
+                const deviceTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+                const loc = { latitude: pos.coords.latitude, longitude: pos.coords.longitude, timezone: deviceTz };
                 // Save raw coords immediately so user isn't left waiting
                 saveLocation(loc);
                 // Then enrich with city name
@@ -84,7 +86,7 @@ Return the local municipality name as "city", the state/province abbreviation (f
         setError(null);
         try {
             const result = await base44.integrations.Core.InvokeLLM({
-                prompt: `Get exact coordinates for: "${query}". Include state/province abbreviation for USA, Canada, Australia. Otherwise leave state null.`,
+                prompt: `Get exact coordinates and the IANA timezone identifier (tzid, e.g. "America/New_York", "Asia/Jerusalem") for: "${query}". Include state/province abbreviation for USA, Canada, Australia. Otherwise leave state null.`,
                 add_context_from_internet: true,
                 response_json_schema: {
                     type: "object",
@@ -93,7 +95,8 @@ Return the local municipality name as "city", the state/province abbreviation (f
                         longitude: { type: "number" },
                         city: { type: "string" },
                         state: { type: "string" },
-                        country: { type: "string" }
+                        country: { type: "string" },
+                        timezone: { type: "string" }
                     }
                 }
             });

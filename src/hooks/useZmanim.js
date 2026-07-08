@@ -37,8 +37,8 @@ function fixCandleLighting(result) {
     return { ...result, zmanim: { ...result.zmanim, candle_lighting: cl } };
 }
 
-function cacheKey(lat, lon, date) {
-    return `${lat.toFixed(3)},${lon.toFixed(3)},${date}`;
+function cacheKey(lat, lon, date, tzid) {
+    return `${lat.toFixed(3)},${lon.toFixed(3)},${date},${tzid || ''}`;
 }
 
 function getCache(key) {
@@ -73,7 +73,8 @@ export function useZmanim(location, date = new Date()) {
     useEffect(() => {
         if (!location?.latitude || !location?.longitude) return;
 
-        const key = cacheKey(location.latitude, location.longitude, dateStr);
+        const tzid = location.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone;
+        const key = cacheKey(location.latitude, location.longitude, dateStr, tzid);
         const cached = getCache(key);
         if (cached) {
             setZmanim(postProcess(cached, date));
@@ -84,7 +85,7 @@ export function useZmanim(location, date = new Date()) {
         setError(null);
 
         // Fetch directly from Hebcal API for speed and precision (No LLM required)
-        fetch(`https://www.hebcal.com/zmanim?cfg=json&latitude=${location.latitude}&longitude=${location.longitude}&date=${dateStr}`)
+        fetch(`https://www.hebcal.com/zmanim?cfg=json&latitude=${location.latitude}&longitude=${location.longitude}&date=${dateStr}&tzid=${encodeURIComponent(tzid)}`)
             .then(res => {
                 if (!res.ok) throw new Error('Failed to fetch data from Hebcal');
                 return res.json();
@@ -127,7 +128,7 @@ export function useZmanim(location, date = new Date()) {
             .finally(() => {
                 setLoading(false);
             });
-    }, [location?.latitude, location?.longitude, dateStr]);
+    }, [location?.latitude, location?.longitude, location?.timezone, dateStr]);
 
     return { zmanim, loading, error };
 }
