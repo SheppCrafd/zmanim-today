@@ -1,10 +1,13 @@
 import { useState } from "react";
 import { ChevronDown, ChevronRight } from "lucide-react";
 
-/* ---------------- RECURSIVE NODE (collapsible dropdown for all sub-levels) ---------------- */
-function TocNode({ node, onSelect, refToIndex, depth }) {
+/* ---------------- RECURSIVE NODE ---------------- */
+function TocNode({ node, onSelect, refToIndex, depth, isSearching }) {
   const [open, setOpen] = useState(false);
   const isLeaf = node.children.length === 0;
+
+  // Force open if searching, otherwise use local state
+  const isOpen = isSearching || open;
 
   const indent = { paddingLeft: `${depth * 1.25 + 0.5}rem` };
 
@@ -28,7 +31,7 @@ function TocNode({ node, onSelect, refToIndex, depth }) {
         className="w-full flex items-center gap-2 py-2.5 pr-2 rounded-sm hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
         style={indent}
       >
-        {open ? (
+        {isOpen ? (
           <ChevronDown className="w-4 h-4 text-slate-400 shrink-0" />
         ) : (
           <ChevronRight className="w-4 h-4 text-slate-400 shrink-0" />
@@ -37,7 +40,7 @@ function TocNode({ node, onSelect, refToIndex, depth }) {
           {node.title}
         </span>
       </button>
-      {open && (
+      {isOpen && (
         <div className="border-l border-slate-200 dark:border-slate-700 ml-[0.625rem]">
           {node.children.map((child, i) => (
             <TocNode
@@ -46,6 +49,7 @@ function TocNode({ node, onSelect, refToIndex, depth }) {
               onSelect={onSelect}
               refToIndex={refToIndex}
               depth={depth + 1}
+              isSearching={isSearching}
             />
           ))}
         </div>
@@ -54,12 +58,20 @@ function TocNode({ node, onSelect, refToIndex, depth }) {
   );
 }
 
-/* ---------------- TOC TREE: top level always visible, everything below collapsible ---------------- */
-export default function TocTree({ nodes, onSelect, refToIndex }) {
+/* ---------------- TOC TREE ---------------- */
+export default function TocTree({ nodes, onSelect, refToIndex, isSearching }) {
+  if (nodes.length === 0) {
+    return (
+      <div className="text-center py-6 text-slate-500 text-sm">
+        No matching sections found.
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col">
       {nodes.map((node, i) => {
-        // Top-level leaf — directly clickable header
+        // Top-level leaf
         if (node.children.length === 0) {
           const index = refToIndex[node.ref];
           return (
@@ -74,7 +86,7 @@ export default function TocTree({ nodes, onSelect, refToIndex }) {
           );
         }
 
-        // Top-level category — always-visible header, children in dropdowns
+        // Top-level category
         return (
           <div key={i} className="mb-6">
             <h2 className="font-semibold text-slate-700 dark:text-slate-100 bg-slate-50 dark:bg-slate-900 border-y border-slate-200 dark:border-slate-800 shadow-sm px-2 py-2 -mx-4 sticky top-0 z-10 mb-2">
@@ -88,6 +100,7 @@ export default function TocTree({ nodes, onSelect, refToIndex }) {
                   onSelect={onSelect}
                   refToIndex={refToIndex}
                   depth={0}
+                  isSearching={isSearching}
                 />
               ))}
             </div>
