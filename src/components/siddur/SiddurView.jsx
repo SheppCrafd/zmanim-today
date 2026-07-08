@@ -71,8 +71,17 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
   const [page, setPage] = useState("toc");
   const [langMode, setLangMode] = useState("both");
 
-  // Refs Sefaria has confirmed to have NO text — hidden from TOC & reader
-  const [emptyRefs, setEmptyRefs] = useState(() => new Set());
+  // Refs Sefaria has confirmed to have NO text — hidden from TOC & reader.
+  // Seeded from localStorage so pruning is instant on reload (no fetch wait).
+  const emptyRefsKey = `siddur-empty-refs:${bookRef}`;
+  const [emptyRefs, setEmptyRefs] = useState(() => {
+    try {
+      const raw = localStorage.getItem(emptyRefsKey);
+      return raw ? new Set(JSON.parse(raw)) : new Set();
+    } catch {
+      return new Set();
+    }
+  });
 
   // Step-loading state
   const [jumpTargetSection, setJumpTargetSection] = useState(null);
@@ -99,6 +108,19 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
       /* ignore */
     }
   }, [fontScale]);
+
+  // Persist the known-empty refs so next load prunes instantly
+  useEffect(() => {
+    try {
+      if (emptyRefs.size) {
+        localStorage.setItem(emptyRefsKey, JSON.stringify([...emptyRefs]));
+      } else {
+        localStorage.removeItem(emptyRefsKey);
+      }
+    } catch {
+      /* ignore */
+    }
+  }, [emptyRefs, emptyRefsKey]);
 
   // Load TOC
   useEffect(() => {
@@ -208,7 +230,8 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
   useEffect(() => {
     if (!sections.length) return;
     let cancelled = false;
-    const known = new Set();
+    // Start from the persisted set so already-known empties never flash back in
+    const known = new Set(emptyRefs);
     (async () => {
       for (let i = 0; i < sections.length; i += 5) {
         const batch = sections.slice(i, i + 5);
@@ -226,7 +249,9 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
         );
         if (cancelled) return;
         results.forEach(({ ref, data }) => {
-          if (data && !segmentsHaveText(data)) known.add(ref);
+          if (!data) return; // errored — leave existing status unchanged
+          if (segmentsHaveText(data)) known.delete(ref);
+          else known.add(ref);
         });
         setEmptyRefs(new Set(known));
       }
