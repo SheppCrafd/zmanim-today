@@ -508,35 +508,53 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
                 WebkitOverflowScrolling: "touch",
               }}
             >
-              {/* PURE NATIVE DOM RENDERING */}
+              {/* PURE NATIVE DOM RENDERING WITH STICKY SECTION CONTAINERS */}
               <div className="pb-8">
-                {flatItems.map((item) => (
-                  <div
-                    key={item.id}
-                    id={item.id}
-                    data-section-index={item.sectionIndex}
-                  >
-                    {item.type === "header" && (
-                      <div className="sticky top-0 z-10 shadow-sm bg-white dark:bg-slate-950">
-                        <SiddurHeader label={item.label} />
-                      </div>
-                    )}
+                {activeSections.map((sec, i) => {
+                  const sectionItems = flatItems.filter(
+                    (item) => item.sectionIndex === i,
+                  );
+                  return (
+                    <div key={i} className="relative">
+                      {sectionItems.map((item) => {
+                        if (item.type === "header") {
+                          return (
+                            <div
+                              key={item.id}
+                              id={item.id}
+                              data-section-index={item.sectionIndex}
+                              className="sticky top-0 z-10 shadow-sm bg-white dark:bg-slate-950"
+                            >
+                              <SiddurHeader label={item.label} />
+                            </div>
+                          );
+                        }
 
-                    {item.type === "segment" && (
-                      <SiddurSegment
-                        sanitizedHe={item.sanitizedHe}
-                        sanitizedEn={item.sanitizedEn}
-                        hasH={item.hasH}
-                        hasE={item.hasE}
-                        showHB={showHB}
-                        showEN={showEN}
-                        fontScale={fontScale}
-                      />
-                    )}
-                    {item.type === "loading" && <SiddurLoading />}
-                    {item.type === "error" && <SiddurError />}
-                  </div>
-                ))}
+                        return (
+                          <div
+                            key={item.id}
+                            id={item.id}
+                            data-section-index={item.sectionIndex}
+                          >
+                            {item.type === "segment" && (
+                              <SiddurSegment
+                                sanitizedHe={item.sanitizedHe}
+                                sanitizedEn={item.sanitizedEn}
+                                hasH={item.hasH}
+                                hasE={item.hasE}
+                                showHB={showHB}
+                                showEN={showEN}
+                                fontScale={fontScale}
+                              />
+                            )}
+                            {item.type === "loading" && <SiddurLoading />}
+                            {item.type === "error" && <SiddurError />}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  );
+                })}
               </div>
             </div>
           </div>
