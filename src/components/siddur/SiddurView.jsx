@@ -85,7 +85,14 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
   const scrollRef = useRef(null);
   const scrollDebounce = useRef(null);
   const pinchRef = useRef({ active: false, startDist: 0, startScale: 1 });
-  const fontScaleRef = useRef(1);
+  const contentRef = useRef(null);
+  const labelRef = useRef(null);
+  const scaleRef = useRef(
+    (typeof localStorage !== "undefined" &&
+      parseFloat(localStorage.getItem("siddur-font-scale"))) ||
+      1,
+  );
+  const persistTimer = useRef(null);
 
   const [tree, setTree] = useState([]);
   const [sections, setSections] = useState([]);
@@ -127,27 +134,31 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
   // Search State
   const [searchQuery, setSearchQuery] = useState("");
 
-  const [fontScale, setFontScale] = useState(() => {
-    try {
-      return parseFloat(localStorage.getItem("siddur-font-scale")) || 1;
-    } catch {
-      return 1;
-    }
-  });
-
   const showEN = langMode !== "he";
   const showHB = langMode !== "en";
 
-  useEffect(() => {
-    fontScaleRef.current = fontScale;
-    try {
-      localStorage.setItem("siddur-font-scale", String(fontScale));
-    } catch {
-      /* ignore */
-    }
-  }, [fontScale]);
+  // Text size is driven entirely through refs + direct DOM mutation so that
+  // pinch / wheel / button zoom NEVER triggers a React re-render of the reader
+  // (which would recreate hundreds of segment elements and cause jank).
+  const applyScale = useCallback((next) => {
+    const s = clampScale(next);
+    scaleRef.current = s;
+    if (contentRef.current)
+      contentRef.current.style.fontSize = `${s}rem`;
+    if (labelRef.current)
+      labelRef.current.textContent = `${Math.round(s * 100)}%`;
+    clearTimeout(persistTimer.current);
+    persistTimer.current = setTimeout(() => {
+      try {
+        localStorage.setItem("siddur-font-scale", String(s));
+      } catch {
+        /* ignore */
+      }
+    }, 350);
+  }, []);
 
-  // Pinch-to-zoom (touch) + trackpad pinch (ctrl+wheel) drive text size
+  // Pinch-to-zoom (touch) + trackpad pinch (ctrl+wheel) drive text size.
+  // Updates go straight to the DOM via applyScale — zero React re-renders.
   useEffect(() => {
     if (page !== "reader") return;
     const el = scrollRef.current;
@@ -161,23 +172,9 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
         pinchRef.current = {
           active: true,
           startDist: dist(e.touches[0], e.touches[1]),
-          startScale: fontScaleRef.current,
+          startScale: scaleRef.current,
         };
       }
-    };
-
-    // rAF coalescing: high-frequency pinch/wheel events update state at most
-    // once per animation frame — no wasted renders, ~16ms latency.
-    let rafId = 0;
-    let pending = null;
-    const flush = () => {
-      rafId = 0;
-      if (pending != null) setFontScale(pending);
-      pending = null;
-    };
-    const commit = (next) => {
-      pending = next;
-      if (!rafId) rafId = requestAnimationFrame(flush);
     };
 
     const onTouchMove = (e) => {
@@ -185,7 +182,7 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
       e.preventDefault();
       const ratio =
         dist(e.touches[0], e.touches[1]) / (pinchRef.current.startDist || 1);
-      commit(clampScale(pinchRef.current.startScale * ratio));
+      applyScale(pinchRef.current.startScale * ratio);
     };
 
     const endPinch = (e) => {
@@ -195,8 +192,7 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
     const onWheel = (e) => {
       if (!e.ctrlKey) return; // trackpad pinch fires ctrl+wheel
       e.preventDefault();
-      const base = pending != null ? pending : fontScaleRef.current;
-      commit(clampScale(base - e.deltaY * 0.003));
+      applyScale(scaleRef.current - e.deltaY * 0.003);
     };
 
     el.addEventListener("touchstart", onTouchStart, { passive: false });
@@ -206,14 +202,13 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
     el.addEventListener("wheel", onWheel, { passive: false });
 
     return () => {
-      if (rafId) cancelAnimationFrame(rafId);
       el.removeEventListener("touchstart", onTouchStart);
       el.removeEventListener("touchmove", onTouchMove);
       el.removeEventListener("touchend", endPinch);
       el.removeEventListener("touchcancel", endPinch);
       el.removeEventListener("wheel", onWheel);
     };
-  }, [page]);
+  }, [page, applyScale]);
 
   // Persist the known-empty refs so next load prunes instantly
   useEffect(() => {
@@ -587,18 +582,21 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
                   size="icon"
                   variant="outline"
                   className="h-8 w-8"
-                  onClick={() => setFontScale((s) => clampScale(s - 0.05))}
+                  onClick={() => applyScale(scaleRef.current - 0.05)}
                 >
                   <ZoomOut className="w-4 h-4" />
                 </Button>
-                <span className="text-xs text-slate-500 w-10 text-center tabular-nums">
-                  {Math.round(fontScale * 100)}%
+                <span
+                  ref={labelRef}
+                  className="text-xs text-slate-500 w-10 text-center tabular-nums"
+                >
+                  {Math.round(scaleRef.current * 100)}%
                 </span>
                 <Button
                   size="icon"
                   variant="outline"
                   className="h-8 w-8"
-                  onClick={() => setFontScale((s) => clampScale(s + 0.05))}
+                  onClick={() => applyScale(scaleRef.current + 0.05)}
                 >
                   <ZoomIn className="w-4 h-4" />
                 </Button>
@@ -670,7 +668,11 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
               }}
             >
               {/* PURE NATIVE DOM RENDERING WITH STICKY SECTION CONTAINERS */}
-              <div className="pb-8" style={{ fontSize: `${fontScale}rem` }}>
+              <div
+                ref={contentRef}
+                className="pb-8"
+                style={{ fontSize: `${scaleRef.current}rem` }}
+              >
                 {activeSections.map((sec, i) => {
                   const sectionItems = itemsBySection[i] || [];
                   return (
