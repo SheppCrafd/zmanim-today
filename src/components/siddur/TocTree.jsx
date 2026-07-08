@@ -75,7 +75,7 @@ export default function TocTree({ nodes, onSelect, refToIndex, isSearching }) {
         if (node.children.length === 0) {
           const index = refToIndex[node.ref];
           return (
-            <div key={i} className="mb-4">
+            <div key={i} className="pb-4">
               <button
                 onClick={() => onSelect(index)}
                 className="w-full text-left font-semibold text-slate-700 dark:text-slate-100 bg-slate-50 dark:bg-slate-900 border-y border-slate-200 dark:border-slate-800 shadow-sm px-2 py-2.5 -mx-4 sticky top-0 z-10 transition-colors hover:bg-slate-100 dark:hover:bg-slate-800"
@@ -88,7 +88,7 @@ export default function TocTree({ nodes, onSelect, refToIndex, isSearching }) {
 
         // Top-level category
         return (
-          <div key={i} className="mb-6">
+          <div key={i} className="pb-6">
             <h2 className="font-semibold text-slate-700 dark:text-slate-100 bg-slate-50 dark:bg-slate-900 border-y border-slate-200 dark:border-slate-800 shadow-sm px-2 py-2 -mx-4 sticky top-0 z-10">
               {node.title}
             </h2>
