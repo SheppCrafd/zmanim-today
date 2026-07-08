@@ -4,6 +4,30 @@ import { cacheGet, cacheSet } from "@/lib/sefariaCache";
 // --- Helper: Flatten deeply nested arrays from Sefaria ---
 const flatten = (arr) => (Array.isArray(arr) ? arr.flat(Infinity) : [arr]);
 
+// --- Helpers: language guards (shared by V3 merge + V2 fallback) ---
+// Sefaria sometimes labels a version "en" while its text is actually Hebrew
+// (or another non-English language). These guards keep each column clean by
+// checking the actual script content of a line, not just the API's label.
+const stripHtml = (s) => (s || "").replace(/<[^>]*>/g, " ");
+
+const looksHebrew = (line) => {
+  const s = stripHtml(line);
+  if (!s || !s.trim()) return false;
+  return /[\u0590-\u05FF\uFB1D-\uFB4F]/.test(s);
+};
+
+const looksEnglish = (line) => {
+  const s = stripHtml(line);
+  if (!s || !s.trim()) return false;
+  const latin = (s.match(/[a-zA-Z]/g) || []).length;
+  if (latin === 0) return false; // no Latin at all → not English
+  const hebrew = (s.match(/[\u0590-\u05FF\uFB1D-\uFB4F]/g) || []).length;
+  // Reject lines dominated by Hebrew script (the main pollution case);
+  // Latin-only transliterations still pass and stay readable.
+  if (hebrew > latin) return false;
+  return true;
+};
+
 // --- Helper: Extract and Merge Text from ALL versions ---
 const extractAndMergeText = (data, expectedLang) => {
   if (!data?.versions || data.versions.length === 0) return [];
@@ -40,14 +64,14 @@ const extractAndMergeText = (data, expectedLang) => {
       if (line && typeof line === "string" && line.trim().length > 0) {
         if (expectedLang === "en") {
           // Ensure it actually contains English characters
-          if (/[a-zA-Z]/.test(line)) {
+          if (looksEnglish(line)) {
             mergedArr[i] = line;
             break; // Found a valid translation! Stop looking and move to the next paragraph.
           }
         } else {
           // Only accept lines that actually contain Hebrew characters —
           // keeps English / other-language text out of the Hebrew column
-          if (/[\u0590-\u05FF\uFB1D-\uFB4F]/.test(line)) {
+          if (looksHebrew(line)) {
             mergedArr[i] = line;
             break; // Found valid Hebrew! Move to the next paragraph.
           }
@@ -95,7 +119,7 @@ const fetchSegmentsForRef = async (ref) => {
           const flatFallbackHe = flatten(fallbackData.he);
           const maxLen = Math.max(heArr.length, flatFallbackHe.length);
           for (let i = 0; i < maxLen; i++) {
-            if (!heArr[i]) heArr[i] = flatFallbackHe[i] || "";
+            if (!heArr[i] && looksHebrew(flatFallbackHe[i])) heArr[i] = flatFallbackHe[i];
           }
         }
 
@@ -108,7 +132,9 @@ const fetchSegmentsForRef = async (ref) => {
           const flatFallbackEn = flatten(fallbackData.text);
           const maxLen = Math.max(enArr.length, flatFallbackEn.length);
           for (let i = 0; i < maxLen; i++) {
-            if (!enArr[i]) enArr[i] = flatFallbackEn[i] || "";
+            // Only fill from the fallback when it's genuinely English —
+            // Sefaria's default `text` for some sections is actually Hebrew.
+            if (!enArr[i] && looksEnglish(flatFallbackEn[i])) enArr[i] = flatFallbackEn[i];
           }
         }
       }
