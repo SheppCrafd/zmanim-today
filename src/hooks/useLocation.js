@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react';
-import { base44 } from '@/api/base44Client';
 
 const LOC_KEY = 'zmanim_saved_location';
 
@@ -34,7 +33,6 @@ export function useSavedLocation() {
         // Hard timeout fallback — in case the browser never calls success or error
         const hardTimeout = setTimeout(() => {
             setLoading(false);
-            // Fall back to last known location silently, or show error
             const saved = (() => { try { return JSON.parse(localStorage.getItem(LOC_KEY)); } catch { return null; } })();
             if (!saved) setError('Location timed out. Please search manually.');
         }, 15000);
@@ -45,27 +43,15 @@ export function useSavedLocation() {
                 // Device timezone matches the GPS location (user is physically here)
                 const deviceTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
                 const loc = { latitude: pos.coords.latitude, longitude: pos.coords.longitude, timezone: deviceTz };
-                // Save raw coords immediately so user isn't left waiting
                 saveLocation(loc);
-                // Then enrich with city name
-                base44.integrations.Core.InvokeLLM({
-                    prompt: `Reverse-geocode these exact GPS coordinates to a real-world address: latitude ${loc.latitude}, longitude ${loc.longitude}.
-Use mapping/geocoding data to find the nearest recognized city (not a small town, village, or suburb). Return the closest proper city name.
-Return the local municipality name as "city", the state/province abbreviation (for USA, Canada, Australia; otherwise null) as "state", and the country as "country".`,
-                    add_context_from_internet: true,
-                    response_json_schema: {
-                        type: "object",
-                        properties: {
-                            city: { type: "string" },
-                            state: { type: "string" },
-                            country: { type: "string" }
-                        }
-                    }
-                }).then(geo => {
-                    saveLocation({ ...loc, city: geo.city, state: geo.state, country: geo.country });
-                }).catch(() => {
-                    // Keep raw coords if geocoding fails — already saved above
-                }).finally(() => setLoading(false));
+                // Reverse-geocode coordinates to city/state/country (no LLM)
+                fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${loc.latitude}&longitude=${loc.longitude}&localityLanguage=en`)
+                    .then(r => r.ok ? r.json() : null)
+                    .then(geo => {
+                        if (geo) saveLocation({ ...loc, city: geo.city || geo.locality || '', state: geo.principalSubdivision || '', country: geo.countryName || '' });
+                    })
+                    .catch(() => { /* keep raw coords */ })
+                    .finally(() => setLoading(false));
             },
             (err) => {
                 clearTimeout(hardTimeout);
@@ -85,29 +71,39 @@ Return the local municipality name as "city", the state/province abbreviation (f
         setLoading(true);
         setError(null);
         try {
-            const result = await base44.integrations.Core.InvokeLLM({
-                prompt: `Get exact coordinates and the IANA timezone identifier (tzid, e.g. "America/New_York", "Asia/Jerusalem") for: "${query}". Include state/province abbreviation for USA, Canada, Australia. Otherwise leave state null.`,
-                add_context_from_internet: true,
-                response_json_schema: {
-                    type: "object",
-                    properties: {
-                        latitude: { type: "number" },
-                        longitude: { type: "number" },
-                        city: { type: "string" },
-                        state: { type: "string" },
-                        country: { type: "string" },
-                        timezone: { type: "string" }
-                    }
-                }
+            const resp = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(query)}&count=1&language=en&format=json`);
+            if (!resp.ok) throw new Error('Geocoding failed');
+            const data = await resp.json();
+            const r = data?.results?.[0];
+            if (!r) throw new Error('No coordinates');
+            saveLocation({
+                latitude: r.latitude,
+                longitude: r.longitude,
+                city: r.name || '',
+                state: r.admin1 || '',
+                country: r.country || '',
+                timezone: r.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone,
             });
-            if (!result.latitude || !result.longitude) throw new Error('No coordinates');
-            saveLocation(result);
         } catch {
             setError(`Could not find "${query}".`);
         } finally {
             setLoading(false);
         }
     };
+
+    // Auto reverse-geocode when a saved location lacks a city name (e.g. raw coords)
+    useEffect(() => {
+        if (!location || location.city || !location.latitude) return;
+        let cancelled = false;
+        fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${location.latitude}&longitude=${location.longitude}&localityLanguage=en`)
+            .then(r => r.ok ? r.json() : null)
+            .then(geo => {
+                if (cancelled || !geo) return;
+                saveLocation({ ...location, city: geo.city || geo.locality || '', state: geo.principalSubdivision || '', country: geo.countryName || '' });
+            })
+            .catch(() => { /* keep raw coords */ });
+        return () => { cancelled = true; };
+    }, [location?.latitude, location?.longitude]);
 
     return { location, loading, error, detectGPS, searchLocation, clearLocation };
 }

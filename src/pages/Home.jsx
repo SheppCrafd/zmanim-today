@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { MapPin, Loader2, Search, ChevronRight, AlertCircle, Settings, Printer } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -13,7 +13,6 @@ import NavMenu from '@/components/NavMenu';
 import { printZmanim } from '@/lib/printZmanim';
 import ZmanimRemindersPanel from '@/components/zmanim/ZmanimRemindersPanel';
 import { formatTime } from '@/lib/timeUtils';
-import { base44 } from '@/api/base44Client';
 
 function LocationLabel({ location }) {
     if (!location) return null;
@@ -34,34 +33,8 @@ export default function Home() {
     const { prefs } = useDashboardPrefs();
     const [searchQuery, setSearchQuery] = useState('');
     const [showSearch, setShowSearch] = useState(false);
-    const [geoName, setGeoName] = useState(null);
 
-    // Reverse-geocode coordinates to city/state/country when missing (matches Zmanim page)
-    useEffect(() => {
-        if (!location || location.city) return;
-        let cancelled = false;
-        base44.integrations.Core.InvokeLLM({
-            prompt: `Reverse-geocode these exact GPS coordinates to a real-world address: latitude ${location.latitude}, longitude ${location.longitude}.
-Use mapping/geocoding data to find the nearest recognized city (not a small town, village, or suburb). Return the closest proper city name.
-Return the local municipality name as "city", the state/province abbreviation (for USA, Canada, Australia; otherwise null) as "state", and the country as "country".`,
-            add_context_from_internet: true,
-            response_json_schema: {
-                type: "object",
-                properties: {
-                    city: { type: "string" },
-                    state: { type: "string" },
-                    country: { type: "string" }
-                }
-            }
-        }).then(result => {
-            if (!cancelled && result) setGeoName(result);
-        }).catch(() => { /* keep raw coords */ });
-        return () => { cancelled = true; };
-    }, [location]);
-
-    const displayLocation = location
-        ? { ...location, ...(geoName ? { city: geoName.city, state: geoName.state, country: geoName.country } : {}) }
-        : null;
+    const displayLocation = location;
 
     const enabledZmanimIds = prefs.items.filter(i => i.enabled && !['compass', 'next_zman'].includes(i.id)).map(i => i.id);
     const showCompass = prefs.items.find(i => i.id === 'compass')?.enabled;
