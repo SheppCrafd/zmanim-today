@@ -4,7 +4,7 @@
 // Falls back gracefully (no-ops) when IndexedDB is unavailable.
 
 const DB_NAME = "sefaria-text-cache";
-const DB_VERSION = 3;
+const DB_VERSION = 4;
 const STORE = "texts";
 
 let dbPromise = null;
@@ -18,10 +18,14 @@ function getDB() {
     }
     try {
       const req = indexedDB.open(DB_NAME, DB_VERSION);
-      req.onupgradeneeded = () => {
-        if (!req.result.objectStoreNames.contains(STORE)) {
-          req.result.createObjectStore(STORE);
+      req.onupgradeneeded = (event) => {
+        const db = req.result;
+        // A version bump means cached segments are stale (e.g. polluted by a
+        // previous merge bug). Drop the old store and recreate it clean.
+        if (event.oldVersion > 0 && event.oldVersion < DB_VERSION) {
+          if (db.objectStoreNames.contains(STORE)) db.deleteObjectStore(STORE);
         }
+        if (!db.objectStoreNames.contains(STORE)) db.createObjectStore(STORE);
       };
       req.onsuccess = () => resolve(req.result);
       req.onerror = () => resolve(null);
