@@ -89,7 +89,7 @@ export default function TocTree({ nodes, onSelect, refToIndex, isSearching }) {
         // Top-level category
         return (
           <div key={i} className="mb-6">
-            <h2 className="font-semibold text-slate-700 dark:text-slate-100 bg-slate-50 dark:bg-slate-900 border-y border-slate-200 dark:border-slate-800 shadow-sm px-2 py-2 -mx-4 sticky top-0 z-10 mb-2">
+            <h2 className="font-semibold text-slate-700 dark:text-slate-100 bg-slate-50 dark:bg-slate-900 border-y border-slate-200 dark:border-slate-800 shadow-sm px-2 py-2 -mx-4 sticky top-0 z-10">
               {node.title}
             </h2>
             <div className="flex flex-col">
