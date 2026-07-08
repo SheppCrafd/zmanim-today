@@ -44,8 +44,12 @@ const extractAndMergeText = (data, expectedLang) => {
             break; // Found a valid translation! Stop looking and move to the next paragraph.
           }
         } else {
-          mergedArr[i] = line;
-          break; // Found valid Hebrew! Stop looking and move to the next paragraph.
+          // Only accept lines that actually contain Hebrew characters —
+          // keeps English / other-language text out of the Hebrew column
+          if (/[\u0590-\u05FF\uFB1D-\uFB4F]/.test(line)) {
+            mergedArr[i] = line;
+            break; // Found valid Hebrew! Move to the next paragraph.
+          }
         }
       }
     }

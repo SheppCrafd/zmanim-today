@@ -221,19 +221,8 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
         return;
       }
       if (query.data) {
-        if (query.data.length === 0) {
-          items.push({
-            type: "segment",
-            id: `seg-${i}-empty`,
-            sanitizedHe: "",
-            sanitizedEn:
-              "<span class='italic opacity-50'>No text provided by Sefaria for this section.</span>",
-            hasH: false,
-            hasE: true,
-            sectionIndex: i,
-          });
-          return;
-        }
+        // Empty section: Sefaria has no text for this ref — render nothing (header only)
+        if (query.data.length === 0) return;
 
         query.data.forEach((seg, segIndex) => {
           const hasH =
