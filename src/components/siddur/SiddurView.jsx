@@ -45,6 +45,33 @@ function sanitizeHTML(htmlString) {
 
 const clampScale = (s) => Math.max(0.5, Math.min(3, Math.round(s * 20) / 20));
 
+/* ---------------- SUBHEADER DETECTION ---------------- */
+// Sefaria injects a section's title (and its parent-category titles) as the
+// opening text segments of a section. The sticky header already shows the
+// title, so these in-text subheaders are redundant. We detect a subheader by
+// normalizing a segment's text and matching it against the normalized titles
+// of EVERY node in the siddur's TOC tree (English + Hebrew), plus a gloss
+// heuristic for foreign parenthetical subtitles (e.g. Portuguese).
+const stripNikud = (s) => (s || "").replace(/[\u0591-\u05C7\u05F3\u05F4]/g, "");
+const sig = (s) => {
+  let t = stripNikud(s);
+  t = t.replace(/<[^>]*>/g, " ");
+  t = t.toLowerCase();
+  t = t.replace(/[^a-z0-9\u05D0-\u05FF\s]/g, " ");
+  t = t.replace(/\b(the|of|on|and|a|an|in|to|for)\b/g, " ");
+  t = t.replace(/([a-z])\1+/g, "$1"); // collapse doubled Latin letters (translit variants: Tikkun≈Tikun)
+  return t.split(/\s+/).filter(Boolean).sort().join(" ");
+};
+const ENGLISH_PROSE_RE =
+  /\b(the|and|of|to|is|it|that|was|for|on|are|with|this|have|from|they|not|but|his|her|she|you|your|all|been|will|there|when|who|its|into|our|may|then|them|would|had|has|their|him|which|where|why|now|did|here|each|same|both|most|other|such|should|those|every|made|my|one|can|out|up|way|could|over|than|after|back|down|off|just|also|only|very|much|like|well|even|own|while|thee|thou|thy|thine|hath|doth|art|shalt|ye|unto|wherefore|thereof|therein|thereon|wert|hast)\b/i;
+// Short foreign-language parenthetical gloss title (no English prose markers)
+const isGlossTitle = (en) => {
+  const s = (en || "").replace(/<[^>]*>/g, " ").trim();
+  if (!s || !/\([^)]*\)/.test(s)) return false;
+  if (s.split(/\s+/).filter(Boolean).length > 10) return false;
+  return !ENGLISH_PROSE_RE.test(s);
+};
+
 // A section is "empty" if Sefaria returned no usable Hebrew or English text
 const segmentsHaveText = (segs) =>
   Array.isArray(segs) &&
@@ -271,6 +298,21 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
       });
   }, [bookRef]);
 
+  // Normalized titles of EVERY node in the TOC tree — used to detect redundant
+  // in-text subheaders (a segment whose text matches a known section/category title).
+  const titleSets = useMemo(() => {
+    const en = new Set();
+    const he = new Set();
+    const walk = (nodes) =>
+      nodes.forEach((n) => {
+        if (n.title) en.add(sig(n.title));
+        if (n.heTitle) he.add(sig(n.heTitle));
+        if (n.children?.length) walk(n.children);
+      });
+    walk(tree);
+    return { en, he };
+  }, [tree]);
+
   // Prune the tree of sections Sefaria has no text for (and their now-empty parents)
   const visibleTree = useMemo(() => {
     if (emptyRefs.size === 0) return tree;
@@ -414,23 +456,20 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
         if (query.data.length === 0) return;
 
         query.data.forEach((seg, segIndex) => {
-          const hasH =
-            seg.he && seg.he.replace(/<[^>]*>/g, "").trim().length > 0;
-          // Drop English segments that are just a transliterated title with a
-          // foreign-language parenthetical gloss (e.g. "Tikum Rachel
-          // (Correção de Raquel)"). The header already shows the section title.
-          const isGlossTitle = (en) => {
-            const s = (en || "")
-              .replace(/<[^>]*>/g, " ")
-              .trim();
-            if (!s || !/\([^)]*\)/.test(s)) return false;
-            if (s.split(/\s+/).filter(Boolean).length > 10) return false;
-            return !/\b(the|and|of|to|is|it|that|was|for|on|are|with|this|have|from|they|not|but|his|her|she|you|your|all|been|will|there|when|who|its|into|our|may|then|them|would|had|has|their|him|which|where|why|now|did|here|each|same|both|most|other|such|should|those|every|made|my|one|can|out|up|way|could|over|than|after|back|down|off|just|also|only|very|much|like|well|even|own|while|thee|thou|thy|thine|hath|doth|art|shalt|ye|unto|wherefore|thereof|therein|thereon|wert|hast)\b/i.test(s);
-          };
-          const hasE =
-            seg.en &&
-            seg.en.replace(/<[^>]*>/g, "").trim().length > 0 &&
-            !isGlossTitle(seg.en);
+          const heText = seg.he || "";
+          const enText = seg.en || "";
+          const hasH = !!heText.replace(/<[^>]*>/g, "").trim();
+          const hasE = !!enText.replace(/<[^>]*>/g, "").trim();
+
+          // Subheader = every present column is a title line: it matches a
+          // known TOC title (normalized) or — for English — is a short
+          // foreign parenthetical gloss. The sticky header already shows the
+          // section title, so skip these redundant in-text subheaders.
+          const heIsTitle = !hasH || titleSets.he.has(sig(heText));
+          const enIsTitle =
+            !hasE || titleSets.en.has(sig(enText)) || isGlossTitle(enText);
+          if ((hasH || hasE) && heIsTitle && enIsTitle) return;
+
           if (!(showHB && hasH) && !(showEN && hasE)) return;
           items.push({
             type: "segment",
