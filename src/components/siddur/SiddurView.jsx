@@ -46,6 +46,11 @@ function sanitizeHTML(htmlString) {
 
 const clampScale = (s) => Math.max(0.5, Math.min(3, Math.round(s * 100) / 100));
 
+// A section is "empty" if Sefaria returned no usable Hebrew or English text
+const segmentsHaveText = (segs) =>
+  Array.isArray(segs) &&
+  segs.some((s) => (s.he && s.he.trim()) || (s.en && s.en.trim()));
+
 export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
   const navigate = useNavigate();
   const location = useLocation();
@@ -65,6 +70,9 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
   const [error, setError] = useState(false);
   const [page, setPage] = useState("toc");
   const [langMode, setLangMode] = useState("both");
+
+  // Refs Sefaria has confirmed to have NO text — hidden from TOC & reader
+  const [emptyRefs, setEmptyRefs] = useState(() => new Set());
 
   // Step-loading state
   const [jumpTargetSection, setJumpTargetSection] = useState(null);
@@ -111,34 +119,65 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
       });
   }, [bookRef]);
 
-  // Recursive filter: keeps nodes that match OR have children that match
+  // Prune the tree of sections Sefaria has no text for (and their now-empty parents)
+  const visibleTree = useMemo(() => {
+    if (emptyRefs.size === 0) return tree;
+    const prune = (nodes) =>
+      nodes
+        .map((node) => {
+          if (!node.children.length) {
+            return emptyRefs.has(node.ref) ? null : node;
+          }
+          const kids = prune(node.children).filter(Boolean);
+          return kids.length ? { ...node, children: kids } : null;
+        })
+        .filter(Boolean);
+    return prune(tree);
+  }, [tree, emptyRefs]);
+
+  // Reader sections (only those with text), keeping their original query index
+  const visibleSections = useMemo(
+    () =>
+      sections
+        .map((sec, originalIndex) => ({ ...sec, originalIndex }))
+        .filter((sec) => !emptyRefs.has(sec.ref)),
+    [sections, emptyRefs],
+  );
+
+  // Map ref → visible index (for TOC jump targets)
+  const visibleRefToIndex = useMemo(() => {
+    const map = {};
+    visibleSections.forEach((sec, i) => {
+      map[sec.ref] = i;
+    });
+    return map;
+  }, [visibleSections]);
+
+  // Recursive search filter: keeps nodes that match OR have children that match
   const filteredTree = useMemo(() => {
-    if (!searchQuery.trim()) return tree;
+    if (!searchQuery.trim()) return visibleTree;
 
     const query = searchQuery.toLowerCase();
 
     const filterNodes = (nodes) => {
       return nodes
         .map((node) => {
-          // Check if current node matches (English or Hebrew)
           const matches =
             node.title?.toLowerCase().includes(query) ||
             node.heTitle?.includes(query);
 
-          // Recursively filter children
           const filteredChildren = filterNodes(node.children || []);
 
-          // Keep this node if it matches directly OR if any of its children match
           if (matches || filteredChildren.length > 0) {
             return { ...node, children: filteredChildren };
           }
           return null;
         })
-        .filter(Boolean); // Remove nulls
+        .filter(Boolean);
     };
 
-    return filterNodes(tree);
-  }, [tree, searchQuery]);
+    return filterNodes(visibleTree);
+  }, [visibleTree, searchQuery]);
 
   // Jump trigger
   const jumpTo = useCallback((i) => {
@@ -165,26 +204,40 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
     }
   }, [location.pathname, sections.length, jumpTargetSection, page, jumpTo]);
 
-  // Prefetcher
+  // Prefetch every section in batches and record which refs have no text
   useEffect(() => {
     if (!sections.length) return;
+    let cancelled = false;
+    const known = new Set();
     (async () => {
       for (let i = 0; i < sections.length; i += 5) {
-        await Promise.all(
-          sections.slice(i, i + 5).map((sec) =>
-            queryClient.prefetchQuery({
-              queryKey: ["sefaria-text-v3", sec.ref],
-              queryFn: () => fetchAndZipSefaria(sec.ref, sec.altRefs),
-              staleTime: 86400000,
-            }),
+        const batch = sections.slice(i, i + 5);
+        const results = await Promise.all(
+          batch.map((sec) =>
+            queryClient
+              .fetchQuery({
+                queryKey: ["sefaria-text-v3", sec.ref],
+                queryFn: () => fetchAndZipSefaria(sec.ref, sec.altRefs),
+                staleTime: 86400000,
+              })
+              .then((data) => ({ ref: sec.ref, data }))
+              .catch(() => ({ ref: sec.ref, data: null })),
           ),
         );
+        if (cancelled) return;
+        results.forEach(({ ref, data }) => {
+          if (data && !segmentsHaveText(data)) known.add(ref);
+        });
+        setEmptyRefs(new Set(known));
       }
     })();
+    return () => {
+      cancelled = true;
+    };
   }, [sections, queryClient]);
 
   // Sliced queries starting from 0
-  const activeSections = sections.slice(0, renderCount + 1);
+  const activeSections = visibleSections.slice(0, renderCount + 1);
 
   const sectionQueries = useQueries({
     queries: activeSections.map((sec) => ({
@@ -255,7 +308,7 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
 
     if (renderCount < jumpTargetSection + 1) {
       // Step A: Load next batch behind overlay
-      setRenderCount((prev) => Math.min(sections.length - 1, prev + 5));
+      setRenderCount((prev) => Math.min(visibleSections.length - 1, prev + 5));
     } else {
       // Step B: Target loaded! Find it natively in the DOM
       const targetElement = document.getElementById(`hdr-${jumpTargetSection}`);
@@ -265,7 +318,9 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
         targetElement.scrollIntoView({ behavior: "auto", block: "start" });
 
         // Step D: Load buffer and remove overlay
-        setRenderCount((prev) => Math.min(sections.length - 1, prev + 5));
+        setRenderCount((prev) =>
+          Math.min(visibleSections.length - 1, prev + 5),
+        );
 
         // Slight delay ensures the browser finishes snapping before revealing
         setTimeout(() => setJumpTargetSection(null), 50);
@@ -278,7 +333,7 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
     page,
     renderCount,
     currentQueriesLoading,
-    sections.length,
+    visibleSections.length,
   ]);
 
   // -------------------------
@@ -291,8 +346,10 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
 
       // 1. Infinite Scroll Downwards
       if (scrollTop + el.clientHeight > el.scrollHeight - 1500) {
-        if (renderCount < sections.length - 1) {
-          setRenderCount((prev) => Math.min(sections.length - 1, prev + 5));
+        if (renderCount < visibleSections.length - 1) {
+          setRenderCount((prev) =>
+            Math.min(visibleSections.length - 1, prev + 5),
+          );
         }
       }
 
@@ -324,7 +381,7 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
     },
     [
       renderCount,
-      sections.length,
+      visibleSections.length,
       jumpTargetSection,
       langMode,
       location.pathname,
@@ -468,7 +525,7 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
                 <TocTree
                   nodes={filteredTree}
                   onSelect={jumpTo}
-                  refToIndex={refToIndex}
+                  refToIndex={visibleRefToIndex}
                   isSearching={searchQuery.length > 0}
                 />
               )}
@@ -610,7 +667,7 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
                   jumpTo(i);
                   setTocOpen(false);
                 }}
-                refToIndex={refToIndex}
+                refToIndex={visibleRefToIndex}
                 isSearching={searchQuery.length > 0}
               />
             </div>
