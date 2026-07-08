@@ -174,7 +174,7 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
           sections.slice(i, i + 5).map((sec) =>
             queryClient.prefetchQuery({
               queryKey: ["sefaria-text-v3", sec.ref],
-              queryFn: () => fetchAndZipSefaria(sec.ref),
+              queryFn: () => fetchAndZipSefaria(sec.ref, sec.altRefs),
               staleTime: 86400000,
             }),
           ),
@@ -189,7 +189,7 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
   const sectionQueries = useQueries({
     queries: activeSections.map((sec) => ({
       queryKey: ["sefaria-text-v3", sec.ref],
-      queryFn: () => fetchAndZipSefaria(sec.ref),
+      queryFn: () => fetchAndZipSefaria(sec.ref, sec.altRefs),
       staleTime: 86400000,
     })),
   });

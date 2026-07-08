@@ -60,16 +60,16 @@ const extractAndMergeText = (data, expectedLang) => {
 
 // ... keep your existing flatten and extractAndMergeText helpers ...
 
-export const fetchAndZipSefaria = async (ref) => {
+// Core: fetch + merge he/en for a single Sefaria ref (V3, then V2 fallback).
+const fetchSegmentsForRef = async (ref) => {
   if (!ref) return [];
-
   const safeRef = encodeURIComponent(ref.replace(/ /g, "_")).replace(
     /'/g,
     "%27",
   );
 
   try {
-    // ATTEMPT 1: V3 API (Now with Sefaria's native missing-segment filler!)
+    // ATTEMPT 1: V3 API (with Sefaria's native missing-segment filler)
     const resp = await fetch(
       `https://www.sefaria.org/api/v3/texts/${safeRef}?fill_in_missing_segments=1`,
     );
@@ -78,7 +78,7 @@ export const fetchAndZipSefaria = async (ref) => {
     let heArr = extractAndMergeText(data, "he");
     let enArr = extractAndMergeText(data, "en");
 
-    // ATTEMPT 2: V2 API FALLBACK
+    // ATTEMPT 2: V2 API FALLBACK to fill any gaps
     const needsHeFallback = heArr.length === 0 || heArr.includes("");
     const needsEnFallback = enArr.length === 0 || enArr.includes("");
 
@@ -115,33 +115,39 @@ export const fetchAndZipSefaria = async (ref) => {
 
     const maxLen = Math.max(heArr.length, enArr.length);
     const segments = [];
-
     for (let i = 0; i < maxLen; i++) {
-      // 💣 BLOWING UP THE ERROR: We guarantee there is ALWAYS text.
-      // If Sefaria literally has zero translation in their DB, we provide a clean fallback string.
-      // Note: If you want it to just look clean and blank instead of showing text, change the fallback to " " (a space).
       const finalHe = heArr[i]?.trim() ? heArr[i] : " ";
       const finalEn = enArr[i]?.trim() ? enArr[i] : " ";
-
       segments.push({
         segmentId: `${ref}-${i + 1}`,
         he: finalHe,
         en: finalEn,
       });
     }
-
     return segments;
   } catch (err) {
     console.error(`Failed to fetch ${ref}:`, err);
-    // Even in a total crash, return a safe fallback so the UI doesn't blow up
-    return [
-      {
-        segmentId: `${ref}-error`,
-        he: "(שגיאת תקשורת)",
-        en: "Failed to connect to Sefaria.",
-      },
-    ];
+    return [];
   }
+};
+
+const segmentsHaveText = (segs) =>
+  segs.some((s) => (s.he && s.he.trim()) || (s.en && s.en.trim()));
+
+export const fetchAndZipSefaria = async (ref, altRefs = []) => {
+  const primary = await fetchSegmentsForRef(ref);
+  if (segmentsHaveText(primary)) return primary;
+
+  // Some siddur nodes are references to other Sefaria texts (e.g. "Ashrei" →
+  // "Psalm 145"). Their own path returns nothing, so try the node's alternate
+  // titles as real refs until one yields text.
+  for (const alt of altRefs || []) {
+    if (!alt || alt === ref) continue;
+    const segs = await fetchSegmentsForRef(alt);
+    if (segmentsHaveText(segs)) return segs;
+  }
+
+  return primary;
 };
 
 // --- Hook 1: Fetch the Table of Contents ---

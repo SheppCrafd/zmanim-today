@@ -6,6 +6,17 @@ function buildTree(node, parentKeyPath, parentLabelPath) {
     ? `${parentLabelPath} > ${node.title}`
     : node.title;
 
+  // Siddur leaves are often references to other Sefaria texts rather than
+  // stored sub-texts (e.g. an "Ashrei" node → "Psalm 145"; a "Psalm 146" node
+  // → the biblical "Psalm 146"). The leaf's own path 404s for these, so collect
+  // every English title (non-primary first, then primary) as fallback refs.
+  const altRefs = Array.isArray(node.titles)
+    ? node.titles
+        .filter((t) => t && t.text && t.lang === "en")
+        .sort((a, b) => (a.primary ? 1 : 0) - (b.primary ? 1 : 0))
+        .map((t) => t.text)
+    : [];
+
   return {
     title: node.title,
     heTitle: node.heTitle,
@@ -13,6 +24,7 @@ function buildTree(node, parentKeyPath, parentLabelPath) {
     // Safely use Sefaria's native ref if it exists, otherwise fallback to our built path
     ref: node.ref || node.wholeRef || fullKeyPath,
     breadcrumb: fullLabelPath,
+    altRefs,
     children: (node.nodes || []).map((child) =>
       buildTree(child, fullKeyPath, fullLabelPath),
     ),
@@ -39,6 +51,7 @@ export function processSefariaSchema(schema) {
         heLabel: node.heTitle,
         breadcrumb: node.breadcrumb,
         ref: node.ref,
+        altRefs: node.altRefs,
       });
     } else {
       node.children.forEach(collectLeaves);
