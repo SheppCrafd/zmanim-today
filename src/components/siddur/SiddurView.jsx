@@ -440,6 +440,7 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
         type: "header",
         id: `hdr-${i}`,
         label: sec.label,
+        heLabel: sec.heLabel,
         sectionIndex: i,
       });
 
@@ -774,7 +775,7 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
                               data-section-index={item.sectionIndex}
                               className="sticky top-0 z-10 shadow-sm bg-white dark:bg-slate-950"
                             >
-                              <SiddurHeader label={item.label} />
+                              <SiddurHeader label={item.label} heLabel={item.heLabel} />
                             </div>
                           );
                         }

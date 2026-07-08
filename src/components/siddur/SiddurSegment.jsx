@@ -2,10 +2,16 @@ import React, { memo } from "react";
 import { AlertCircle } from "lucide-react";
 
 /* Memoized header — only re-renders if the label changes */
-export const SiddurHeader = memo(function SiddurHeader({ label }) {
+export const SiddurHeader = memo(function SiddurHeader({ label, heLabel }) {
   return (
     <div className="px-3 py-2 font-semibold text-base bg-slate-50 dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800">
       {label}
+      {heLabel ? (
+        <span className="font-normal text-slate-500 dark:text-slate-400">
+          {" - "}
+          <span dir="rtl">{heLabel}</span>
+        </span>
+      ) : null}
     </div>
   );
 });
