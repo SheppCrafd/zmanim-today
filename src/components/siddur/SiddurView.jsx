@@ -15,6 +15,7 @@ import {
   ArrowLeft,
   List,
   X,
+  Search, // <-- Added Search icon
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useNavigate, useLocation } from "react-router-dom";
@@ -69,6 +70,9 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
   const [jumpTargetSection, setJumpTargetSection] = useState(null);
   const [tocOpen, setTocOpen] = useState(false);
 
+  // Search State
+  const [searchQuery, setSearchQuery] = useState("");
+
   const [fontScale, setFontScale] = useState(() => {
     try {
       return parseFloat(localStorage.getItem("siddur-font-scale")) || 1;
@@ -106,6 +110,35 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
         setLoading(false);
       });
   }, [bookRef]);
+
+  // Recursive filter: keeps nodes that match OR have children that match
+  const filteredTree = useMemo(() => {
+    if (!searchQuery.trim()) return tree;
+
+    const query = searchQuery.toLowerCase();
+
+    const filterNodes = (nodes) => {
+      return nodes
+        .map((node) => {
+          // Check if current node matches (English or Hebrew)
+          const matches =
+            node.title?.toLowerCase().includes(query) ||
+            node.heTitle?.includes(query);
+
+          // Recursively filter children
+          const filteredChildren = filterNodes(node.children || []);
+
+          // Keep this node if it matches directly OR if any of its children match
+          if (matches || filteredChildren.length > 0) {
+            return { ...node, children: filteredChildren };
+          }
+          return null;
+        })
+        .filter(Boolean); // Remove nulls
+    };
+
+    return filterNodes(tree);
+  }, [tree, searchQuery]);
 
   // Jump trigger
   const jumpTo = useCallback((i) => {
@@ -309,6 +342,30 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
     ],
   );
 
+  // Reusable Search Bar Component logic so we don't repeat the HTML twice
+  const renderSearchBar = () => (
+    <div className="relative mb-4 sticky top-0 z-20 bg-white dark:bg-slate-950 pt-2 pb-2">
+      <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none">
+        <Search className="h-4 w-4 text-slate-400" />
+      </div>
+      <input
+        type="text"
+        placeholder="Search sections..."
+        value={searchQuery}
+        onChange={(e) => setSearchQuery(e.target.value)}
+        className="w-full pl-9 pr-4 py-2 bg-slate-100 dark:bg-slate-900 border-none rounded-md text-sm focus:ring-2 focus:ring-blue-500 outline-none transition-all dark:text-slate-200"
+      />
+      {searchQuery && (
+        <button
+          onClick={() => setSearchQuery("")}
+          className="absolute inset-y-0 right-3 flex items-center"
+        >
+          <X className="h-4 w-4 text-slate-400 hover:text-slate-600" />
+        </button>
+      )}
+    </div>
+  );
+
   return (
     // Changed "h-screen" to "h-[100dvh]" so mobile URL bars don't push the bottom off-screen
     <div className="h-[100dvh] flex flex-col bg-white dark:bg-slate-950 overflow-hidden">
@@ -416,7 +473,15 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
               </div>
             )}
             {!loading && !error && (
-              <TocTree nodes={tree} onSelect={jumpTo} refToIndex={refToIndex} />
+              <>
+                {renderSearchBar()}
+                <TocTree
+                  nodes={filteredTree}
+                  onSelect={jumpTo}
+                  refToIndex={refToIndex}
+                  isSearching={searchQuery.length > 0}
+                />
+              </>
             )}
           </div>
         )}
@@ -532,13 +597,15 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
               </Button>
             </div>
             <div className="p-4">
+              {renderSearchBar()}
               <TocTree
-                nodes={tree}
+                nodes={filteredTree}
                 onSelect={(i) => {
                   jumpTo(i);
                   setTocOpen(false);
                 }}
                 refToIndex={refToIndex}
+                isSearching={searchQuery.length > 0}
               />
             </div>
           </div>
