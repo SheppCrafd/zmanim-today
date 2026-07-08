@@ -4,7 +4,7 @@ import { AlertCircle } from "lucide-react";
 /* Memoized header — only re-renders if the label changes */
 export const SiddurHeader = memo(function SiddurHeader({ label }) {
   return (
-    <div className="px-3 py-2 font-semibold bg-slate-50 dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800">
+    <div className="px-3 py-2 font-semibold text-base bg-slate-50 dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800">
       {label}
     </div>
   );
@@ -18,7 +18,6 @@ export const SiddurSegment = memo(function SiddurSegment({
   hasE,
   showHB,
   showEN,
-  fontScale,
 }) {
   // Check if BOTH languages are toggled on in the menu
   const showBoth = showHB && showEN;
@@ -28,7 +27,6 @@ export const SiddurSegment = memo(function SiddurSegment({
       className={`px-4 py-2 ${
         showBoth ? "md:grid md:grid-cols-2 md:gap-4 space-y-4 md:space-y-0" : ""
       }`}
-      style={{ fontSize: `${fontScale}em` }}
     >
       {/* HEBREW COLUMN - Always renders on right (order-2) if Both are enabled */}
       {showHB && (

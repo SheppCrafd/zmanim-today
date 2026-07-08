@@ -394,6 +394,16 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
     return items;
   }, [activeSections, sectionQueries, showEN, showHB]);
 
+  // Group flat items by section index once — avoids an O(n²) filter per render
+  const itemsBySection = useMemo(() => {
+    const map = {};
+    flatItems.forEach((item) => {
+      if (!map[item.sectionIndex]) map[item.sectionIndex] = [];
+      map[item.sectionIndex].push(item);
+    });
+    return map;
+  }, [flatItems]);
+
   // -------------------------
   // NATIVE JUMP ENGINE
   // -------------------------
@@ -644,11 +654,9 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
               }}
             >
               {/* PURE NATIVE DOM RENDERING WITH STICKY SECTION CONTAINERS */}
-              <div className="pb-8">
+              <div className="pb-8" style={{ fontSize: `${fontScale}rem` }}>
                 {activeSections.map((sec, i) => {
-                  const sectionItems = flatItems.filter(
-                    (item) => item.sectionIndex === i,
-                  );
+                  const sectionItems = itemsBySection[i] || [];
                   return (
                     <div key={i} className="relative">
                       {sectionItems.map((item) => {
@@ -679,7 +687,6 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
                                 hasE={item.hasE}
                                 showHB={showHB}
                                 showEN={showEN}
-                                fontScale={fontScale}
                               />
                             )}
                             {item.type === "loading" && <SiddurLoading />}
