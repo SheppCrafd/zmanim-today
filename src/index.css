@@ -2,7 +2,6 @@
 @tailwind components;
 @tailwind utilities;
 
-
 /* :root {
   font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
   line-height: 1.5;
@@ -71,8 +70,6 @@ button:focus-visible {
     background-color: #f9f9f9;
   }
 } */
-
-
 
 @layer base {
   :root {
@@ -146,8 +143,6 @@ button:focus-visible {
   }
 }
 
-
-
 @layer base {
   * {
     @apply border-border outline-ring/50;
@@ -172,20 +167,50 @@ button:focus-visible {
 .dark .bg-white\/90 {
   background-color: hsla(222, 47%, 10%, 0.9) !important;
 }
-.dark .border-slate-100 { border-color: hsl(222, 30%, 18%) !important; }
-.dark .border-slate-200 { border-color: hsl(222, 30%, 20%) !important; }
-.dark .divide-slate-100 > * + * { border-color: hsl(222, 30%, 18%) !important; }
-.dark .text-slate-800 { color: hsl(210, 40%, 92%) !important; }
-.dark .text-slate-700 { color: hsl(210, 30%, 82%) !important; }
-.dark .text-slate-600 { color: hsl(210, 20%, 70%) !important; }
-.dark .text-slate-500 { color: hsl(210, 15%, 58%) !important; }
-.dark .text-slate-400 { color: hsl(210, 12%, 48%) !important; }
-.dark .hover\:bg-slate-50:hover { background-color: hsl(222, 47%, 13%) !important; }
-.dark .hover\:bg-slate-100:hover { background-color: hsl(222, 47%, 15%) !important; }
-.dark .bg-slate-100 { background-color: hsl(222, 47%, 14%) !important; }
-.dark .bg-slate-200 { background-color: hsl(222, 35%, 18%) !important; }
-.dark .shadow-sm { box-shadow: 0 1px 3px rgba(0,0,0,0.4) !important; }
-.dark .shadow-lg { box-shadow: 0 4px 20px rgba(0,0,0,0.5) !important; }
+.dark .border-slate-100 {
+  border-color: hsl(222, 30%, 18%) !important;
+}
+.dark .border-slate-200 {
+  border-color: hsl(222, 30%, 20%) !important;
+}
+.dark .divide-slate-100 > * + * {
+  border-color: hsl(222, 30%, 18%) !important;
+}
+.dark .text-slate-800 {
+  color: hsl(210, 40%, 92%) !important;
+}
+.dark .text-slate-700 {
+  color: hsl(210, 30%, 82%) !important;
+}
+.dark .text-slate-600 {
+  color: hsl(210, 20%, 70%) !important;
+}
+.dark .text-slate-500 {
+  color: hsl(210, 15%, 58%) !important;
+}
+.dark .text-slate-400 {
+  color: hsl(210, 12%, 48%) !important;
+}
+.dark .hover\:bg-slate-50:hover {
+  background-color: hsl(222, 47%, 13%) !important;
+}
+.dark .hover\:bg-slate-100:hover {
+  background-color: hsl(222, 47%, 15%) !important;
+}
+.dark .bg-slate-100 {
+  background-color: hsl(222, 47%, 14%) !important;
+}
+.dark .bg-slate-200 {
+  background-color: hsl(222, 35%, 18%) !important;
+}
+.dark .shadow-sm {
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4) !important;
+}
+.dark .shadow-lg {
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5) !important;
+}
 
 /* Compass SVG ring in dark mode */
-.dark { --compass-bg: hsl(222, 47%, 10%); }
+.dark {
+  --compass-bg: hsl(222, 47%, 10%);
+}

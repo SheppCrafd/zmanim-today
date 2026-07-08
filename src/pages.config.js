@@ -1,11 +1,10 @@
-import Zmanim from './pages/Zmanim';
-
+import Zmanim from "./pages/Zmanim";
 
 export const PAGES = {
-    "Zmanim": Zmanim,
-}
+  Zmanim: Zmanim,
+};
 
 export const pagesConfig = {
-    mainPage: "Zmanim",
-    Pages: PAGES,
+  mainPage: "Zmanim",
+  Pages: PAGES,
 };

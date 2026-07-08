@@ -1,24 +1,28 @@
-import { format } from 'date-fns';
-import { ZMANIM_GROUPS, getGroupEntries } from '@/lib/zmanimSchema';
+import { format } from "date-fns";
+import { ZMANIM_GROUPS, getGroupEntries } from "@/lib/zmanimSchema";
 
 function escapeHTML(str) {
-    return String(str ?? '').replace(/[&<>"']/g, (c) => ({
-        '&': '&amp;',
-        '<': '&lt;',
-        '>': '&gt;',
-        '"': '&quot;',
-        "'": '&#39;',
-    }[c]));
+  return String(str ?? "").replace(
+    /[&<>"']/g,
+    (c) =>
+      ({
+        "&": "&amp;",
+        "<": "&lt;",
+        ">": "&gt;",
+        '"': "&quot;",
+        "'": "&#39;",
+      })[c],
+  );
 }
 
 function renderRow(entry) {
-    const val = escapeHTML(entry.value || '');
-    const valStyle = entry.highlight
-        ? 'color:#1d4ed8;background:#dbeafe;padding:4px 12px;border-radius:8px;'
-        : 'color:#334155;';
-    return `<div style="display:flex;align-items:center;justify-content:space-between;padding:16px;border-bottom:1px solid #f1f5f9;${entry.highlight ? 'background:#fffbeb80;' : ''}">
+  const val = escapeHTML(entry.value || "");
+  const valStyle = entry.highlight
+    ? "color:#1d4ed8;background:#dbeafe;padding:4px 12px;border-radius:8px;"
+    : "color:#334155;";
+  return `<div style="display:flex;align-items:center;justify-content:space-between;padding:16px;border-bottom:1px solid #f1f5f9;${entry.highlight ? "background:#fffbeb80;" : ""}">
         <div style="flex:1;">
-            <p style="margin:0;font-weight:600;color:${entry.highlight ? '#0f172a' : '#334155'};">${escapeHTML(entry.label)}</p>
+            <p style="margin:0;font-weight:600;color:${entry.highlight ? "#0f172a" : "#334155"};">${escapeHTML(entry.label)}</p>
             <p style="margin:2px 0 0;font-size:13px;color:#64748b;">${escapeHTML(entry.description)}</p>
         </div>
         <div style="font-family:ui-monospace,monospace;font-size:18px;font-weight:700;${valStyle}">${val}</div>
@@ -26,23 +30,30 @@ function renderRow(entry) {
 }
 
 function renderGroup(group, zmanimData, dayOfWeek) {
-    const entries = getGroupEntries(group.id, zmanimData, dayOfWeek);
-    if (!entries.length) return '';
-    return `<div style="margin-bottom:16px;border-radius:14px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.1);background:#fff;">
+  const entries = getGroupEntries(group.id, zmanimData, dayOfWeek);
+  if (!entries.length) return "";
+  return `<div style="margin-bottom:16px;border-radius:14px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.1);background:#fff;">
         <div style="background:linear-gradient(to right,${group.printFrom},${group.printTo});padding:16px;display:flex;align-items:center;gap:12px;">
             <span style="font-size:24px;">${escapeHTML(group.icon)}</span>
             <span style="color:#fff;font-size:18px;font-weight:600;">${escapeHTML(group.title)}</span>
         </div>
-        <div>${entries.map(renderRow).join('')}</div>
+        <div>${entries.map(renderRow).join("")}</div>
     </div>`;
 }
 
-export function printZmanim({ zmanimData, date, locationLabel, hebrewInfo, timezone }) {
-    const z = zmanimData?.zmanim || {};
-    const dow = date.getDay();
-    const dateStr = format(date, 'EEEE, MMMM d, yyyy');
+export function printZmanim({
+  zmanimData,
+  date,
+  locationLabel,
+  hebrewInfo,
+  timezone,
+}) {
+  const z = zmanimData?.zmanim || {};
+  const dow = date.getDay();
+  const dateStr = format(date, "EEEE, MMMM d, yyyy");
 
-    const hebrewBlock = hebrewInfo ? `
+  const hebrewBlock = hebrewInfo
+    ? `
         <div style="background:#fff;border-radius:14px;padding:16px 20px;margin-bottom:16px;box-shadow:0 1px 3px rgba(0,0,0,0.1);">
             <div style="display:flex;justify-content:space-between;gap:16px;padding:6px 0;">
                 <span style="font-size:14px;color:#475569;">Hebrew Date</span>
@@ -58,16 +69,21 @@ export function printZmanim({ zmanimData, date, locationLabel, hebrewInfo, timez
                     <div style="font-size:13px;color:#64748b;">${escapeHTML(hebrewInfo.day_of_week_transliterated)}</div>
                 </div>
             </div>
-            ${hebrewInfo.parsha ? `<div style="display:flex;justify-content:space-between;gap:16px;padding:6px 0;border-top:1px solid #f1f5f9;">
+            ${
+              hebrewInfo.parsha
+                ? `<div style="display:flex;justify-content:space-between;gap:16px;padding:6px 0;border-top:1px solid #f1f5f9;">
                 <span style="font-size:14px;color:#475569;">Parsha</span>
                 <div style="text-align:right;">
-                    ${hebrewInfo.parsha_hebrew ? `<div style="font-weight:600;color:#1d4ed8;" dir="rtl">${escapeHTML(hebrewInfo.parsha_hebrew)}</div>` : ''}
+                    ${hebrewInfo.parsha_hebrew ? `<div style="font-weight:600;color:#1d4ed8;" dir="rtl">${escapeHTML(hebrewInfo.parsha_hebrew)}</div>` : ""}
                     <div style="font-size:13px;color:#2563eb;">${escapeHTML(hebrewInfo.parsha)}</div>
                 </div>
-            </div>` : ''}
-        </div>` : '';
+            </div>`
+                : ""
+            }
+        </div>`
+    : "";
 
-    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Zmanim – ${escapeHTML(dateStr)}</title>
+  const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Zmanim – ${escapeHTML(dateStr)}</title>
     <style>
         * { box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
         body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; margin: 0; background: linear-gradient(to bottom right,#f8fafc,#eff6ff,#fffbeb); color: #1e293b; }
@@ -90,10 +106,10 @@ export function printZmanim({ zmanimData, date, locationLabel, hebrewInfo, timez
             <div class="date">${escapeHTML(dateStr)}</div>
         </div>
         ${hebrewBlock}
-        ${ZMANIM_GROUPS.map(g => renderGroup(g, z, dow)).join('')}
+        ${ZMANIM_GROUPS.map((g) => renderGroup(g, z, dow)).join("")}
         <div class="footer">
             <p style="margin:0;">Times calculated based on your location</p>
-            ${timezone ? `<p style="margin:4px 0 0;">Timezone: ${escapeHTML(timezone)}</p>` : ''}
+            ${timezone ? `<p style="margin:4px 0 0;">Timezone: ${escapeHTML(timezone)}</p>` : ""}
             <p style="margin:8px 0 0;">Based on https://outorah.org/p/41921/ · Zmanim Today</p>
         </div>
     </div>
@@ -104,8 +120,8 @@ export function printZmanim({ zmanimData, date, locationLabel, hebrewInfo, timez
     </script>
     </body></html>`;
 
-    const blob = new Blob([html], { type: 'text/html' });
-    const url = URL.createObjectURL(blob);
-    window.open(url, '_blank');
-    setTimeout(() => URL.revokeObjectURL(url), 60000);
+  const blob = new Blob([html], { type: "text/html" });
+  const url = URL.createObjectURL(blob);
+  window.open(url, "_blank");
+  setTimeout(() => URL.revokeObjectURL(url), 60000);
 }

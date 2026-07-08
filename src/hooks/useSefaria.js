@@ -9,12 +9,12 @@ const extractAndMergeText = (data, expectedLang) => {
 
   // 1. Find all versions for the requested language that actually contain text
   let matchingVersions = data.versions.filter(
-    (v) => v.language === expectedLang && v.text
+    (v) => v.language === expectedLang && v.text,
   );
 
   if (matchingVersions.length === 0) return [];
 
-  // 2. Explicitly prioritize "Sefaria Community Translation" 
+  // 2. Explicitly prioritize "Sefaria Community Translation"
   // so it gets checked first for every single paragraph.
   matchingVersions.sort((a, b) => {
     if (a.versionTitle === "Sefaria Community Translation") return -1;
@@ -24,9 +24,9 @@ const extractAndMergeText = (data, expectedLang) => {
 
   // 3. Find the maximum segment length across all matching versions
   const maxLength = Math.max(
-    ...matchingVersions.map((v) => flatten(v.text).length)
+    ...matchingVersions.map((v) => flatten(v.text).length),
   );
-  
+
   const mergedArr = new Array(maxLength).fill("");
 
   // 4. Fill in the merged array by checking each version line-by-line
@@ -61,12 +61,14 @@ export const fetchAndZipSefaria = async (ref) => {
 
   const safeRef = encodeURIComponent(ref.replace(/ /g, "_")).replace(
     /'/g,
-    "%27"
+    "%27",
   );
 
   try {
     // ATTEMPT 1: V3 API (Now with Sefaria's native missing-segment filler!)
-    const resp = await fetch(`https://www.sefaria.org/api/v3/texts/${safeRef}?fill_in_missing_segments=1`);
+    const resp = await fetch(
+      `https://www.sefaria.org/api/v3/texts/${safeRef}?fill_in_missing_segments=1`,
+    );
     let data = resp.ok ? await resp.json() : null;
 
     let heArr = extractAndMergeText(data, "he");
@@ -78,7 +80,7 @@ export const fetchAndZipSefaria = async (ref) => {
 
     if (needsHeFallback || needsEnFallback) {
       const fallbackResp = await fetch(
-        `https://www.sefaria.org/api/texts/${safeRef}?context=0`
+        `https://www.sefaria.org/api/texts/${safeRef}?context=0`,
       );
       if (fallbackResp.ok) {
         const fallbackData = await fallbackResp.json();
@@ -93,7 +95,11 @@ export const fetchAndZipSefaria = async (ref) => {
         }
 
         // Patch English
-        if (needsEnFallback && fallbackData.text && fallbackData.text.length > 0) {
+        if (
+          needsEnFallback &&
+          fallbackData.text &&
+          fallbackData.text.length > 0
+        ) {
           const flatFallbackEn = flatten(fallbackData.text);
           const maxLen = Math.max(enArr.length, flatFallbackEn.length);
           for (let i = 0; i < maxLen; i++) {
@@ -124,11 +130,13 @@ export const fetchAndZipSefaria = async (ref) => {
   } catch (err) {
     console.error(`Failed to fetch ${ref}:`, err);
     // Even in a total crash, return a safe fallback so the UI doesn't blow up
-    return [{
-      segmentId: `${ref}-error`,
-      he: "(שגיאת תקשורת)",
-      en: "Failed to connect to Sefaria.",
-    }];
+    return [
+      {
+        segmentId: `${ref}-error`,
+        he: "(שגיאת תקשורת)",
+        en: "Failed to connect to Sefaria.",
+      },
+    ];
   }
 };
 
