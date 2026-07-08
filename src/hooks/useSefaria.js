@@ -110,8 +110,8 @@ export const fetchAndZipSefaria = async (ref) => {
       // 💣 BLOWING UP THE ERROR: We guarantee there is ALWAYS text.
       // If Sefaria literally has zero translation in their DB, we provide a clean fallback string.
       // Note: If you want it to just look clean and blank instead of showing text, change the fallback to " " (a space).
-      const finalHe = heArr[i]?.trim() ? heArr[i] : "(טקסט חסר בספריא)";
-      const finalEn = enArr[i]?.trim() ? enArr[i] : "(Translation currently unavailable on Sefaria)";
+      const finalHe = heArr[i]?.trim() ? heArr[i] : "";
+      const finalEn = enArr[i]?.trim() ? enArr[i] : "";
 
       segments.push({
         segmentId: `${ref}-${i + 1}`,
