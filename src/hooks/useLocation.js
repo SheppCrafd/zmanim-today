@@ -2,6 +2,20 @@ import { useState, useEffect } from 'react';
 
 const LOC_KEY = 'zmanim_saved_location';
 
+// BigDataCloud returns verbose ISO country names; normalize to friendly names
+function cleanCountry(name) {
+    if (!name) return '';
+    const map = {
+        'United States of America (the)': 'United States',
+        'United Kingdom of Great Britain and Northern Ireland (the)': 'United Kingdom',
+        'Russian Federation (the)': 'Russia',
+        'Netherlands (the)': 'Netherlands',
+        'Korea (the Republic of)': 'South Korea',
+        'Iran (Islamic Republic of)': 'Iran',
+    };
+    return map[name] || name.replace(' (the)', '');
+}
+
 export function useSavedLocation() {
     const [location, setLocationState] = useState(() => {
         try {
@@ -48,7 +62,7 @@ export function useSavedLocation() {
                 fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${loc.latitude}&longitude=${loc.longitude}&localityLanguage=en`)
                     .then(r => r.ok ? r.json() : null)
                     .then(geo => {
-                        if (geo) saveLocation({ ...loc, city: geo.city || geo.locality || '', state: geo.principalSubdivision || '', country: geo.countryName || '' });
+                        if (geo) saveLocation({ ...loc, city: geo.city || geo.locality || '', state: geo.principalSubdivision || '', country: cleanCountry(geo.countryName) });
                     })
                     .catch(() => { /* keep raw coords */ })
                     .finally(() => setLoading(false));
@@ -99,7 +113,7 @@ export function useSavedLocation() {
             .then(r => r.ok ? r.json() : null)
             .then(geo => {
                 if (cancelled || !geo) return;
-                saveLocation({ ...location, city: geo.city || geo.locality || '', state: geo.principalSubdivision || '', country: geo.countryName || '' });
+                saveLocation({ ...location, city: geo.city || geo.locality || '', state: geo.principalSubdivision || '', country: cleanCountry(geo.countryName) });
             })
             .catch(() => { /* keep raw coords */ });
         return () => { cancelled = true; };
