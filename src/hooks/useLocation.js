@@ -17,6 +17,22 @@ function cleanCountry(name) {
   return map[name] || name.replace(" (the)", "");
 }
 
+// US state names — when a search query matches one, prefer the state-level
+// result over a city that happens to share the name (e.g. "California" → the
+// state of California, not California, MO).
+const US_STATES = new Set([
+  "alabama", "alaska", "arizona", "arkansas", "california", "colorado",
+  "connecticut", "delaware", "florida", "georgia", "hawaii", "idaho",
+  "illinois", "indiana", "iowa", "kansas", "kentucky", "louisiana", "maine",
+  "maryland", "massachusetts", "michigan", "minnesota", "mississippi",
+  "missouri", "montana", "nebraska", "nevada", "new hampshire",
+  "new jersey", "new mexico", "new york", "north carolina", "north dakota",
+  "ohio", "oklahoma", "oregon", "pennsylvania", "rhode island",
+  "south carolina", "south dakota", "tennessee", "texas", "utah", "vermont",
+  "virginia", "washington", "west virginia", "wisconsin", "wyoming",
+  "district of columbia", "washington dc",
+]);
+
 export function useSavedLocation() {
   const [location, setLocationState] = useState(() => {
     try {
@@ -117,17 +133,30 @@ export function useSavedLocation() {
     setError(null);
     try {
       const resp = await fetch(
-        `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(query)}&count=1&language=en&format=json`,
+        `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(query)}&count=10&language=en&format=json`,
       );
       if (!resp.ok) throw new Error("Geocoding failed");
       const data = await resp.json();
-      const r = data?.results?.[0];
-      if (!r) throw new Error("No coordinates");
+      const results = data?.results || [];
+      if (!results.length) throw new Error("No coordinates");
+
+      // If the query matches a US state name, prefer the state-level record
+      // (feature_code "ADM1") instead of a same-named city.
+      let r = results[0];
+      if (US_STATES.has(query.trim().toLowerCase())) {
+        r =
+          results.find(
+            (res) =>
+              res.feature_code === "ADM1" &&
+              (res.country || "").toLowerCase().includes("united states"),
+          ) || r;
+      }
+      const isState = r.feature_code === "ADM1";
       saveLocation({
         latitude: r.latitude,
         longitude: r.longitude,
-        city: r.name || "",
-        state: r.admin1 || "",
+        city: isState ? "" : r.name || "",
+        state: r.admin1 || (isState ? r.name : ""),
         country: r.country || "",
         timezone:
           r.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone,
