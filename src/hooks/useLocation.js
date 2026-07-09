@@ -80,6 +80,25 @@ const US_STATES = {
 const titleCaseState = (s) =>
   s.replace(/\b\w/g, (c) => c.toUpperCase());
 
+// Trailing geographic qualifiers that users append but the geocoder doesn't
+// index (e.g. "Hashima Island" finds nothing, "Hashima" works). When the full
+// query returns no results we strip one of these and retry.
+const GEO_SUFFIX_RE = /\s+(island|islands|country|state|city)$/i;
+
+async function geocodeFirst(name) {
+  if (!name) return null;
+  try {
+    const resp = await fetch(
+      `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(name)}&count=1&language=en&format=json`,
+    );
+    if (!resp.ok) return null;
+    const data = await resp.json();
+    return data?.results?.[0] || null;
+  } catch {
+    return null;
+  }
+}
+
 export function useSavedLocation() {
   const [location, setLocationState] = useState(() => {
     try {
@@ -196,12 +215,11 @@ export function useSavedLocation() {
       return;
     }
     try {
-      const resp = await fetch(
-        `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(query)}&count=1&language=en&format=json`,
-      );
-      if (!resp.ok) throw new Error("Geocoding failed");
-      const data = await resp.json();
-      const r = data?.results?.[0];
+      // Try the full query first; if it yields nothing, retry with a trailing
+      // geographic suffix stripped ("Hashima Island" → "Hashima").
+      const r =
+        (await geocodeFirst(trimmed)) ||
+        (await geocodeFirst(trimmed.replace(GEO_SUFFIX_RE, "").trim()));
       if (!r) throw new Error("No coordinates");
       saveLocation({
         latitude: r.latitude,
