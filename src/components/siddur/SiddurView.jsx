@@ -616,11 +616,7 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
   return (
     <div className="h-[100dvh] flex flex-col bg-white dark:bg-slate-950 overflow-hidden">
       {/* TOP BAR */}
-      <div
-        className={`sticky top-0 z-50 bg-white dark:bg-slate-950 ${
-          page === "reader" ? "" : "border-b"
-        }`}
-      >
+      <div className="sticky top-0 z-50 border-b bg-white dark:bg-slate-950">
         <div className="flex justify-between items-center px-4 pt-4 pb-2">
           <div className="flex items-center gap-3">
             <NavMenu />
@@ -761,30 +757,34 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
               >
                 {activeSections.map((sec, i) => {
                   const sectionItems = itemsBySection[i] || [];
+                  const headerItem = sectionItems.find(
+                    (it) => it.type === "header",
+                  );
+                  const bodyItems = sectionItems.filter(
+                    (it) => it.type !== "header",
+                  );
                   return (
-                    <div
-                      key={i}
-                      className="relative"
-                      style={{
-                        contentVisibility: "auto",
-                        containIntrinsicSize: "auto 600px",
-                      }}
-                    >
-                      {sectionItems.map((item) => {
-                        if (item.type === "header") {
-                          return (
-                            <div
-                              key={item.id}
-                              id={item.id}
-                              data-section-index={item.sectionIndex}
-                              className="sticky top-0 z-10 shadow-sm bg-white dark:bg-slate-950"
-                            >
-                              <SiddurHeader label={item.label} heLabel={item.heLabel} />
-                            </div>
-                          );
-                        }
-
-                        return (
+                    <div key={i} className="relative">
+                      {headerItem && (
+                        <div
+                          key={headerItem.id}
+                          id={headerItem.id}
+                          data-section-index={headerItem.sectionIndex}
+                          className="sticky top-0 z-10 shadow-sm bg-white dark:bg-slate-950"
+                        >
+                          <SiddurHeader
+                            label={headerItem.label}
+                            heLabel={headerItem.heLabel}
+                          />
+                        </div>
+                      )}
+                      <div
+                        style={{
+                          contentVisibility: "auto",
+                          containIntrinsicSize: "auto 600px",
+                        }}
+                      >
+                        {bodyItems.map((item) => (
                           <div
                             key={item.id}
                             id={item.id}
@@ -803,8 +803,8 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
                             {item.type === "loading" && <SiddurLoading />}
                             {item.type === "error" && <SiddurError />}
                           </div>
-                        );
-                      })}
+                        ))}
+                      </div>
                     </div>
                   );
                 })}
