@@ -99,6 +99,44 @@ async function geocodeFirst(name) {
   }
 }
 
+// Returns up to `count` geocoding results (used for fuzzy candidate searches).
+async function geocodeList(name, count) {
+  if (!name) return [];
+  try {
+    const resp = await fetch(
+      `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(name)}&count=${count}&language=en&format=json`,
+    );
+    if (!resp.ok) return [];
+    const data = await resp.json();
+    return data?.results || [];
+  } catch {
+    return [];
+  }
+}
+
+// Iterative Levenshtein distance — used to recover small typos
+// ("coneticut"→"connecticut", "londun"→"london").
+function editDistance(a, b) {
+  a = (a || "").toLowerCase();
+  b = (b || "").toLowerCase();
+  if (a === b) return 0;
+  const m = a.length;
+  const n = b.length;
+  if (!m) return n;
+  if (!n) return m;
+  let prev = Array.from({ length: n + 1 }, (_, j) => j);
+  let cur = new Array(n + 1);
+  for (let i = 1; i <= m; i++) {
+    cur[0] = i;
+    for (let j = 1; j <= n; j++) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+      cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + cost);
+    }
+    [prev, cur] = [cur, prev];
+  }
+  return prev[n];
+}
+
 export function useSavedLocation() {
   const [location, setLocationState] = useState(() => {
     try {
@@ -215,21 +253,81 @@ export function useSavedLocation() {
       return;
     }
     try {
-      // Try the full query first; if it yields nothing, retry with a trailing
-      // geographic suffix stripped ("Hashima Island" → "Hashima").
+      const ql = trimmed.toLowerCase();
+      const stripped = trimmed.replace(GEO_SUFFIX_RE, "").trim();
+      const threshold = Math.max(2, Math.floor(ql.length * 0.25));
+
+      // Fast path: direct lookup (full query, then suffix-stripped). Accept
+      // only when the returned name is an exact-or-1-char match, otherwise the
+      // geocoder may have returned a wrong near-match for a typo
+      // (e.g. "londun" → Londungo, Angola).
       const r =
-        (await geocodeFirst(trimmed)) ||
-        (await geocodeFirst(trimmed.replace(GEO_SUFFIX_RE, "").trim()));
-      if (!r) throw new Error("No coordinates");
-      saveLocation({
-        latitude: r.latitude,
-        longitude: r.longitude,
-        city: r.name || "",
-        state: r.admin1 || "",
-        country: r.country || "",
-        timezone:
-          r.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone,
-      });
+        (await geocodeFirst(trimmed)) || (await geocodeFirst(stripped));
+      if (r && editDistance(ql, r.name.toLowerCase()) <= 1) {
+        saveLocation({
+          latitude: r.latitude,
+          longitude: r.longitude,
+          city: r.name || "",
+          state: r.admin1 || "",
+          country: r.country || "",
+          timezone:
+            r.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone,
+        });
+        return;
+      }
+
+      // Fuzzy path: gather candidates and pick the closest by edit distance.
+      const candidates = []; // { key?, result?, name, dist }
+      const pushResult = (item) => {
+        if (!item) return;
+        const name = item.name.toLowerCase();
+        candidates.push({ result: item, name, dist: editDistance(ql, name) });
+      };
+      if (r) pushResult(r);
+      if (stripped && stripped.toLowerCase() !== ql) {
+        pushResult(await geocodeFirst(stripped));
+      }
+      // US state names (handles state typos the geocoder can't resolve at all).
+      let bestState = null;
+      for (const key of Object.keys(US_STATES)) {
+        const d = editDistance(ql, key);
+        if (!bestState || d < bestState.dist) bestState = { key, dist: d };
+      }
+      if (bestState && bestState.dist <= threshold) {
+        candidates.push({ key: bestState.key, name: bestState.key, dist: bestState.dist });
+      }
+      // Prefix search — drop trailing chars the user likely mistyped
+      // ("londun" → prefix "lond" → surfaces London).
+      if (trimmed.length > 4) {
+        const prefix = trimmed.slice(0, Math.max(3, trimmed.length - 2));
+        for (const item of await geocodeList(prefix, 8)) pushResult(item);
+      }
+
+      const best = candidates.sort((a, b) => a.dist - b.dist)[0];
+      if (!best || best.dist > threshold) throw new Error("No coordinates");
+
+      if (best.key) {
+        const s = US_STATES[best.key];
+        saveLocation({
+          latitude: s.lat,
+          longitude: s.lng,
+          city: "",
+          state: titleCaseState(best.key),
+          country: "United States",
+          timezone: s.tz,
+        });
+      } else {
+        saveLocation({
+          latitude: best.result.latitude,
+          longitude: best.result.longitude,
+          city: best.result.name || "",
+          state: best.result.admin1 || "",
+          country: best.result.country || "",
+          timezone:
+            best.result.timezone ||
+            Intl.DateTimeFormat().resolvedOptions().timeZone,
+        });
+      }
     } catch {
       setError(`Could not find "${query}".`);
     } finally {
