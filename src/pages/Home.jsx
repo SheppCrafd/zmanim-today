@@ -229,6 +229,7 @@ export default function Home() {
                       tomorrowZmanim.zmanim.havdalah ||
                         tomorrowZmanim.zmanim.tzait_hakochavim,
                       prefs.use24Hour,
+                      tomorrowZmanim.timezone,
                     )}
                   </span>
                 </div>

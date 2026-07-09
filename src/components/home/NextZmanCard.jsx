@@ -55,7 +55,7 @@ export default function NextZmanCard({ zmanim, use24Hour }) {
             {meta.icon} {meta.label}
           </p>
           <p className="text-sm text-slate-500 dark:text-slate-400">
-            {formatTime(next.val, use24Hour)}
+            {formatTime(next.val, use24Hour, zmanim.timezone)}
           </p>
         </div>
         <div className="text-right">

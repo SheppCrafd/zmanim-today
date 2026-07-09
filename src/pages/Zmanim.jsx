@@ -154,14 +154,18 @@ export default function Zmanim() {
   const zmanim = useMemo(() => {
     if (!rawZmanim) return null;
 
+    const tz = rawZmanim.timezone;
     const formatTime = (timeInput) => {
       if (!timeInput) return "";
       const d = new Date(timeInput);
-      return d.toLocaleTimeString([], {
+      const opts = {
         hour: "numeric",
         minute: "2-digit",
         hour12: !prefs?.use24Hour, // Toggle 12hr representation dynamically
-      });
+      };
+      // Format in the location's timezone, not the browser's
+      if (tz && tz !== "Local Time") opts.timeZone = tz;
+      return d.toLocaleTimeString([], opts);
     };
 
     const formattedZmanimData = {};

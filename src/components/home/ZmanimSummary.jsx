@@ -11,7 +11,7 @@ export default function ZmanimSummary({ zmanim, enabledIds, use24Hour }) {
       if (!meta) return null;
       const raw = zmanim.zmanim[id];
       if (!raw) return null;
-      return { ...meta, value: formatTime(raw, use24Hour) };
+      return { ...meta, value: formatTime(raw, use24Hour, zmanim.timezone) };
     })
     .filter(Boolean);
 

@@ -43,7 +43,7 @@ export function parseTimeStr(timeInput) {
 /**
  * Formats a raw ISO timestamp into a readable 12hr or 24hr string
  */
-export function formatTime(timeInput, use24Hour = false) {
+export function formatTime(timeInput, use24Hour = false, timeZone) {
   if (!timeInput) return "";
 
   const d = new Date(timeInput);
@@ -65,12 +65,16 @@ export function formatTime(timeInput, use24Hour = false) {
     return timeInput;
   }
 
-  // Rely on native JavaScript formatting for the ISO strings
-  return d.toLocaleTimeString([], {
+  // Rely on native JavaScript formatting for the ISO strings.
+  // Format in the zman's own timezone (the location tzid) so a user whose
+  // device is in a different zone still sees local prayer times.
+  const opts = {
     hour: "numeric",
     minute: "2-digit",
     hour12: !use24Hour,
-  });
+  };
+  if (timeZone && timeZone !== "Local Time") opts.timeZone = timeZone;
+  return d.toLocaleTimeString([], opts);
 }
 
 /**
