@@ -616,7 +616,11 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
   return (
     <div className="h-[100dvh] flex flex-col bg-white dark:bg-slate-950 overflow-hidden">
       {/* TOP BAR */}
-      <div className="sticky top-0 z-50 border-b bg-white dark:bg-slate-950">
+      <div
+        className={`sticky top-0 z-50 bg-white dark:bg-slate-950 ${
+          page === "reader" ? "" : "border-b"
+        }`}
+      >
         <div className="flex justify-between items-center px-4 pt-4 pb-2">
           <div className="flex items-center gap-3">
             <NavMenu />
