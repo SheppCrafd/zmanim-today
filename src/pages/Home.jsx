@@ -187,6 +187,21 @@ export default function Home() {
                 ✕
               </Button>
             </form>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={detectGPS}
+              disabled={locLoading}
+              className="w-full"
+            >
+              {locLoading ? (
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              ) : (
+                <MapPin className="w-4 h-4 mr-2" />
+              )}
+              {locLoading ? "Detecting…" : "Use My Location"}
+            </Button>
           </div>
         )}
 
