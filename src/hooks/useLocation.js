@@ -199,19 +199,39 @@ export function useSavedLocation() {
           timezone: deviceTz,
         };
         saveLocation(loc);
-        // Reverse-geocode coordinates to city/state/country (no LLM)
-        fetch(
+        // Resolve the IANA timezone FROM THE COORDINATES (not the device clock,
+        // which may be misconfigured or set to a different zone than the user's
+        // physical location) and reverse-geocode for city/state/country in
+        // parallel. Either lookup failing falls back gracefully.
+        const geoP = fetch(
           `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${loc.latitude}&longitude=${loc.longitude}&localityLanguage=en`,
         )
           .then((r) => (r.ok ? r.json() : null))
-          .then((geo) => {
-            if (geo)
-              saveLocation({
-                ...loc,
-                city: geo.city || geo.locality || "",
-                state: geo.principalSubdivision || "",
-                country: cleanCountry(geo.countryName),
-              });
+          .catch(() => null);
+        const tzP = fetch(
+          `https://timeapi.io/api/Time/current/coordinate?latitude=${loc.latitude}&longitude=${loc.longitude}`,
+        )
+          .then((r) => (r.ok ? r.json() : null))
+          .then((d) => d?.timeZone || null)
+          .catch(() => null);
+        Promise.all([geoP, tzP])
+          .then(([geo, coordTz]) => {
+            const hasGeo =
+              geo &&
+              (geo.city || geo.locality || geo.principalSubdivision || geo.countryName);
+            if (!coordTz && !hasGeo) return;
+            saveLocation({
+              ...loc,
+              // Coordinate-derived zone wins; device clock is only a fallback.
+              timezone: coordTz || loc.timezone,
+              ...(hasGeo
+                ? {
+                    city: geo.city || geo.locality || "",
+                    state: geo.principalSubdivision || "",
+                    country: cleanCountry(geo.countryName),
+                  }
+                : {}),
+            });
           })
           .catch(() => {
             /* keep raw coords */
