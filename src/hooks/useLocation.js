@@ -17,21 +17,68 @@ function cleanCountry(name) {
   return map[name] || name.replace(" (the)", "");
 }
 
-// US state names — when a search query matches one, prefer the state-level
-// result over a city that happens to share the name (e.g. "California" → the
-// state of California, not California, MO).
-const US_STATES = new Set([
-  "alabama", "alaska", "arizona", "arkansas", "california", "colorado",
-  "connecticut", "delaware", "florida", "georgia", "hawaii", "idaho",
-  "illinois", "indiana", "iowa", "kansas", "kentucky", "louisiana", "maine",
-  "maryland", "massachusetts", "michigan", "minnesota", "mississippi",
-  "missouri", "montana", "nebraska", "nevada", "new hampshire",
-  "new jersey", "new mexico", "new york", "north carolina", "north dakota",
-  "ohio", "oklahoma", "oregon", "pennsylvania", "rhode island",
-  "south carolina", "south dakota", "tennessee", "texas", "utah", "vermont",
-  "virginia", "washington", "west virginia", "wisconsin", "wyoming",
-  "district of columbia", "washington dc",
-]);
+// US state name → centroid {lat, lng, tz}. Open-Meteo's geocoding database does
+// not surface state-level (ADM1) records, so a bare state-name query resolves
+// to a same-named city or country (e.g. "California" → California, MO; "Georgia"
+// → the country). When a query matches a state name we use these coordinates
+// directly instead of hitting the API.
+const US_STATES = {
+  alabama: { lat: 32.8, lng: -86.8, tz: "America/Chicago" },
+  alaska: { lat: 61.4, lng: -149.4, tz: "America/Anchorage" },
+  arizona: { lat: 34.2, lng: -111.6, tz: "America/Phoenix" },
+  arkansas: { lat: 34.8, lng: -91.4, tz: "America/Chicago" },
+  california: { lat: 36.8, lng: -119.4, tz: "America/Los_Angeles" },
+  colorado: { lat: 39.6, lng: -105.8, tz: "America/Denver" },
+  connecticut: { lat: 41.6, lng: -73.1, tz: "America/New_York" },
+  delaware: { lat: 38.9, lng: -75.5, tz: "America/New_York" },
+  "district of columbia": { lat: 38.9, lng: -77.0, tz: "America/New_York" },
+  "washington dc": { lat: 38.9, lng: -77.0, tz: "America/New_York" },
+  florida: { lat: 28.0, lng: -81.8, tz: "America/New_York" },
+  georgia: { lat: 33.0, lng: -83.6, tz: "America/New_York" },
+  hawaii: { lat: 20.8, lng: -156.3, tz: "Pacific/Honolulu" },
+  idaho: { lat: 44.2, lng: -114.5, tz: "America/Boise" },
+  illinois: { lat: 40.0, lng: -89.0, tz: "America/Chicago" },
+  indiana: { lat: 39.9, lng: -86.3, tz: "America/Indiana/Indianapolis" },
+  iowa: { lat: 42.0, lng: -93.6, tz: "America/Chicago" },
+  kansas: { lat: 38.5, lng: -98.0, tz: "America/Chicago" },
+  kentucky: { lat: 37.7, lng: -84.7, tz: "America/New_York" },
+  louisiana: { lat: 31.0, lng: -92.0, tz: "America/Chicago" },
+  maine: { lat: 45.4, lng: -69.0, tz: "America/New_York" },
+  maryland: { lat: 39.1, lng: -77.2, tz: "America/New_York" },
+  massachusetts: { lat: 42.3, lng: -71.8, tz: "America/New_York" },
+  michigan: { lat: 44.3, lng: -85.6, tz: "America/Detroit" },
+  minnesota: { lat: 46.4, lng: -94.3, tz: "America/Chicago" },
+  mississippi: { lat: 32.7, lng: -89.7, tz: "America/Chicago" },
+  missouri: { lat: 38.6, lng: -92.6, tz: "America/Chicago" },
+  montana: { lat: 46.9, lng: -110.5, tz: "America/Denver" },
+  nebraska: { lat: 41.5, lng: -99.8, tz: "America/Chicago" },
+  nevada: { lat: 39.9, lng: -117.0, tz: "America/Los_Angeles" },
+  "new hampshire": { lat: 43.7, lng: -71.6, tz: "America/New_York" },
+  "new jersey": { lat: 40.3, lng: -74.5, tz: "America/New_York" },
+  "new mexico": { lat: 34.3, lng: -106.0, tz: "America/Denver" },
+  "new york": { lat: 43.0, lng: -75.5, tz: "America/New_York" },
+  "north carolina": { lat: 35.8, lng: -80.8, tz: "America/New_York" },
+  "north dakota": { lat: 47.5, lng: -100.7, tz: "America/Chicago" },
+  ohio: { lat: 40.4, lng: -83.0, tz: "America/New_York" },
+  oklahoma: { lat: 35.6, lng: -96.9, tz: "America/Chicago" },
+  oregon: { lat: 44.0, lng: -120.5, tz: "America/Los_Angeles" },
+  pennsylvania: { lat: 41.2, lng: -77.2, tz: "America/New_York" },
+  "rhode island": { lat: 41.7, lng: -71.5, tz: "America/New_York" },
+  "south carolina": { lat: 33.9, lng: -80.9, tz: "America/New_York" },
+  "south dakota": { lat: 44.5, lng: -100.0, tz: "America/Chicago" },
+  tennessee: { lat: 35.9, lng: -86.4, tz: "America/Chicago" },
+  texas: { lat: 31.0, lng: -100.0, tz: "America/Chicago" },
+  utah: { lat: 39.3, lng: -111.7, tz: "America/Denver" },
+  vermont: { lat: 44.1, lng: -72.7, tz: "America/New_York" },
+  virginia: { lat: 37.8, lng: -78.9, tz: "America/New_York" },
+  washington: { lat: 47.5, lng: -120.5, tz: "America/Los_Angeles" },
+  "west virginia": { lat: 38.6, lng: -80.5, tz: "America/New_York" },
+  wisconsin: { lat: 44.5, lng: -89.5, tz: "America/Chicago" },
+  wyoming: { lat: 43.0, lng: -107.5, tz: "America/Denver" },
+};
+
+const titleCaseState = (s) =>
+  s.replace(/\b\w/g, (c) => c.toUpperCase());
 
 export function useSavedLocation() {
   const [location, setLocationState] = useState(() => {
@@ -131,32 +178,36 @@ export function useSavedLocation() {
   const searchLocation = async (query) => {
     setLoading(true);
     setError(null);
+    const trimmed = query.trim();
+    // Bare US state name → resolve directly to the state centroid (Open-Meteo
+    // has no state-level records, so the API would otherwise pick a same-named
+    // city or country).
+    const state = US_STATES[trimmed.toLowerCase()];
+    if (state) {
+      saveLocation({
+        latitude: state.lat,
+        longitude: state.lng,
+        city: "",
+        state: titleCaseState(trimmed.toLowerCase()),
+        country: "United States",
+        timezone: state.tz,
+      });
+      setLoading(false);
+      return;
+    }
     try {
       const resp = await fetch(
-        `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(query)}&count=10&language=en&format=json`,
+        `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(query)}&count=1&language=en&format=json`,
       );
       if (!resp.ok) throw new Error("Geocoding failed");
       const data = await resp.json();
-      const results = data?.results || [];
-      if (!results.length) throw new Error("No coordinates");
-
-      // If the query matches a US state name, prefer the state-level record
-      // (feature_code "ADM1") instead of a same-named city.
-      let r = results[0];
-      if (US_STATES.has(query.trim().toLowerCase())) {
-        r =
-          results.find(
-            (res) =>
-              res.feature_code === "ADM1" &&
-              (res.country || "").toLowerCase().includes("united states"),
-          ) || r;
-      }
-      const isState = r.feature_code === "ADM1";
+      const r = data?.results?.[0];
+      if (!r) throw new Error("No coordinates");
       saveLocation({
         latitude: r.latitude,
         longitude: r.longitude,
-        city: isState ? "" : r.name || "",
-        state: r.admin1 || (isState ? r.name : ""),
+        city: r.name || "",
+        state: r.admin1 || "",
         country: r.country || "",
         timezone:
           r.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone,
