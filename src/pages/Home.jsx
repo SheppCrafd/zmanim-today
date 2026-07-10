@@ -58,10 +58,9 @@ export default function Home() {
   const displayLocation = location;
 
   const enabledZmanimIds = prefs.items
-    .filter((i) => i.enabled && !["compass", "next_zman"].includes(i.id))
+    .filter((i) => i.enabled && i.id !== "compass")
     .map((i) => i.id);
   const showCompass = prefs.items.find((i) => i.id === "compass")?.enabled;
-  const showNextZman = prefs.items.find((i) => i.id === "next_zman")?.enabled;
 
   const locationLabel = displayLocation
     ? [displayLocation.city, displayLocation.state, displayLocation.country]
@@ -221,7 +220,7 @@ export default function Home() {
             )}
 
             {/* Next Zman */}
-            {showNextZman && zmanim && !zmanimLoading && (
+            {zmanim && !zmanimLoading && (
               <NextZmanCard zmanim={zmanim} use24Hour={prefs.use24Hour} />
             )}
 

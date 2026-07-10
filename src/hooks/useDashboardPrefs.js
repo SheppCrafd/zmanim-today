@@ -11,7 +11,6 @@ const PREFS_KEY = "dashboard_prefs_v3";
 export const ALL_DASHBOARD_ITEMS = [
   // Dashboard-only widgets
   { id: "compass", label: "Jerusalem Compass", icon: "🧭", defaultOn: true },
-  { id: "next_zman", label: "Next Zman Countdown", icon: "⏱", defaultOn: true },
   // All zmanim from ZMANIM_SCHEMA, in order
   {
     id: "alot_hashachar",
