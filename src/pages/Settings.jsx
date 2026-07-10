@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { GripVertical, Check, ArrowLeft, Moon } from "lucide-react";
+import { GripVertical, Check, ArrowLeft, Moon, BookOpen } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import NavMenu from "@/components/NavMenu";
 import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd";
@@ -209,52 +209,38 @@ export default function Settings() {
           </DragDropContext>
         </div>
 
-        {/* Siddurim */}
+        {/* Documentation */}
         <div className="mb-6">
           <p className="text-xs font-semibold uppercase tracking-widest text-slate-400 mb-2 px-1">
-            Siddurim
+            Documentation
           </p>
-          <div className="bg-white rounded-xl border border-slate-200 divide-y divide-slate-100">
-            {[
-              {
-                label: "Sephardic Siddur",
-                sub: "Edot HaMizrach",
-                path: "/SephardicSiddur",
-              },
-              {
-                label: "Ashkenazi Siddur",
-                sub: "Nusach Ashkenaz",
-                path: "/AshkenaziSiddur",
-              },
-              {
-                label: "Chabad Siddur",
-                sub: "Nusach Ari",
-                path: "/ChabadSiddur",
-              },
-            ].map(({ label, sub, path }) => (
-              <a
-                key={path}
-                href={path}
-                className="flex items-center justify-between px-4 py-3 hover:bg-slate-50 transition-colors"
-              >
-                <div>
-                  <p className="text-sm font-medium text-slate-800">
-                    📖 {label}
-                  </p>
-                  <p className="text-xs text-slate-400">{sub}</p>
-                </div>
-                <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                  <path
-                    d="M6 12l4-4-4-4"
-                    stroke="#cbd5e1"
-                    strokeWidth="1.5"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                </svg>
-              </a>
-            ))}
-          </div>
+          <a
+            href="https://zmanimtoday.mintlify.site/home"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center justify-between px-4 py-3 bg-white rounded-xl border border-slate-200 hover:bg-slate-50 transition-colors"
+          >
+            <div className="flex items-center gap-3">
+              <BookOpen className="w-4 h-4 text-blue-500" />
+              <div>
+                <p className="text-sm font-medium text-slate-800">
+                  App Documentation
+                </p>
+                <p className="text-xs text-slate-400">
+                  Guides, zmanim references, and help
+                </p>
+              </div>
+            </div>
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+              <path
+                d="M6 12l4-4-4-4"
+                stroke="#cbd5e1"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          </a>
         </div>
       </div>
     </div>
