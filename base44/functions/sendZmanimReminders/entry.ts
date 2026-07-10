@@ -97,6 +97,35 @@ async function fetchZmanim(lat, lng, tzid, dateStr) {
 
 Deno.serve(async (req) => {
   try {
+    // Authorization: this endpoint processes ALL push subscriptions under the
+    // service role and sends notifications / mutates records on behalf of every
+    // user, so it must only be invokable by the platform's scheduled
+    // automation runner — never by unauthenticated external callers. The
+    // runner supplies a pre-shared secret via the automation's function_args
+    // (request body `args.secret`). Any request missing/mismatching the secret
+    // is rejected before any service-role work runs.
+    const cronSecret = Deno.env.get("REMINDERS_CRON_SECRET");
+    if (!cronSecret) {
+      return Response.json(
+        { error: "Cron secret not configured" },
+        { status: 500 },
+      );
+    }
+    let suppliedSecret = null;
+    try {
+      const body = await req.json();
+      suppliedSecret = body?.args?.secret || body?.secret || null;
+    } catch {
+      /* non-JSON or empty body */
+    }
+    const headerSecret = req.headers.get("x-cron-secret");
+    const url = new URL(req.url);
+    const querySecret = url.searchParams.get("secret");
+    const supplied = suppliedSecret || headerSecret || querySecret;
+    if (supplied !== cronSecret) {
+      return Response.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const base44 = createClientFromRequest(req);
     const publicKey = Deno.env.get("VAPID_PUBLIC_KEY");
     const privateKey = Deno.env.get("VAPID_PRIVATE_KEY");
