@@ -1,5 +1,14 @@
 import React, { useState } from "react";
-import { GripVertical, Check, ArrowLeft, Moon, BookOpen } from "lucide-react";
+import {
+  GripVertical,
+  Check,
+  ArrowLeft,
+  Moon,
+  BookOpen,
+  LogOut,
+  Trash2,
+  Loader2,
+} from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import NavMenu from "@/components/NavMenu";
 import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd";
@@ -9,12 +18,46 @@ import {
 } from "@/hooks/useDashboardPrefs";
 import { useSavedLocation } from "@/hooks/useLocation";
 import { useTheme } from "@/lib/ThemeContext";
+import { base44 } from "@/api/base44Client";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 export default function Settings() {
   const navigate = useNavigate();
   const { prefs, toggleItem, reorderItems, toggle24Hour } = useDashboardPrefs();
   const { location, clearLocation } = useSavedLocation();
   const { dark, toggleDark } = useTheme();
+  const [loggingOut, setLoggingOut] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState(null);
+
+  const handleLogout = async () => {
+    setLoggingOut(true);
+    await base44.auth.logout("/");
+  };
+
+  const handleDeleteAccount = async () => {
+    setDeleting(true);
+    setDeleteError(null);
+    try {
+      await base44.functions.invoke("deleteAccount");
+      await base44.auth.logout("/");
+    } catch (error) {
+      setDeleting(false);
+      setDeleteError(
+        error?.response?.data?.error || "Failed to delete account.",
+      );
+    }
+  };
 
   const onDragEnd = (result) => {
     if (!result.destination) return;
@@ -241,6 +284,67 @@ export default function Settings() {
               />
             </svg>
           </a>
+        </div>
+
+        {/* Account */}
+        <div className="mb-6">
+          <p className="text-xs font-semibold uppercase tracking-widest text-slate-400 mb-2 px-1">
+            Account
+          </p>
+          <div className="bg-white rounded-xl border border-slate-200 divide-y divide-slate-100">
+            <button
+              onClick={handleLogout}
+              disabled={loggingOut}
+              className="w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-50 transition-colors disabled:opacity-60"
+            >
+              {loggingOut ? (
+                <Loader2 className="w-4 h-4 text-slate-500 animate-spin" />
+              ) : (
+                <LogOut className="w-4 h-4 text-slate-500" />
+              )}
+              <span className="text-sm font-medium text-slate-700">
+                {loggingOut ? "Logging out…" : "Log Out"}
+              </span>
+            </button>
+
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <button className="w-full flex items-center gap-3 px-4 py-3 hover:bg-red-50 transition-colors">
+                  <Trash2 className="w-4 h-4 text-red-500" />
+                  <span className="text-sm font-medium text-red-600">
+                    Delete Account
+                  </span>
+                </button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Delete Account</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    This permanently deletes your account and saved push
+                    subscriptions. This action cannot be undone.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                {deleteError && (
+                  <p className="text-sm text-red-600">{deleteError}</p>
+                )}
+                <AlertDialogFooter>
+                  <AlertDialogCancel disabled={deleting}>
+                    Cancel
+                  </AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={handleDeleteAccount}
+                    disabled={deleting}
+                    className="bg-red-600 hover:bg-red-700 text-white"
+                  >
+                    {deleting ? (
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    ) : null}
+                    {deleting ? "Deleting…" : "Delete"}
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          </div>
         </div>
       </div>
     </div>
