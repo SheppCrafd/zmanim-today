@@ -1,0 +1,56 @@
+{
+  "name": "PushSubscription",
+  "type": "object",
+  "properties": {
+    "endpoint": {
+      "type": "string",
+      "description": "Browser push subscription endpoint URL (unique per device)"
+    },
+    "p256dh": {
+      "type": "string",
+      "description": "P-256 public key from the push subscription (base64url)"
+    },
+    "auth": {
+      "type": "string",
+      "description": "Auth secret from the push subscription (base64url)"
+    },
+    "latitude": {
+      "type": "number"
+    },
+    "longitude": {
+      "type": "number"
+    },
+    "timezone": {
+      "type": "string",
+      "description": "IANA timezone id for zmanim calculation"
+    },
+    "city": {
+      "type": "string"
+    },
+    "country": {
+      "type": "string"
+    },
+    "prefs": {
+      "type": "object",
+      "description": "Reminder preferences mirroring localStorage, e.g. { alot_hashachar: { enabled: true, minutesBefore: 10 } }"
+    },
+    "sent_date": {
+      "type": "string",
+      "description": "Local date (YYYY-MM-DD) the sent_keys list applies to"
+    },
+    "sent_keys": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Zman keys already notified today (dedup across 5-min runs)"
+    }
+  },
+  "required": [
+    "endpoint",
+    "p256dh",
+    "auth",
+    "latitude",
+    "longitude"
+  ]
+}

@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useRef } from "react";
-import { Bell, BellRing, Check } from "lucide-react";
+import React, { useState } from "react";
+import { Bell, BellRing, Check, Wifi } from "lucide-react";
 import {
   Sheet,
   SheetContent,
@@ -7,6 +7,7 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
+import { usePushReminders } from "@/hooks/usePushReminders";
 
 const STORAGE_KEY = "zmanim_reminders";
 
@@ -111,20 +112,6 @@ const ALL_ZMANIM = [
 
 const MINUTES_OPTIONS = [5, 10, 15, 30];
 
-function parseZmanTime(timeStr, date) {
-  if (!timeStr) return null;
-  const match = timeStr.match(/(\d+):(\d+)\s*(AM|PM)/i);
-  if (!match) return null;
-  let hours = parseInt(match[1]);
-  const minutes = parseInt(match[2]);
-  const period = match[3].toUpperCase();
-  if (period === "PM" && hours !== 12) hours += 12;
-  if (period === "AM" && hours === 12) hours = 0;
-  const d = new Date(date);
-  d.setHours(hours, minutes, 0, 0);
-  return d;
-}
-
 function loadPrefs() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
@@ -154,50 +141,17 @@ export default function ZmanimRemindersPanel({ zmanimData, currentDate }) {
   const [notifPermission, setNotifPermission] = useState(
     typeof Notification !== "undefined" ? Notification.permission : "default",
   );
-  const timeoutsRef = useRef([]);
   const iosNotStandalone = isIOS() && !isStandalone();
+  const { status: pushStatus, error: pushError } = usePushReminders({
+    prefs,
+    notifPermission,
+  });
 
   const date = currentDate || new Date();
   const isToday = new Date().toDateString() === new Date(date).toDateString();
   const hasEnabled = Object.values(prefs).some((p) => p?.enabled);
 
-  useEffect(() => {
-    timeoutsRef.current.forEach(clearTimeout);
-    timeoutsRef.current = [];
 
-    if (!zmanimData?.zmanim || !isToday || notifPermission !== "granted")
-      return;
-
-    const todayDow = new Date().getDay(); // 0=Sun,5=Fri,6=Sat
-
-    ALL_ZMANIM.forEach(({ key, label, emoji }) => {
-      const pref = prefs[key];
-      if (!pref?.enabled) return;
-      // Candle lighting only on Friday (5), Havdalah/Tzait only on Saturday (6)
-      if (key === "candle_lighting" && todayDow !== 5) return;
-      if (key === "tzait_72" && todayDow !== 6) return;
-      const timeStr = zmanimData.zmanim[key];
-      if (!timeStr) return;
-      const zmanTime = parseZmanTime(timeStr, date);
-      if (!zmanTime) return;
-      const notifyAt = new Date(
-        zmanTime.getTime() - pref.minutesBefore * 60000,
-      );
-      const delay = notifyAt.getTime() - Date.now();
-      if (delay < 0) return;
-      const t = setTimeout(() => {
-        new Notification(`${emoji} ${label} in ${pref.minutesBefore} min`, {
-          body: `${label} is at ${timeStr}`,
-          icon: "/favicon.ico",
-        });
-      }, delay);
-      timeoutsRef.current.push(t);
-    });
-
-    return () => {
-      timeoutsRef.current.forEach(clearTimeout);
-    };
-  }, [prefs, zmanimData, isToday, notifPermission]);
 
   const requestPermission = async () => {
     if (typeof Notification === "undefined") return;
@@ -384,7 +338,17 @@ export default function ZmanimRemindersPanel({ zmanimData, currentDate }) {
 
           {notifPermission === "granted" && hasEnabled && isToday && (
             <p className="text-xs text-green-700 bg-green-50 rounded-lg p-2 text-center flex items-center justify-center gap-1">
-              <Check className="w-3 h-3" /> Reminders are active for today
+              <Check className="w-3 h-3" /> Reminders are active
+            </p>
+          )}
+          {pushStatus === "subscribed" && (
+            <p className="text-xs text-blue-700 bg-blue-50 rounded-lg p-2 text-center flex items-center justify-center gap-1">
+              <Wifi className="w-3 h-3" /> Background delivery on — works even when the app is closed
+            </p>
+          )}
+          {pushError && (
+            <p className="text-xs text-amber-700 bg-amber-50 rounded-lg p-2 text-center">
+              {pushError}
             </p>
           )}
         </div>
