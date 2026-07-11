@@ -1,5 +1,6 @@
 import { format } from "date-fns";
 import { ZMANIM_GROUPS, getGroupEntries } from "@/lib/zmanimSchema";
+import { formatTime } from "@/lib/timeUtils";
 
 function escapeHTML(str) {
   return String(str ?? "").replace(
@@ -15,8 +16,8 @@ function escapeHTML(str) {
   );
 }
 
-function renderRow(entry) {
-  const val = escapeHTML(entry.value || "");
+function renderRow(entry, timezone) {
+  const val = escapeHTML(entry.value ? formatTime(entry.value, false, timezone) : "");
   const valStyle = entry.highlight
     ? "color:#1d4ed8;background:#dbeafe;padding:4px 12px;border-radius:8px;"
     : "color:#334155;";
@@ -29,7 +30,7 @@ function renderRow(entry) {
     </div>`;
 }
 
-function renderGroup(group, zmanimData, dayOfWeek) {
+function renderGroup(group, zmanimData, dayOfWeek, timezone) {
   const entries = getGroupEntries(group.id, zmanimData, dayOfWeek);
   if (!entries.length) return "";
   return `<div style="margin-bottom:16px;border-radius:14px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.1);background:#fff;">
@@ -37,7 +38,7 @@ function renderGroup(group, zmanimData, dayOfWeek) {
             <span style="font-size:24px;">${escapeHTML(group.icon)}</span>
             <span style="color:#fff;font-size:18px;font-weight:600;">${escapeHTML(group.title)}</span>
         </div>
-        <div>${entries.map(renderRow).join("")}</div>
+        <div>${entries.map((e) => renderRow(e, timezone)).join("")}</div>
     </div>`;
 }
 
@@ -106,7 +107,7 @@ export function printZmanim({
             <div class="date">${escapeHTML(dateStr)}</div>
         </div>
         ${hebrewBlock}
-        ${ZMANIM_GROUPS.map((g) => renderGroup(g, z, dow)).join("")}
+        ${ZMANIM_GROUPS.map((g) => renderGroup(g, z, dow, timezone)).join("")}
         <div class="footer">
             <p style="margin:0;">Times calculated based on your location</p>
             ${timezone ? `<p style="margin:4px 0 0;">Timezone: ${escapeHTML(timezone)}</p>` : ""}
