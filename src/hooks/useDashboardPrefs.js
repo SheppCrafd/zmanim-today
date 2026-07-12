@@ -62,7 +62,6 @@ export const ALL_DASHBOARD_ITEMS = [
     defaultOn: true,
   },
   { id: "tzait_72", label: "Tzait (72 min)", icon: "🌟", defaultOn: false },
-  { id: "havdalah", label: "Havdalah", icon: "🕍", defaultOn: false },
   { id: "chatzot_laila", label: "Chatzot Laila", icon: "🌙", defaultOn: false },
 ];
 

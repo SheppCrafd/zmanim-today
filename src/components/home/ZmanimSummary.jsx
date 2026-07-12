@@ -1,6 +1,6 @@
 import React from "react";
 import { formatTime, parseTimeStr } from "@/lib/timeUtils";
-import { ZMANIM_BY_ID } from "@/lib/zmanimSchema";
+import { ZMANIM_BY_ID, getZmanLabel } from "@/lib/zmanimSchema";
 
 export default function ZmanimSummary({ zmanim, enabledIds, use24Hour }) {
   if (!zmanim?.zmanim) return null;
@@ -11,7 +11,7 @@ export default function ZmanimSummary({ zmanim, enabledIds, use24Hour }) {
       if (!meta) return null;
       const raw = zmanim.zmanim[id];
       if (!raw) return null;
-      return { ...meta, value: formatTime(raw, use24Hour, zmanim.timezone), _t: parseTimeStr(raw) };
+      return { ...meta, label: getZmanLabel(id, new Date().getDay()), value: formatTime(raw, use24Hour, zmanim.timezone), _t: parseTimeStr(raw) };
     })
     .filter(Boolean)
     .sort((a, b) => {

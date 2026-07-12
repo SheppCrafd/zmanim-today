@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { Timer } from "lucide-react";
 import { parseTimeStr, formatCountdown, formatTime } from "@/lib/timeUtils";
-import { ZMANIM_BY_ID, ZMANIM_ORDERED_KEYS } from "@/lib/zmanimSchema";
+import { ZMANIM_BY_ID, ZMANIM_ORDERED_KEYS, getZmanLabel } from "@/lib/zmanimSchema";
 
 export default function NextZmanCard({ zmanim, use24Hour }) {
   const [now, setNow] = useState(new Date());
@@ -52,7 +52,7 @@ export default function NextZmanCard({ zmanim, use24Hour }) {
       <div className="flex items-center justify-between">
         <div>
           <p className="text-lg font-bold text-slate-800 dark:text-slate-100">
-            {meta.icon} {meta.label}
+            {meta.icon} {getZmanLabel(next.key, now.getDay())}
           </p>
           <p className="text-sm text-slate-500 dark:text-slate-400">
             {formatTime(next.val, use24Hour, zmanim.timezone)}

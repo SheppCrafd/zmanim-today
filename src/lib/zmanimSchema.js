@@ -34,7 +34,7 @@ export const ZMANIM_SCHEMA = [
     id: "sof_zman_shma_mga",
     label: "Sof Zman Shema (MGA)",
     icon: "📜",
-    description: "3 hrs after dawn (stringent)",
+    description: "3 halachic hrs after dawn (stringent)",
     group: "morning",
     highlight: false,
   },
@@ -42,7 +42,7 @@ export const ZMANIM_SCHEMA = [
     id: "sof_zman_shma_gra",
     label: "Sof Zman Shema (GRA)",
     icon: "📜",
-    description: "Latest Shema - 3 hrs after sunrise",
+    description: "Latest Shema - 3 halachic hrs after sunrise",
     group: "morning",
     highlight: true,
   },
@@ -50,7 +50,7 @@ export const ZMANIM_SCHEMA = [
     id: "sof_zman_tefillah_mga",
     label: "Sof Zman Tefillah (MGA)",
     icon: "🕍",
-    description: "4 hrs after dawn (stringent)",
+    description: "4 halachic hrs after dawn (stringent)",
     group: "morning",
     highlight: false,
   },
@@ -58,7 +58,7 @@ export const ZMANIM_SCHEMA = [
     id: "sof_zman_tefillah_gra",
     label: "Sof Zman Tefillah (GRA)",
     icon: "🕍",
-    description: "Latest Shemoneh Esrei - 4 hrs",
+    description: "Latest Shemoneh Esrei - 4 halachic hrs",
     group: "morning",
     highlight: true,
   },
@@ -84,7 +84,7 @@ export const ZMANIM_SCHEMA = [
     id: "mincha_ketana",
     label: "Mincha Ketana",
     icon: "🕐",
-    description: "Preferred Mincha - 2.5 hrs before sunset",
+    description: "Preferred Mincha - 2.5 halachic hrs before sunset",
     group: "afternoon",
     highlight: false,
   },
@@ -92,7 +92,7 @@ export const ZMANIM_SCHEMA = [
     id: "plag_hamincha",
     label: "Plag HaMincha",
     icon: "⏳",
-    description: "Earliest candle lighting - 1.25 hrs before sunset",
+    description: "1.25 halachic hrs before sunset",
     group: "afternoon",
     highlight: false,
   },
@@ -132,15 +132,6 @@ export const ZMANIM_SCHEMA = [
     highlight: false,
   },
   {
-    id: "havdalah",
-    label: "Havdalah",
-    icon: "🕍",
-    description: "End of Shabbat - 3 medium stars",
-    group: "evening",
-    highlight: true,
-    saturdayOnly: true,
-  },
-  {
     id: "chatzot_laila",
     label: "Chatzot Laila",
     icon: "🌙",
@@ -157,6 +148,19 @@ export const ZMANIM_BY_ID = Object.fromEntries(
 
 /** Ordered list of zmanim keys (for next-zman countdown ordering) */
 export const ZMANIM_ORDERED_KEYS = ZMANIM_SCHEMA.map((z) => z.id);
+
+/**
+ * Returns the display label for a zman, adjusting for day-of-week
+ * (e.g. Tzeit HaKochavim doubles as Havdalah on Saturday).
+ */
+export function getZmanLabel(id, dayOfWeek) {
+  const meta = ZMANIM_BY_ID[id];
+  if (!meta) return id;
+  if (id === "tzait_hakochavim" && dayOfWeek === 6) {
+    return "Tzeit HaKochavim/Havdalah";
+  }
+  return meta.label;
+}
 
 /** Group definitions for the full Zmanim page */
 export const ZMANIM_GROUPS = [
@@ -199,13 +203,13 @@ export function getGroupEntries(groupId, zmanimData, dayOfWeek) {
   return ZMANIM_SCHEMA.filter((z) => z.group === groupId)
     .filter((z) => {
       if (z.fridayOnly && !isFriday) return false;
-      if (z.saturdayOnly && !isSaturday) return false;
-      // Hide tzait_72 label on Saturday (havdalah takes over), but keep otherwise
+      // Hide tzait_72 on Saturday (clutter reduction)
       if (z.id === "tzait_72" && isSaturday) return false;
       return true;
     })
     .map((z) => ({
       ...z,
+      label: getZmanLabel(z.id, dayOfWeek),
       value: zmanimData?.[z.id] ?? null,
     }))
     .filter((z) => z.value !== null);

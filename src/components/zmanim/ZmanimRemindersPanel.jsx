@@ -92,13 +92,13 @@ const ALL_ZMANIM = [
   },
   {
     key: "tzait_hakochavim",
-    label: "Ma'ariv / Tzait HaKochavim",
+    label: "Tzeit HaKochavim / Havdalah",
     emoji: "🌙",
-    description: "Nightfall – 3 stars",
+    description: "Nightfall - 3 medium stars",
   },
   {
     key: "tzait_72",
-    label: "Havdalah / Tzait (72 min)",
+    label: "Tzait (72 min)",
     emoji: "🌟",
     description: "Rabbeinu Tam nightfall",
   },
@@ -263,11 +263,7 @@ export default function ZmanimRemindersPanel({ zmanimData, currentDate }) {
               const zmanTime = zmanimData?.zmanim?.[key];
               const todayDow = new Date().getDay();
               const dayNote =
-                key === "candle_lighting"
-                  ? "(Fridays only)"
-                  : key === "tzait_72"
-                    ? "(Saturdays only)"
-                    : null;
+                key === "candle_lighting" ? "(Fridays only)" : null;
               return (
                 <div
                   key={key}

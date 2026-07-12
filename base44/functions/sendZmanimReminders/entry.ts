@@ -37,8 +37,8 @@ const LABELS = {
   plag_hamincha: { emoji: "\uD83C\uDF25\uFE0F", label: "Plag HaMincha" },
   candle_lighting: { emoji: "\uD83D\uDD6F\uFE0F", label: "Candle Lighting" },
   sunset: { emoji: "\uD83C\uDF07", label: "Sunset" },
-  tzait_hakochavim: { emoji: "\uD83C\uDF19", label: "Tzeit HaKochavim" },
-  tzait_72: { emoji: "\uD83C\uDF1F", label: "Havdalah / Tzait (72 min)" },
+  tzait_hakochavim: { emoji: "\uD83C\uDF19", label: "Tzeit HaKochavim / Havdalah" },
+  tzait_72: { emoji: "\uD83C\uDF1F", label: "Tzait (72 min)" },
   chatzot_laila: { emoji: "\uD83C\uDF03", label: "Chatzot Laila" },
 };
 
@@ -187,7 +187,6 @@ Deno.serve(async (req) => {
           const pref = prefs[key];
           if (!pref || !pref.enabled) continue;
           if (key === "candle_lighting" && dow !== 5) continue;
-          if (key === "tzait_72" && dow !== 6) continue;
           const timeStr = zmanim[key];
           if (!timeStr) continue;
           const zmanTime = new Date(timeStr).getTime();
