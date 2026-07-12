@@ -1,5 +1,5 @@
 import React from "react";
-import { formatTime } from "@/lib/timeUtils";
+import { formatTime, parseTimeStr } from "@/lib/timeUtils";
 import { ZMANIM_BY_ID } from "@/lib/zmanimSchema";
 
 export default function ZmanimSummary({ zmanim, enabledIds, use24Hour }) {
@@ -11,9 +11,14 @@ export default function ZmanimSummary({ zmanim, enabledIds, use24Hour }) {
       if (!meta) return null;
       const raw = zmanim.zmanim[id];
       if (!raw) return null;
-      return { ...meta, value: formatTime(raw, use24Hour, zmanim.timezone) };
+      return { ...meta, value: formatTime(raw, use24Hour, zmanim.timezone), _t: parseTimeStr(raw) };
     })
-    .filter(Boolean);
+    .filter(Boolean)
+    .sort((a, b) => {
+      const ta = a._t ? a._t.getTime() : Infinity;
+      const tb = b._t ? b._t.getTime() : Infinity;
+      return ta - tb;
+    });
 
   if (!items.length) return null;
 

@@ -31,14 +31,6 @@ export const ZMANIM_SCHEMA = [
     highlight: true,
   },
   {
-    id: "sof_zman_shma_gra",
-    label: "Sof Zman Shema (GRA)",
-    icon: "📜",
-    description: "Latest Shema - 3 hrs after sunrise",
-    group: "morning",
-    highlight: true,
-  },
-  {
     id: "sof_zman_shma_mga",
     label: "Sof Zman Shema (MGA)",
     icon: "📜",
@@ -47,10 +39,10 @@ export const ZMANIM_SCHEMA = [
     highlight: false,
   },
   {
-    id: "sof_zman_tefillah_gra",
-    label: "Sof Zman Tefillah (GRA)",
-    icon: "🕍",
-    description: "Latest Shemoneh Esrei - 4 hrs",
+    id: "sof_zman_shma_gra",
+    label: "Sof Zman Shema (GRA)",
+    icon: "📜",
+    description: "Latest Shema - 3 hrs after sunrise",
     group: "morning",
     highlight: true,
   },
@@ -61,6 +53,14 @@ export const ZMANIM_SCHEMA = [
     description: "4 hrs after dawn (stringent)",
     group: "morning",
     highlight: false,
+  },
+  {
+    id: "sof_zman_tefillah_gra",
+    label: "Sof Zman Tefillah (GRA)",
+    icon: "🕍",
+    description: "Latest Shemoneh Esrei - 4 hrs",
+    group: "morning",
+    highlight: true,
   },
 
   // Midday & Afternoon
@@ -135,7 +135,7 @@ export const ZMANIM_SCHEMA = [
     id: "havdalah",
     label: "Havdalah",
     icon: "🕍",
-    description: "Nightfall - Rabbeinu Tam",
+    description: "End of Shabbat - 3 medium stars",
     group: "evening",
     highlight: true,
     saturdayOnly: true,
