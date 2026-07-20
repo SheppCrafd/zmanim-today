@@ -5,6 +5,7 @@ import {
   useMemo,
   useCallback,
 } from "react";
+import DOMPurify from "dompurify";
 import { useQueries, useQueryClient } from "@tanstack/react-query";
 import {
   ExternalLink,
@@ -29,18 +30,20 @@ import {
   SiddurError,
 } from "@/components/siddur/SiddurSegment";
 
-/* ---------------- SANITIZER ---------------- */
+/* ---------------- SANITIZER ----------------
+ * Sefaria text can include community-contributed HTML, so this is untrusted
+ * input rendered via dangerouslySetInnerHTML. Delegate to DOMPurify (fuzzed
+ * against real browser parsers, actively maintained) rather than a hand-rolled
+ * parser+stripper — the latter is exactly the pattern that's historically
+ * produced subtle mutation-XSS bypasses. Zero surviving attributes, matching
+ * the plain-text-with-basic-formatting output the reader has always shown.
+ * (Note: don't combine ALLOWED_ATTR with USE_PROFILES here — DOMPurify 3.x
+ * silently drops the ALLOWED_ATTR restriction when both are set together.) */
 function sanitizeHTML(htmlString) {
   if (!htmlString) return "";
-  const parser = new DOMParser();
-  const doc = parser.parseFromString(htmlString, "text/html");
-  doc
-    .querySelectorAll("script, iframe, object, embed, style, link, meta, base")
-    .forEach((el) => el.remove());
-  doc.querySelectorAll("*").forEach((el) => {
-    Array.from(el.attributes).forEach((attr) => el.removeAttribute(attr.name));
+  return DOMPurify.sanitize(htmlString, {
+    ALLOWED_ATTR: [],
   });
-  return doc.body.innerHTML;
 }
 
 const clampScale = (s) => Math.max(0.5, Math.min(3, Math.round(s * 20) / 20));
