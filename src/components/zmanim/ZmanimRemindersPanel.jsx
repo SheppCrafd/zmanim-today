@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import { Bell, BellRing, Check, Wifi } from "lucide-react";
 import {
   Sheet,

@@ -1,4 +1,3 @@
-import React, { useRef, useState, useEffect } from "react";
 import { useCompassHeading } from "@/hooks/useCompassHeading";
 import { Link } from "react-router-dom";
 

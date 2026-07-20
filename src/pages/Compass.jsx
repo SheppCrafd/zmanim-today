@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { MapPin, Loader2, AlertCircle } from "lucide-react";
 import NavMenu from "@/components/NavMenu";
 import { Button } from "@/components/ui/button";

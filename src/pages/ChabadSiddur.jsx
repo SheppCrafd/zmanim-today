@@ -1,4 +1,3 @@
-import React from "react";
 import SiddurView from "@/components/siddur/SiddurView";
 
 export default function ChabadSiddur() {

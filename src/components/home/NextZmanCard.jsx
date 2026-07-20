@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { Timer } from "lucide-react";
 import { parseTimeStr, formatCountdown, formatTime } from "@/lib/timeUtils";
 import { ZMANIM_BY_ID, ZMANIM_ORDERED_KEYS, getZmanLabel } from "@/lib/zmanimSchema";

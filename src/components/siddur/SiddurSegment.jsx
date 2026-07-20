@@ -1,4 +1,4 @@
-import React, { memo } from "react";
+import { memo } from "react";
 import { AlertCircle } from "lucide-react";
 
 /* Memoized header — only re-renders if the label changes */

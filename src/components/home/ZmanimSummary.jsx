@@ -1,4 +1,3 @@
-import React from "react";
 import { formatTime, parseTimeStr } from "@/lib/timeUtils";
 import { ZMANIM_BY_ID, getZmanLabel } from "@/lib/zmanimSchema";
 
