@@ -11,6 +11,16 @@
       content="width=device-width, initial-scale=1.0, viewport-fit=cover"
     />
     <link rel="manifest" href="/manifest.json" />
+    <!-- Warm connections to APIs hit during the normal load path (zmanim
+         fetch is immediate once a location is known; the rest are hit on
+         user-initiated location/siddur flows) so the first request to each
+         doesn't pay DNS/TLS setup cost on top of the request itself. -->
+    <link rel="preconnect" href="https://www.hebcal.com" />
+    <link rel="dns-prefetch" href="https://www.hebcal.com" />
+    <link rel="dns-prefetch" href="https://api.bigdatacloud.net" />
+    <link rel="dns-prefetch" href="https://geocoding-api.open-meteo.com" />
+    <link rel="dns-prefetch" href="https://timeapi.io" />
+    <link rel="dns-prefetch" href="https://www.sefaria.org" />
     <title>Zmanim Today</title>
     <meta
       name="description"
