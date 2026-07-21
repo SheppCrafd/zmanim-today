@@ -60,7 +60,14 @@ function CompassSVG({ heading, bearing }) {
   useEffect(() => {
     function tick() {
       animHeading.current = lerp(animHeading.current, heading, 0.1);
-      setDisplayHeading(animHeading.current);
+      // Skip re-rendering for sub-visual changes — on a 280px dial this is
+      // well under a pixel of arrow movement, so it's imperceptible, but
+      // skipping it avoids a steady 60fps re-render of the full compass SVG.
+      setDisplayHeading((prev) =>
+        Math.abs(animHeading.current - prev) < 0.05
+          ? prev
+          : animHeading.current,
+      );
       animFrame.current = requestAnimationFrame(tick);
     }
     animFrame.current = requestAnimationFrame(tick);

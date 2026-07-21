@@ -46,6 +46,24 @@ function sanitizeHTML(htmlString) {
   });
 }
 
+// Query data is immutable once fetched (react-query + IndexedDB cache), so the
+// same raw he/en string comes back on every re-render of a given section. The
+// flatItems memo below recomputes for the *entire* activeSections list every
+// time it grows (infinite scroll) or langMode toggles, which without a cache
+// means re-running DOMPurify over every already-seen segment again and again.
+// Caching by the raw string sidesteps that — pure function of its input, so a
+// plain module-level Map (never invalidated) is safe and keeps the sanitized
+// output byte-identical to calling sanitizeHTML directly.
+const sanitizeCache = new Map();
+function sanitizeCached(htmlString) {
+  if (!htmlString) return "";
+  const hit = sanitizeCache.get(htmlString);
+  if (hit !== undefined) return hit;
+  const clean = sanitizeHTML(htmlString);
+  sanitizeCache.set(htmlString, clean);
+  return clean;
+}
+
 const clampScale = (s) => Math.max(0.5, Math.min(3, Math.round(s * 20) / 20));
 
 /* ---------------- SUBHEADER DETECTION ---------------- */
@@ -417,8 +435,15 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
     };
   }, [sections, queryClient, pruning]);
 
-  // Sliced queries starting from 0
-  const activeSections = visibleSections.slice(0, renderCount + 1);
+  // Sliced queries starting from 0. Memoized so unrelated re-renders (e.g. a
+  // search-box keystroke while on the TOC page) don't produce a new array
+  // identity, which would otherwise force flatItems/itemsBySection below to
+  // recompute (and re-walk every loaded segment) even though nothing about
+  // the reader's visible content actually changed.
+  const activeSections = useMemo(
+    () => visibleSections.slice(0, renderCount + 1),
+    [visibleSections, renderCount],
+  );
 
   const sectionQueries = useQueries({
     queries: activeSections.map((sec) => ({
@@ -478,8 +503,8 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
           items.push({
             type: "segment",
             id: `seg-${i}-${segIndex}`,
-            sanitizedHe: sanitizeHTML(seg.he),
-            sanitizedEn: sanitizeHTML(seg.en),
+            sanitizedHe: sanitizeCached(seg.he),
+            sanitizedEn: sanitizeCached(seg.en),
             hasH,
             hasE,
             sectionIndex: i,

@@ -13,4 +13,20 @@ export default defineConfig({
     }),
     react(),
   ],
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          // React core changes far less often than app code and is loaded on
+          // every route (Home is eager, everything else is lazy but still
+          // depends on it). Splitting it into its own chunk means a deploy
+          // that only touches app code doesn't invalidate the browser's
+          // cached copy of react/react-dom — same bytes shipped, better
+          // repeat-visit caching. Doesn't change what loads eagerly vs.
+          // lazily for any route.
+          "react-vendor": ["react", "react-dom", "react-router-dom"],
+        },
+      },
+    },
+  },
 });

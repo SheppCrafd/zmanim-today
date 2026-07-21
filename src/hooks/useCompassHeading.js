@@ -24,7 +24,15 @@ export function useCompassHeading() {
       if (diff > 180) diff -= 360;
       if (diff < -180) diff += 360;
       smoothRef.current = smoothRef.current + diff * 0.1;
-      setHeading(smoothRef.current);
+      // Skip the state update (and the re-render it triggers) when the change
+      // since the last render is imperceptibly small. Sensor noise otherwise
+      // drives this to re-render ~60x/sec for the entire time the compass is
+      // mounted (i.e. most of the time Home is open), even while the device
+      // is sitting still. The physics above still integrate every frame, so
+      // accuracy is unaffected — only redundant renders are skipped.
+      setHeading((prev) =>
+        Math.abs(smoothRef.current - prev) < 0.05 ? prev : smoothRef.current,
+      );
       frameRef.current = requestAnimationFrame(animate);
     };
     frameRef.current = requestAnimationFrame(animate);
