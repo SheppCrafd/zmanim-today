@@ -10,6 +10,7 @@ import PageNotFound from "./lib/PageNotFound";
 import { AuthProvider, useAuth } from "@/lib/AuthContext";
 import { ThemeProvider } from "@/lib/ThemeContext";
 import UserNotRegisteredError from "@/components/UserNotRegisteredError";
+import BottomTabBar from "@/components/BottomTabBar";
 import { Navigate } from "react-router-dom";
 
 // Home is the landing route, so it stays in the main bundle — first paint is
@@ -63,6 +64,19 @@ const RouteFallback = () => (
   </div>
 );
 
+// The four primary destinations get a flex-column app shell with the tab
+// bar as a normal last child (not `position: fixed` — see BottomTabBar.jsx
+// for why). The page itself scrolls inside the flex-1 middle; the tab bar
+// takes only the space it needs and is never overlaid or scrolled away.
+// The Siddur reading routes deliberately don't get this shell — they're a
+// full-screen focused mode with their own internal layout.
+const TabPage = ({ children }) => (
+  <div className="h-[100dvh] flex flex-col">
+    <div className="flex-1 min-h-0 overflow-y-auto">{children}</div>
+    <BottomTabBar />
+  </div>
+);
+
 const AuthenticatedApp = () => {
   const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } =
     useAuth();
@@ -84,10 +98,10 @@ const AuthenticatedApp = () => {
   return (
     <Suspense fallback={<RouteFallback />}>
       <Routes>
-        <Route path="/" element={<Home />} />
-        <Route path="/Zmanim" element={<Zmanim />} />
-        <Route path="/Compass" element={<Compass />} />
-        <Route path="/Settings" element={<Settings />} />
+        <Route path="/" element={<TabPage><Home /></TabPage>} />
+        <Route path="/Zmanim" element={<TabPage><Zmanim /></TabPage>} />
+        <Route path="/Compass" element={<TabPage><Compass /></TabPage>} />
+        <Route path="/Settings" element={<TabPage><Settings /></TabPage>} />
 
         {/* SIDDUR ROUTES — wildcard prevents remount on TOC↔section navigation */}
         <Route

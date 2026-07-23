@@ -2,15 +2,12 @@ import { useState } from "react";
 import {
   GripVertical,
   Check,
-  ArrowLeft,
   Moon,
   BookOpen,
   LogOut,
   Trash2,
   Loader2,
 } from "lucide-react";
-import { useNavigate } from "react-router-dom";
-import NavMenu from "@/components/NavMenu";
 import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd";
 import {
   useDashboardPrefs,
@@ -32,7 +29,6 @@ import {
 } from "@/components/ui/alert-dialog";
 
 export default function Settings() {
-  const navigate = useNavigate();
   const { prefs, toggleItem, reorderItems, toggle24Hour } = useDashboardPrefs();
   const { location, clearLocation } = useSavedLocation();
   const { dark, toggleDark } = useTheme();
@@ -73,26 +69,13 @@ export default function Settings() {
     ALL_DASHBOARD_ITEMS.find((i) => i.id === id)?.icon || "⏱";
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-amber-50 pb-24">
+    <div className="min-h-full bg-background pb-4">
       <div className="max-w-lg mx-auto px-4 pt-4">
-        <div className="flex items-center mb-6 min-h-[56px]">
-          <div className="shrink-0">
-            <NavMenu />
-          </div>
-          <div className="flex-1 text-center px-2">
-            <h1 className="font-display text-2xl font-semibold text-slate-800 tracking-tight">
-              Settings
-            </h1>
-            <p className="text-slate-500 text-sm">Customize your dashboard</p>
-          </div>
-          <div className="shrink-0">
-            <button
-              onClick={() => navigate(-1)}
-              className="p-2 rounded-lg bg-white/90 shadow-sm border border-slate-200 hover:bg-slate-50 transition-colors flex items-center gap-1 text-sm text-slate-700 pr-3"
-            >
-              <ArrowLeft className="w-4 h-4" /> Back
-            </button>
-          </div>
+        <div className="mb-6">
+          <h1 className="font-display text-2xl font-semibold text-slate-800 tracking-tight">
+            Settings
+          </h1>
+          <p className="text-slate-500 text-sm">Customize your dashboard</p>
         </div>
 
         {/* Location */}
