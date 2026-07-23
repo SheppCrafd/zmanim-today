@@ -80,7 +80,7 @@ export default function Settings() {
             <NavMenu />
           </div>
           <div className="flex-1 text-center px-2">
-            <h1 className="text-2xl font-bold text-slate-800 tracking-tight">
+            <h1 className="font-display text-2xl font-semibold text-slate-800 tracking-tight">
               Settings
             </h1>
             <p className="text-slate-500 text-sm">Customize your dashboard</p>

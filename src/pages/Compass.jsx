@@ -345,7 +345,7 @@ export default function Compass() {
             <NavMenu />
           </div>
           <div className="flex-1 text-center px-2">
-            <h1 className="text-3xl font-bold text-slate-800 dark:text-slate-100 mb-1 tracking-tight">
+            <h1 className="font-display text-3xl font-semibold text-slate-800 dark:text-slate-100 mb-1 tracking-tight">
               Compass to
               <br />
               Jerusalem

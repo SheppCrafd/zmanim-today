@@ -649,7 +649,7 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
           <div className="flex items-center gap-3">
             <NavMenu />
             <div>
-              <h1 className="text-lg font-bold">{title}</h1>
+              <h1 className="font-display text-lg font-semibold">{title}</h1>
               <p className="text-xs text-slate-500">{subtitle}</p>
             </div>
           </div>

@@ -207,7 +207,7 @@ export default function Zmanim() {
             <NavMenu />
           </div>
           <div className="flex-1 text-center px-2">
-            <h1 className="text-4xl md:text-5xl font-bold text-slate-800 mb-2 tracking-tight">
+            <h1 className="font-display text-4xl md:text-5xl font-semibold text-slate-800 mb-2 tracking-tight">
               Zmanim
             </h1>
             <p className="text-slate-600 text-lg">זמני היום</p>
