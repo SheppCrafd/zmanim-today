@@ -58,7 +58,16 @@ function CompassSVG({ heading, bearing }) {
   const [displayHeading, setDisplayHeading] = useState(heading);
 
   useEffect(() => {
+    // Stops scheduling frames once the dial has caught up to `heading` instead
+    // of recursing forever — the effect reruns (and restarts the loop) the
+    // next time a real sensor reading changes `heading`. Recursing
+    // unconditionally meant a permanent 60fps loop on this page for as long
+    // as it stayed open, even while stationary or on a device with no
+    // magnetometer where `heading` never changes at all after mount.
     function tick() {
+      let diff = heading - animHeading.current;
+      if (diff > 180) diff -= 360;
+      if (diff < -180) diff += 360;
       animHeading.current = lerp(animHeading.current, heading, 0.1);
       // Skip re-rendering for sub-visual changes — on a 280px dial this is
       // well under a pixel of arrow movement, so it's imperceptible, but
@@ -68,7 +77,9 @@ function CompassSVG({ heading, bearing }) {
           ? prev
           : animHeading.current,
       );
-      animFrame.current = requestAnimationFrame(tick);
+      if (Math.abs(diff) > 0.05) {
+        animFrame.current = requestAnimationFrame(tick);
+      }
     }
     animFrame.current = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(animFrame.current);

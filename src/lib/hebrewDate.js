@@ -88,14 +88,30 @@ async function convert(date) {
   return res.json();
 }
 
+// A Gregorian date's Hebrew date/parsha never changes, so once resolved it's
+// cached for the rest of the session — repeat visits to the same date (very
+// common via the Zmanim page's Today/prev/next controls) are instant instead
+// of re-hitting Hebcal.
+const hebrewDateCache = new Map();
+const dateKey = (d) => `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+
 export async function getHebrewDate(date) {
-  const data = await convert(date);
+  const key = dateKey(date);
+  const cached = hebrewDateCache.get(key);
+  if (cached) return cached;
 
   // Parsha: from the Shabbat of the week containing this date
   const daysUntilSaturday = (6 - date.getDay() + 7) % 7;
   const saturday = new Date(date);
   saturday.setDate(saturday.getDate() + daysUntilSaturday);
-  const satData = await convert(saturday);
+
+  // These two lookups don't depend on each other, so run them in parallel
+  // instead of paying two sequential round trips before anything can render.
+  const [data, satData] = await Promise.all([
+    convert(date),
+    convert(saturday),
+  ]);
+
   const parshaEvent = (satData.events || []).find(
     (e) => e.startsWith("Parashat") || e.startsWith("Parshat"),
   );
@@ -105,7 +121,7 @@ export async function getHebrewDate(date) {
 
   const day = HEBREW_DAYS[date.getDay()];
 
-  return {
+  const result = {
     hebrew_date: data.hebrew,
     hebrew_date_transliterated: `${data.hd} ${data.hm} ${data.hy}`,
     day_of_week_hebrew: day.hebrew,
@@ -113,4 +129,6 @@ export async function getHebrewDate(date) {
     parsha,
     parsha_hebrew: parsha ? PARSHA_HEBREW[parsha] || "" : "",
   };
+  hebrewDateCache.set(key, result);
+  return result;
 }

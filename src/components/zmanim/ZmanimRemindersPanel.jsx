@@ -261,7 +261,6 @@ export default function ZmanimRemindersPanel({ zmanimData, currentDate }) {
             {ALL_ZMANIM.map(({ key, label, emoji, description }) => {
               const pref = prefs[key] || { enabled: false, minutesBefore: 10 };
               const zmanTime = zmanimData?.zmanim?.[key];
-              const todayDow = new Date().getDay();
               const dayNote =
                 key === "candle_lighting" ? "(Fridays only)" : null;
               return (
