@@ -147,35 +147,36 @@ Deno.serve(async (req) => {
     );
     const now = Date.now();
     const results = { sent: 0, skipped: 0, errors: 0, removed: 0, total: subs.length };
+    // Stores in-flight promises, not resolved values — under the concurrent
+    // worker pool below, two subscribers sharing a cache key (same rounded
+    // coordinates + date) can be processed in the same tick, and this makes
+    // the second one await the first's already-started fetch instead of
+    // firing a duplicate request to Hebcal.
     const zmanimCache = new Map();
 
-    for (const sub of subs) {
+    async function processSub(sub) {
       try {
         if (
           !sub.endpoint || !sub.p256dh || !sub.auth ||
           !sub.latitude || !sub.longitude
         ) {
           results.skipped++;
-          continue;
+          return;
         }
         const tzid = sub.timezone || "";
         const today = localDateStr(tzid);
         const dow = localDow(tzid);
         const cacheKey =
           `${sub.latitude.toFixed(3)},${sub.longitude.toFixed(3)},${today}`;
-        let zmanim = zmanimCache.get(cacheKey);
-        if (!zmanim) {
-          zmanim = await fetchZmanim(
-            sub.latitude,
-            sub.longitude,
-            tzid,
-            today,
-          );
-          zmanimCache.set(cacheKey, zmanim);
+        let zmanimPromise = zmanimCache.get(cacheKey);
+        if (!zmanimPromise) {
+          zmanimPromise = fetchZmanim(sub.latitude, sub.longitude, tzid, today);
+          zmanimCache.set(cacheKey, zmanimPromise);
         }
+        const zmanim = await zmanimPromise;
         if (!zmanim) {
           results.skipped++;
-          continue;
+          return;
         }
 
         let sentKeys = Array.isArray(sub.sent_keys) ? sub.sent_keys.slice() : [];
@@ -254,6 +255,27 @@ Deno.serve(async (req) => {
         results.skipped++;
       }
     }
+
+    // Subscribers are fully independent (own endpoint, own webpush call), so
+    // processing them one at a time serially just adds up every subscriber's
+    // network round trip in sequence — with hundreds of subscribers that
+    // could take minutes, delaying later-processed reminders and risking the
+    // function's own execution time limit as the subscriber base grows. A
+    // small bounded worker pool (same concurrency-limited pattern already
+    // used for SiddurView's cold-start empty-section sweep) processes them
+    // in parallel instead, capped so a burst doesn't hammer the push service
+    // or Hebcal all at once.
+    const CONCURRENCY = 15;
+    let cursor = 0;
+    async function worker() {
+      while (cursor < subs.length) {
+        const sub = subs[cursor++];
+        await processSub(sub);
+      }
+    }
+    await Promise.all(
+      Array.from({ length: Math.min(CONCURRENCY, subs.length) }, worker),
+    );
 
     return Response.json({ ok: true, ...results });
   } catch (error) {

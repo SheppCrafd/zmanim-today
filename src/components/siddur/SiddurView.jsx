@@ -144,7 +144,6 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
 
   const [tree, setTree] = useState([]);
   const [sections, setSections] = useState([]);
-  const [refToIndex, setRefToIndex] = useState({});
 
   // Render count for infinite downward scroll (always starts at 0)
   const [renderCount, setRenderCount] = useState(10);
@@ -305,12 +304,9 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
     fetch(`https://www.sefaria.org/api/index/${bookRef}`)
       .then((r) => r.json())
       .then((data) => {
-        const { tree, flat, refToIndex } = processSefariaSchema(
-          data?.schema || {},
-        );
+        const { tree, flat } = processSefariaSchema(data?.schema || {});
         setTree(tree);
         setSections(flat);
-        setRefToIndex(refToIndex);
         setLoading(false);
       })
       .catch(() => {

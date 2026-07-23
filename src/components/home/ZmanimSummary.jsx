@@ -4,13 +4,14 @@ import { ZMANIM_BY_ID, getZmanLabel } from "@/lib/zmanimSchema";
 export default function ZmanimSummary({ zmanim, enabledIds, use24Hour }) {
   if (!zmanim?.zmanim) return null;
 
+  const dayOfWeek = new Date().getDay();
   const items = enabledIds
     .map((id) => {
       const meta = ZMANIM_BY_ID[id];
       if (!meta) return null;
       const raw = zmanim.zmanim[id];
       if (!raw) return null;
-      return { ...meta, label: getZmanLabel(id, new Date().getDay()), value: formatTime(raw, use24Hour, zmanim.timezone), _t: parseTimeStr(raw) };
+      return { ...meta, label: getZmanLabel(id, dayOfWeek), value: formatTime(raw, use24Hour, zmanim.timezone), _t: parseTimeStr(raw) };
     })
     .filter(Boolean)
     .sort((a, b) => {
@@ -22,11 +23,11 @@ export default function ZmanimSummary({ zmanim, enabledIds, use24Hour }) {
   if (!items.length) return null;
 
   return (
-    <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+    <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
       {items.map((item, i) => (
         <div
           key={item.id}
-          className={`flex items-center justify-between px-4 py-3 ${i < items.length - 1 ? "border-b border-slate-100" : ""}`}
+          className={`flex items-center justify-between px-4 py-3 ${i < items.length - 1 ? "border-b border-border" : ""}`}
         >
           <div className="flex items-center gap-3">
             <span className="text-base">{item.icon}</span>

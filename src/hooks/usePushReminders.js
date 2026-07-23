@@ -3,6 +3,7 @@ import { base44 } from "@/api/base44Client";
 import { VAPID_PUBLIC_KEY } from "@/lib/vapid";
 
 const SUB_ID_KEY = "zmanim_push_sub_id";
+const SUB_SNAPSHOT_KEY = "zmanim_push_sub_snapshot";
 const LOC_KEY = "zmanim_saved_location";
 
 function bufferToB64url(buf) {
@@ -83,6 +84,25 @@ export function usePushReminders({ prefs, notifPermission }) {
           return null;
         }
       })();
+
+      // This effect re-runs on every Home mount whenever notifications are
+      // already granted, which previously meant a backend PUT on every single
+      // page load even when nothing about the subscription had changed since
+      // the last sync. Skip the round trip entirely when the payload is
+      // byte-identical to what was last successfully synced.
+      const fingerprint = JSON.stringify(payload);
+      const lastSynced = (() => {
+        try {
+          return localStorage.getItem(SUB_SNAPSHOT_KEY);
+        } catch {
+          return null;
+        }
+      })();
+      if (savedId && lastSynced === fingerprint) {
+        setStatus("subscribed");
+        return;
+      }
+
       if (savedId) {
         try {
           await base44.entities.PushSubscription.update(savedId, payload);
@@ -98,6 +118,9 @@ export function usePushReminders({ prefs, notifPermission }) {
           localStorage.setItem(SUB_ID_KEY, created.id);
         } catch {}
       }
+      try {
+        localStorage.setItem(SUB_SNAPSHOT_KEY, fingerprint);
+      } catch {}
       setStatus("subscribed");
     } catch (e) {
       setError(e?.message || "Failed to enable push reminders.");

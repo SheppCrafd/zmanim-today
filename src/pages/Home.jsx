@@ -35,19 +35,22 @@ function LocationLabel({ location }) {
   );
 }
 
-const today = new Date();
-const tomorrow = new Date(today);
-tomorrow.setDate(today.getDate() + 1);
-const isFriday = today.getDay() === 5;
-
 export default function Home() {
+  // Computed fresh every render (not module scope) — this is an installed
+  // PWA people leave open for days, and a `new Date()` fixed at module-load
+  // time would keep showing yesterday's zmanim/Havdalah state forever past
+  // midnight until a hard refresh. The cost of recomputing is negligible.
+  const today = new Date();
+  const tomorrow = new Date(today);
+  tomorrow.setDate(today.getDate() + 1);
+  const isFriday = today.getDay() === 5;
+
   const {
     location,
     loading: locLoading,
     error: locError,
     detectGPS,
     searchLocation,
-    clearLocation,
   } = useSavedLocation();
   const { zmanim, loading: zmanimLoading } = useZmanim(location);
   // Only ever displayed in the Friday-only Havdalah card below, so only
