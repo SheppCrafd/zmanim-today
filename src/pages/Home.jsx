@@ -5,6 +5,7 @@ import {
   Search,
   ChevronRight,
   AlertCircle,
+  Settings,
   Printer,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -16,6 +17,7 @@ import { useDashboardPrefs } from "@/hooks/useDashboardPrefs";
 import MiniCompass from "@/components/home/MiniCompass";
 import NextZmanCard from "@/components/home/NextZmanCard";
 import ZmanimSummary from "@/components/home/ZmanimSummary";
+import NavMenu from "@/components/NavMenu";
 import { printZmanim } from "@/lib/printZmanim";
 import ZmanimRemindersPanel from "@/components/zmanim/ZmanimRemindersPanel";
 import { formatTime } from "@/lib/timeUtils";
@@ -76,11 +78,14 @@ export default function Home() {
   };
 
   return (
-    <div className="min-h-screen bg-background pb-24">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-amber-50 pb-24">
       <div className="max-w-lg mx-auto px-4 pt-4 pb-4">
         {/* Header */}
-        <div className="flex items-center justify-between mb-6 min-h-[56px]">
-          <div>
+        <div className="flex items-center mb-6 min-h-[56px]">
+          <div className="shrink-0">
+            <NavMenu />
+          </div>
+          <div className="flex-1 text-center px-2">
             <h1 className="font-display text-2xl font-semibold text-slate-800 tracking-tight">
               Zmanim Today
             </h1>
@@ -88,6 +93,11 @@ export default function Home() {
           </div>
           <div className="shrink-0 flex items-center gap-2">
             <ZmanimRemindersPanel zmanimData={zmanim} currentDate={today} />
+            <Link to="/Settings">
+              <button className="p-2 rounded-lg bg-white/90 shadow-sm border border-slate-200 hover:bg-slate-50 transition-colors">
+                <Settings className="w-5 h-5 text-slate-700" />
+              </button>
+            </Link>
           </div>
         </div>
 

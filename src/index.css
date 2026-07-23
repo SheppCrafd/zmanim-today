@@ -104,7 +104,7 @@ button:focus-visible {
     --chart-3: 197 37% 24%;
     --chart-4: 43 74% 66%;
     --chart-5: 27 87% 67%;
-    --radius: 0.625rem;
+    --radius: 0.5rem;
     --font-display: "Fraunces", ui-serif, Georgia, serif;
     --sidebar-background: 0 0% 98%;
     --sidebar-foreground: 240 5.3% 26.1%;
@@ -158,39 +158,15 @@ button:focus-visible {
   body {
     @apply bg-background text-foreground;
   }
-
-  ::selection {
-    background-color: hsl(var(--primary) / 0.25);
-    color: hsl(var(--foreground));
-  }
-
-  * {
-    scrollbar-width: thin;
-    scrollbar-color: hsl(var(--border)) transparent;
-  }
-
-  ::-webkit-scrollbar {
-    width: 10px;
-    height: 10px;
-  }
-  ::-webkit-scrollbar-track {
-    background: transparent;
-  }
-  ::-webkit-scrollbar-thumb {
-    background-color: hsl(var(--border));
-    border-radius: 9999px;
-    border: 2px solid transparent;
-    background-clip: content-box;
-  }
-  ::-webkit-scrollbar-thumb:hover {
-    background-color: hsl(var(--muted-foreground) / 0.5);
-    background-clip: content-box;
-  }
 }
 
 /* Dark mode overrides for app-wide surfaces */
 .dark body {
   background-color: hsl(222, 47%, 6%);
+}
+.dark .bg-gradient-to-br {
+  background-image: none !important;
+  background-color: hsl(222, 47%, 6%) !important;
 }
 .dark .bg-white {
   background-color: hsl(222, 47%, 10%) !important;

@@ -23,6 +23,7 @@ import ZmanimCard from "../components/zmanim/ZmanimCard";
 import LocationDisplay from "../components/zmanim/LocationDisplay";
 import { getHebrewDate } from "../lib/hebrewDate";
 import { useSavedLocation } from "@/hooks/useLocation";
+import NavMenu from "@/components/NavMenu";
 import { printZmanim } from "@/lib/printZmanim";
 import { useDashboardPrefs } from "@/hooks/useDashboardPrefs";
 import { ZMANIM_GROUPS, getGroupEntries } from "@/lib/zmanimSchema";
@@ -201,11 +202,17 @@ export default function Zmanim() {
     <div className="min-h-screen bg-background pb-24">
       <div className="max-w-4xl mx-auto px-4 pt-4 pb-8 md:px-8">
         {/* Header */}
-        <div className="text-center mb-8">
-          <h1 className="font-display text-4xl md:text-5xl font-semibold text-slate-800 mb-2 tracking-tight">
-            Zmanim
-          </h1>
-          <p className="text-slate-600 text-lg">זמני היום</p>
+        <div className="flex items-center mb-8 min-h-[72px]">
+          <div className="shrink-0">
+            <NavMenu />
+          </div>
+          <div className="flex-1 text-center px-2">
+            <h1 className="font-display text-4xl md:text-5xl font-semibold text-slate-800 mb-2 tracking-tight">
+              Zmanim
+            </h1>
+            <p className="text-slate-600 text-lg">זמני היום</p>
+          </div>
+          <div className="shrink-0 w-9"></div>
         </div>
 
         {/* Location Search */}
