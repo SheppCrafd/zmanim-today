@@ -21,6 +21,11 @@
     <link rel="dns-prefetch" href="https://geocoding-api.open-meteo.com" />
     <link rel="dns-prefetch" href="https://timeapi.io" />
     <link rel="dns-prefetch" href="https://www.sefaria.org" />
+    <!-- index.css @imports Fraunces from Google Fonts and every page's title
+         uses it, so this connection is on the critical rendering path for
+         first paint, not just a "nice to have" prefetch. -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <title>Zmanim Today</title>
     <meta
       name="description"

@@ -3,7 +3,6 @@ import { lazy, Suspense, useEffect } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { queryClientInstance } from "@/lib/query-client";
-import VisualEditAgent from "@/lib/VisualEditAgent";
 import NavigationTracker from "@/lib/NavigationTracker";
 import { BrowserRouter as Router, Route, Routes } from "react-router-dom";
 import PageNotFound from "./lib/PageNotFound";
@@ -30,6 +29,27 @@ const AshkenaziSiddur = lazy(loadAshkenaziSiddur);
 const ChabadSiddur = lazy(loadChabadSiddur);
 const Compass = lazy(loadCompass);
 const Settings = lazy(loadSettings);
+
+// VisualEditAgent (~700 lines) exists purely to let the base44 builder
+// highlight/edit elements live inside its own iframe — it does nothing for a
+// real visitor (installed PWA, direct browser visit, no trusted parent) and
+// its own postMessage calls are already no-ops without a trusted referrer.
+// Gating the import on that same check means real users never fetch/parse/
+// execute it at all, instead of paying for it on every load just in case.
+const ALLOWED_BUILDER_ORIGIN = /^https:\/\/([a-z0-9-]+\.)*base44\.(com|app)$/i;
+function isInsideTrustedBuilder() {
+  try {
+    return (
+      window.parent !== window &&
+      ALLOWED_BUILDER_ORIGIN.test(new URL(document.referrer).origin)
+    );
+  } catch {
+    return false;
+  }
+}
+const VisualEditAgent = isInsideTrustedBuilder()
+  ? lazy(() => import("@/lib/VisualEditAgent"))
+  : null;
 
 const ROUTE_PREFETCHERS = [
   loadZmanim,
@@ -124,7 +144,11 @@ function App() {
             <AuthenticatedApp />
           </Router>
           <Toaster />
-          <VisualEditAgent />
+          {VisualEditAgent && (
+            <Suspense fallback={null}>
+              <VisualEditAgent />
+            </Suspense>
+          )}
         </QueryClientProvider>
       </AuthProvider>
     </ThemeProvider>

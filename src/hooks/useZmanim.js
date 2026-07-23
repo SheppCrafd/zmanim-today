@@ -71,11 +71,15 @@ export function useZmanim(location, date = new Date()) {
   const [zmanim, setZmanim] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [refreshTick, setRefreshTick] = useState(0);
 
   const dateStr = format(date, "yyyy-MM-dd");
 
   useEffect(() => {
-    if (!location?.latitude || !location?.longitude) return;
+    if (!location?.latitude || !location?.longitude) {
+      setZmanim(null);
+      return;
+    }
 
     const tzid =
       location.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone;
@@ -135,7 +139,33 @@ export function useZmanim(location, date = new Date()) {
       .finally(() => {
         setLoading(false);
       });
-  }, [location?.latitude, location?.longitude, location?.timezone, dateStr]);
+  }, [
+    location?.latitude,
+    location?.longitude,
+    location?.timezone,
+    dateStr,
+    refreshTick,
+  ]);
 
-  return { zmanim, loading, error };
+  // Bypasses the session cache for the current location/date and re-fetches
+  // from Hebcal — used by an explicit user-facing "refresh" action.
+  const refetch = () => {
+    if (!location?.latitude || !location?.longitude) return;
+    const tzid =
+      location.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone;
+    const key = cacheKey(location.latitude, location.longitude, dateStr, tzid);
+    try {
+      const raw = sessionStorage.getItem(STORAGE_KEY);
+      if (raw) {
+        const store = JSON.parse(raw);
+        delete store[key];
+        sessionStorage.setItem(STORAGE_KEY, JSON.stringify(store));
+      }
+    } catch {
+      /* ignore */
+    }
+    setRefreshTick((t) => t + 1);
+  };
+
+  return { zmanim, loading, error, refetch };
 }
