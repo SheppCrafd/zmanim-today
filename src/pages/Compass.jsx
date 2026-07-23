@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { MapPin, Loader2, AlertCircle } from "lucide-react";
-import NavMenu from "@/components/NavMenu";
+import PageHeader from "@/components/PageHeader";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { useSavedLocation } from "@/hooks/useLocation";
@@ -339,23 +339,7 @@ export default function Compass() {
   return (
     <div className="min-h-screen bg-background pb-24">
       <div className="max-w-sm mx-auto px-4 pt-4 pb-4">
-        {/* Header */}
-        <div className="flex items-center mb-8 min-h-[72px]">
-          <div className="shrink-0">
-            <NavMenu />
-          </div>
-          <div className="flex-1 text-center px-2">
-            <h1 className="font-display text-3xl font-semibold text-slate-800 dark:text-slate-100 mb-1 tracking-tight">
-              Compass to
-              <br />
-              Jerusalem
-            </h1>
-            <p className="text-slate-500 dark:text-slate-400 text-sm">
-              מצפן לירושלים
-            </p>
-          </div>
-          <div className="shrink-0 w-9"></div>
-        </div>
+        <PageHeader title="Compass to Jerusalem" subtitle="מצפן לירושלים" />
 
         {/* Location error */}
         {locationError && (
@@ -368,7 +352,7 @@ export default function Compass() {
         )}
 
         {/* Compass */}
-        <div className="bg-card rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm p-6 mb-5 flex flex-col items-center">
+        <div className="bg-card rounded-2xl border border-border shadow-sm p-6 mb-5 flex flex-col items-center">
           {!location && !locationError ? (
             <div className="flex flex-col items-center py-10 gap-3">
               <Loader2 className="w-7 h-7 text-blue-500 animate-spin" />
@@ -416,7 +400,7 @@ export default function Compass() {
         {location && (
           <>
             <div className="grid grid-cols-3 gap-3 mb-4">
-              <div className="bg-card rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm p-3 text-center">
+              <div className="bg-card rounded-xl border border-border shadow-sm p-3 text-center">
                 <p className="text-xs text-slate-400 dark:text-slate-500 mb-1">
                   Heading
                 </p>
@@ -424,7 +408,7 @@ export default function Compass() {
                   {Math.round(effectiveHeading)}°
                 </p>
               </div>
-              <div className="bg-card rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm p-3 text-center">
+              <div className="bg-card rounded-xl border border-border shadow-sm p-3 text-center">
                 <p className="text-xs text-slate-400 dark:text-slate-500 mb-1">
                   Bearing
                 </p>
@@ -432,7 +416,7 @@ export default function Compass() {
                   {Math.round(bearing)}°
                 </p>
               </div>
-              <div className="bg-card rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm p-3 text-center">
+              <div className="bg-card rounded-xl border border-border shadow-sm p-3 text-center">
                 <p className="text-xs text-slate-400 dark:text-slate-500 mb-1">
                   Distance
                 </p>
@@ -442,7 +426,7 @@ export default function Compass() {
               </div>
             </div>
 
-            <div className="bg-card rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm px-4 py-3 mb-4">
+            <div className="bg-card rounded-xl border border-border shadow-sm px-4 py-3 mb-4">
               <p className="text-sm text-slate-500 dark:text-slate-400 text-center">
                 Jerusalem is{" "}
                 <span className="text-amber-600 dark:text-amber-400 font-semibold">

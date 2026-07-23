@@ -10,7 +10,7 @@ import {
   Loader2,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import NavMenu from "@/components/NavMenu";
+import PageHeader, { iconButtonClass } from "@/components/PageHeader";
 import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd";
 import {
   useDashboardPrefs,
@@ -73,34 +73,27 @@ export default function Settings() {
     ALL_DASHBOARD_ITEMS.find((i) => i.id === id)?.icon || "⏱";
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-amber-50 pb-24">
+    <div className="min-h-screen bg-background pb-24">
       <div className="max-w-lg mx-auto px-4 pt-4">
-        <div className="flex items-center mb-6 min-h-[56px]">
-          <div className="shrink-0">
-            <NavMenu />
-          </div>
-          <div className="flex-1 text-center px-2">
-            <h1 className="font-display text-2xl font-semibold text-slate-800 tracking-tight">
-              Settings
-            </h1>
-            <p className="text-slate-500 text-sm">Customize your dashboard</p>
-          </div>
-          <div className="shrink-0">
+        <PageHeader
+          title="Settings"
+          subtitle="Customize your dashboard"
+          right={
             <button
               onClick={() => navigate(-1)}
-              className="p-2 rounded-lg bg-white/90 shadow-sm border border-slate-200 hover:bg-slate-50 transition-colors flex items-center gap-1 text-sm text-slate-700 pr-3"
+              className={`${iconButtonClass} flex items-center gap-1 text-sm text-foreground pr-3`}
             >
               <ArrowLeft className="w-4 h-4" /> Back
             </button>
-          </div>
-        </div>
+          }
+        />
 
         {/* Location */}
         <div className="mb-6">
           <p className="text-xs font-semibold uppercase tracking-widest text-slate-400 mb-2 px-1">
             Location
           </p>
-          <div className="bg-white rounded-xl border border-slate-200 divide-y divide-slate-100">
+          <div className="bg-card rounded-xl border border-border shadow-sm divide-y divide-border">
             {location ? (
               <div className="flex items-center justify-between px-4 py-3">
                 <div>
@@ -134,7 +127,7 @@ export default function Settings() {
           <p className="text-xs font-semibold uppercase tracking-widest text-slate-400 mb-2 px-1">
             Appearance
           </p>
-          <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700">
+          <div className="bg-card rounded-xl border border-border shadow-sm">
             <button
               onClick={toggleDark}
               className="w-full flex items-center justify-between px-4 py-3"
@@ -166,7 +159,7 @@ export default function Settings() {
           <p className="text-xs font-semibold uppercase tracking-widest text-slate-400 mb-2 px-1">
             Time Format
           </p>
-          <div className="bg-white rounded-xl border border-slate-200">
+          <div className="bg-card rounded-xl border border-border shadow-sm">
             <button
               onClick={toggle24Hour}
               className="w-full flex items-center justify-between px-4 py-3"
@@ -205,7 +198,7 @@ export default function Settings() {
                 <div
                   {...provided.droppableProps}
                   ref={provided.innerRef}
-                  className="bg-white rounded-xl border border-slate-200 overflow-hidden divide-y divide-slate-100"
+                  className="bg-card rounded-xl border border-border shadow-sm overflow-hidden divide-y divide-border"
                 >
                   {prefs.items.map((item, index) => (
                     <Draggable
@@ -217,7 +210,7 @@ export default function Settings() {
                         <div
                           ref={provided.innerRef}
                           {...provided.draggableProps}
-                          className={`flex items-center gap-3 px-4 py-3 transition-colors ${snapshot.isDragging ? "bg-blue-50 shadow-md" : "bg-white"}`}
+                          className={`flex items-center gap-3 px-4 py-3 transition-colors ${snapshot.isDragging ? "bg-primary/10 shadow-md" : "bg-card"}`}
                         >
                           <div
                             {...provided.dragHandleProps}
@@ -261,7 +254,7 @@ export default function Settings() {
             href="https://zmanimtoday.mintlify.site/home"
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center justify-between px-4 py-3 bg-white rounded-xl border border-slate-200 hover:bg-slate-50 transition-colors"
+            className="flex items-center justify-between px-4 py-3 bg-card rounded-xl border border-border shadow-sm hover:bg-accent active:scale-[0.98] transition-all"
           >
             <div className="flex items-center gap-3">
               <BookOpen className="w-4 h-4 text-blue-500" />
@@ -291,11 +284,11 @@ export default function Settings() {
           <p className="text-xs font-semibold uppercase tracking-widest text-slate-400 mb-2 px-1">
             Account
           </p>
-          <div className="bg-white rounded-xl border border-slate-200 divide-y divide-slate-100">
+          <div className="bg-card rounded-xl border border-border shadow-sm divide-y divide-border">
             <button
               onClick={handleLogout}
               disabled={loggingOut}
-              className="w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-50 transition-colors disabled:opacity-60"
+              className="w-full flex items-center gap-3 px-4 py-3 hover:bg-accent transition-colors disabled:opacity-60"
             >
               {loggingOut ? (
                 <Loader2 className="w-4 h-4 text-slate-500 animate-spin" />

@@ -55,9 +55,9 @@ export default function NavMenu() {
       {/* Hamburger Button */}
       <button
         onClick={() => setOpen(true)}
-        className="p-2 rounded-lg bg-white/90 shadow-sm border border-slate-200 hover:bg-slate-50 transition-colors"
+        className="p-2 rounded-lg bg-card border border-border shadow-sm hover:bg-accent active:scale-95 transition-all"
       >
-        <Menu className="w-5 h-5 text-slate-700" />
+        <Menu className="w-5 h-5 text-foreground" />
       </button>
 
       {/* Overlay */}
@@ -70,15 +70,15 @@ export default function NavMenu() {
 
       {/* Drawer */}
       <div
-        className={`fixed top-0 left-0 h-full w-72 bg-white z-50 shadow-2xl transform transition-transform duration-300 ${open ? "translate-x-0" : "-translate-x-full"}`}
+        className={`fixed top-0 left-0 h-full w-72 bg-card z-50 shadow-2xl transform transition-transform duration-300 ${open ? "translate-x-0" : "-translate-x-full"}`}
       >
-        <div className="flex items-center justify-between p-4 border-b border-slate-100">
-          <h2 className="text-lg font-bold text-slate-800">Menu</h2>
+        <div className="flex items-center justify-between p-4 border-b border-border">
+          <h2 className="text-lg font-bold text-foreground">Menu</h2>
           <button
             onClick={() => setOpen(false)}
-            className="p-1 rounded hover:bg-slate-100 transition-colors"
+            className="p-1 rounded hover:bg-accent transition-colors"
           >
-            <X className="w-5 h-5 text-slate-600" />
+            <X className="w-5 h-5 text-muted-foreground" />
           </button>
         </div>
         <nav className="p-4 space-y-1">
@@ -89,20 +89,20 @@ export default function NavMenu() {
                 key={path}
                 to={path}
                 onClick={() => setOpen(false)}
-                className={`flex items-center gap-3 p-3 rounded-xl transition-colors ${
+                className={`flex items-center gap-3 p-3 rounded-xl transition-colors active:scale-[0.98] ${
                   active
-                    ? "bg-blue-50 text-blue-700"
-                    : "text-slate-700 hover:bg-slate-50"
+                    ? "bg-primary/10 text-primary"
+                    : "text-foreground hover:bg-accent"
                 }`}
               >
                 <div
-                  className={`p-2 rounded-lg ${active ? "bg-blue-100" : "bg-slate-100"}`}
+                  className={`p-2 rounded-lg ${active ? "bg-primary/15" : "bg-muted"}`}
                 >
                   <Icon className="w-4 h-4" />
                 </div>
                 <div>
                   <p className="font-semibold text-sm">{label}</p>
-                  <p className="text-xs text-slate-500">{description}</p>
+                  <p className="text-xs text-muted-foreground">{description}</p>
                 </div>
               </Link>
             );
@@ -111,19 +111,19 @@ export default function NavMenu() {
           {/* Siddurim section */}
           <button
             onClick={() => setSiddurimOpen(!siddurimOpen)}
-            className="w-full flex items-center gap-3 p-3 rounded-xl text-slate-700 hover:bg-slate-50 transition-colors"
+            className="w-full flex items-center gap-3 p-3 rounded-xl text-foreground hover:bg-accent transition-colors active:scale-[0.98]"
           >
-            <div className="p-2 rounded-lg bg-slate-100">
+            <div className="p-2 rounded-lg bg-muted">
               <BookOpen className="w-4 h-4" />
             </div>
             <div className="flex-1 text-left">
               <p className="font-semibold text-sm">Siddurim (BETA)</p>
-              <p className="text-xs text-slate-500">Prayer books (BETA)</p>
+              <p className="text-xs text-muted-foreground">Prayer books (BETA)</p>
             </div>
             {siddurimOpen ? (
-              <ChevronUp className="w-4 h-4 text-slate-400" />
+              <ChevronUp className="w-4 h-4 text-muted-foreground" />
             ) : (
-              <ChevronDown className="w-4 h-4 text-slate-400" />
+              <ChevronDown className="w-4 h-4 text-muted-foreground" />
             )}
           </button>
 
@@ -136,15 +136,15 @@ export default function NavMenu() {
                     key={path}
                     to={path}
                     onClick={() => setOpen(false)}
-                    className={`flex items-center gap-3 p-2.5 rounded-xl transition-colors ${
+                    className={`flex items-center gap-3 p-2.5 rounded-xl transition-colors active:scale-[0.98] ${
                       active
-                        ? "bg-blue-50 text-blue-700"
-                        : "text-slate-700 hover:bg-slate-50"
+                        ? "bg-primary/10 text-primary"
+                        : "text-foreground hover:bg-accent"
                     }`}
                   >
                     <div>
                       <p className="font-medium text-sm">{label}</p>
-                      <p className="text-xs text-slate-500">{description}</p>
+                      <p className="text-xs text-muted-foreground">{description}</p>
                     </div>
                   </Link>
                 );

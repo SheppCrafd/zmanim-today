@@ -64,7 +64,7 @@ export default function MiniCompass({ location }) {
 
   return (
     <Link to="/Compass" className="block">
-      <div className="bg-white rounded-xl border border-slate-200 p-4 flex items-center gap-4 hover:bg-slate-50 transition-colors active:bg-slate-100">
+      <div className="bg-card rounded-xl border border-border shadow-sm p-4 flex items-center gap-4 hover:bg-accent active:scale-[0.98] transition-all">
         <svg
           width={size}
           height={size}

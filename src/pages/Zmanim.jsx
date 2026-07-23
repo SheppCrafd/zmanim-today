@@ -23,7 +23,7 @@ import ZmanimCard from "../components/zmanim/ZmanimCard";
 import LocationDisplay from "../components/zmanim/LocationDisplay";
 import { getHebrewDate } from "../lib/hebrewDate";
 import { useSavedLocation } from "@/hooks/useLocation";
-import NavMenu from "@/components/NavMenu";
+import PageHeader from "@/components/PageHeader";
 import { printZmanim } from "@/lib/printZmanim";
 import { useDashboardPrefs } from "@/hooks/useDashboardPrefs";
 import { ZMANIM_GROUPS, getGroupEntries } from "@/lib/zmanimSchema";
@@ -201,23 +201,11 @@ export default function Zmanim() {
   return (
     <div className="min-h-screen bg-background pb-24">
       <div className="max-w-4xl mx-auto px-4 pt-4 pb-8 md:px-8">
-        {/* Header */}
-        <div className="flex items-center mb-8 min-h-[72px]">
-          <div className="shrink-0">
-            <NavMenu />
-          </div>
-          <div className="flex-1 text-center px-2">
-            <h1 className="font-display text-4xl md:text-5xl font-semibold text-slate-800 mb-2 tracking-tight">
-              Zmanim
-            </h1>
-            <p className="text-slate-600 text-lg">זמני היום</p>
-          </div>
-          <div className="shrink-0 w-9"></div>
-        </div>
+        <PageHeader title="Zmanim" subtitle="זמני היום" />
 
         {/* Location Search */}
         {!location && (
-          <Card className="mb-6 shadow-lg border-0 bg-white/80 backdrop-blur-sm">
+          <Card className="mb-6 border border-border shadow-sm bg-card">
             <CardContent className="p-6">
               <form onSubmit={handleManualLocation} className="space-y-4">
                 <div>
@@ -286,7 +274,7 @@ export default function Zmanim() {
 
         {/* Location & Date Card */}
         {location && (
-          <Card className="mb-6 shadow-lg border-0 bg-white/80 backdrop-blur-sm">
+          <Card className="mb-6 border border-border shadow-sm bg-card">
             <CardContent className="p-6">
               <div className="flex items-start justify-between">
                 <LocationDisplay location={location} />
@@ -467,7 +455,7 @@ export default function Zmanim() {
 
         {/* Calculating State */}
         {calculating && (
-          <Card className="shadow-lg border-0 bg-white/80 backdrop-blur-sm">
+          <Card className="border border-border shadow-sm bg-card">
             <CardContent className="flex flex-col items-center justify-center py-12">
               <Loader2 className="w-10 h-10 text-blue-600 animate-spin mb-4" />
               <p className="text-slate-700">Calculating zmanim...</p>
