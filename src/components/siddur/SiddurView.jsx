@@ -133,8 +133,13 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
   const scrollRef = useRef(null);
   const scrollDebounce = useRef(null);
   const pinchRef = useRef({ active: false, startDist: 0, startScale: 1 });
+  const pendingScaleRef = useRef(null);
+  const zoomRafRef = useRef(null);
   const contentRef = useRef(null);
   const labelRef = useRef(null);
+  // Per-section flatItems cache (keyed by ref + lang mode) — see flatItems
+  // below for why this exists.
+  const sectionItemsCacheRef = useRef(new Map());
   const scaleRef = useRef(
     (typeof localStorage !== "undefined" &&
       parseFloat(localStorage.getItem("siddur-font-scale"))) ||
@@ -235,6 +240,38 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
 
   // Pinch-to-zoom (touch) + trackpad pinch (ctrl+wheel) drive text size.
   // Updates go straight to the DOM via applyScale — zero React re-renders.
+  //
+  // applyScale itself does several layout-forcing reads (elementFromPoint to
+  // find the anchor row, getBoundingClientRect before/after the font-size
+  // write) so it can keep that row visually pinned while the text resizes.
+  // touchmove and ctrl+wheel can both fire many times faster than the
+  // display can actually paint, and calling applyScale directly from the raw
+  // event handler ran that whole read-write-read-write sequence once per
+  // *event* rather than once per *frame* — during a fast pinch or trackpad
+  // gesture that's several rounds of forced layout crammed into a single
+  // 16ms frame budget, which is exactly what shows up as zoom feeling
+  // stuttery instead of buttery. scheduleScale coalesces any number of
+  // same-frame requests into a single applyScale call using only the latest
+  // value, since intermediate values within one frame were never painted
+  // anyway.
+  const scheduleScale = useCallback(
+    (next) => {
+      pendingScaleRef.current = next;
+      if (zoomRafRef.current != null) return;
+      zoomRafRef.current = requestAnimationFrame(() => {
+        zoomRafRef.current = null;
+        const value = pendingScaleRef.current;
+        // Reset before applying — once consumed, the next event outside this
+        // frame's batch should compute its delta from applyScale's fresh,
+        // authoritative scaleRef.current, not a stale leftover pending value
+        // (which may predate clamping, e.g. past the 0.5–3 range).
+        pendingScaleRef.current = null;
+        applyScale(value);
+      });
+    },
+    [applyScale],
+  );
+
   useEffect(() => {
     if (page !== "reader") return;
     const el = scrollRef.current;
@@ -258,7 +295,7 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
       e.preventDefault();
       const ratio =
         dist(e.touches[0], e.touches[1]) / (pinchRef.current.startDist || 1);
-      applyScale(pinchRef.current.startScale * ratio);
+      scheduleScale(pinchRef.current.startScale * ratio);
     };
 
     const endPinch = (e) => {
@@ -268,7 +305,15 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
     const onWheel = (e) => {
       if (!e.ctrlKey) return; // trackpad pinch fires ctrl+wheel
       e.preventDefault();
-      applyScale(scaleRef.current - e.deltaY * 0.003);
+      // Base off any not-yet-applied pending value so several wheel ticks
+      // landing in the same animation frame accumulate correctly, instead of
+      // each one computing its delta from the same stale scaleRef.current
+      // and only the last tick in the frame actually counting.
+      const base =
+        pendingScaleRef.current != null
+          ? pendingScaleRef.current
+          : scaleRef.current;
+      scheduleScale(base - e.deltaY * 0.003);
     };
 
     el.addEventListener("touchstart", onTouchStart, { passive: false });
@@ -283,8 +328,12 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
       el.removeEventListener("touchend", endPinch);
       el.removeEventListener("touchcancel", endPinch);
       el.removeEventListener("wheel", onWheel);
+      if (zoomRafRef.current != null) {
+        cancelAnimationFrame(zoomRafRef.current);
+        zoomRafRef.current = null;
+      }
     };
-  }, [page, applyScale]);
+  }, [page, scheduleScale]);
 
   // Persist the known-empty refs so next load prunes instantly
   useEffect(() => {
@@ -455,31 +504,52 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
   }, [sectionQueries]);
 
   // DOM Items
+  //
+  // Previously this walked *every* active section from scratch on every call
+  // — including all of infinite scroll's growing history — even though only
+  // the newly-added tail sections are actually new. Late in a long reading
+  // session (renderCount deep into a big siddur), each +5 growth tick was
+  // re-running the per-segment subheader/hasH/hasE logic over every section
+  // already read, not just the new ones — steadily more expensive right at
+  // the moment new content streams in, which is exactly when a scroll hitch
+  // is most visible. A finished section's item list is a pure function of
+  // (its ref, showHB, showEN) and query data never mutates in place once
+  // loaded, so it's cached per-section and only the newly-active sections
+  // (or sections whose loading/error state just resolved) do real work.
   const flatItems = useMemo(() => {
+    const cache = sectionItemsCacheRef.current;
     const items = [];
     activeSections.forEach((sec, i) => {
       const query = sectionQueries[i];
-
-      items.push({
+      const header = {
         type: "header",
         id: `hdr-${i}`,
         label: sec.label,
         heLabel: sec.heLabel,
         sectionIndex: i,
-      });
+      };
 
       if (!query || query.isLoading) {
+        items.push(header);
         items.push({ type: "loading", id: `load-${sec.ref}`, sectionIndex: i });
         return;
       }
       if (query.isError) {
+        items.push(header);
         items.push({ type: "error", id: `err-${sec.ref}`, sectionIndex: i });
         return;
       }
-      if (query.data) {
-        // Empty section: Sefaria has no text for this ref — render nothing (header only)
-        if (query.data.length === 0) return;
 
+      const cacheKey = `${sec.ref}::${showHB ? 1 : 0}::${showEN ? 1 : 0}`;
+      const cached = cache.get(cacheKey);
+      if (cached) {
+        items.push(header, ...cached);
+        return;
+      }
+
+      const sectionBody = [];
+      // Empty section: Sefaria has no text for this ref — render nothing (header only)
+      if (query.data && query.data.length > 0) {
         query.data.forEach((seg, segIndex) => {
           const heText = seg.he || "";
           const enText = seg.en || "";
@@ -496,7 +566,7 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
           if ((hasH || hasE) && heIsTitle && enIsTitle) return;
 
           if (!(showHB && hasH) && !(showEN && hasE)) return;
-          items.push({
+          sectionBody.push({
             type: "segment",
             id: `seg-${i}-${segIndex}`,
             sanitizedHe: sanitizeCached(seg.he),
@@ -507,9 +577,11 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
           });
         });
       }
+      cache.set(cacheKey, sectionBody);
+      items.push(header, ...sectionBody);
     });
     return items;
-  }, [activeSections, sectionQueries, showEN, showHB]);
+  }, [activeSections, sectionQueries, showEN, showHB, titleSets]);
 
   // Group flat items by section index once — avoids an O(n²) filter per render
   const itemsBySection = useMemo(() => {
@@ -579,11 +651,14 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
       if (jumpTargetSection !== null) return;
 
       // 2. Native URL Sync (Checks which header is currently at the top of the screen)
+      // Scoped to just section headers (id^="hdr-") — data-section-index also
+      // appears on every segment/loading/error item below, so querying that
+      // attribute directly meant scanning (and getBoundingClientRect()-ing)
+      // every rendered segment in a long reading session, not just the
+      // handful of section headers this check actually needs.
       clearTimeout(scrollDebounce.current);
       scrollDebounce.current = setTimeout(() => {
-        const headerElements = document.querySelectorAll(
-          "[data-section-index]",
-        );
+        const headerElements = document.querySelectorAll('[id^="hdr-"]');
         let activeIndex = null;
 
         for (let i = 0; i < headerElements.length; i++) {
@@ -809,11 +884,7 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
                         }}
                       >
                         {bodyItems.map((item) => (
-                          <div
-                            key={item.id}
-                            id={item.id}
-                            data-section-index={item.sectionIndex}
-                          >
+                          <div key={item.id} id={item.id}>
                             {item.type === "segment" && (
                               <SiddurSegment
                                 sanitizedHe={item.sanitizedHe}
