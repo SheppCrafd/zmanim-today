@@ -10,6 +10,7 @@ import PageNotFound from "./lib/PageNotFound";
 import { AuthProvider, useAuth } from "@/lib/AuthContext";
 import { ThemeProvider } from "@/lib/ThemeContext";
 import UserNotRegisteredError from "@/components/UserNotRegisteredError";
+import BottomTabBar from "@/components/BottomTabBar";
 import { Navigate } from "react-router-dom";
 
 // Home is the landing route, so it stays in the main bundle — first paint is
@@ -63,6 +64,17 @@ const RouteFallback = () => (
   </div>
 );
 
+// The four primary destinations get the fixed bottom tab bar (native-app
+// style primary nav); the Siddur reading routes deliberately don't — they're
+// a full-screen focused mode, same as a reading app hiding its own tab bar
+// once you're actually reading. See BottomTabBar.jsx.
+const TabPage = ({ children }) => (
+  <>
+    {children}
+    <BottomTabBar />
+  </>
+);
+
 const AuthenticatedApp = () => {
   const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } =
     useAuth();
@@ -84,10 +96,10 @@ const AuthenticatedApp = () => {
   return (
     <Suspense fallback={<RouteFallback />}>
       <Routes>
-        <Route path="/" element={<Home />} />
-        <Route path="/Zmanim" element={<Zmanim />} />
-        <Route path="/Compass" element={<Compass />} />
-        <Route path="/Settings" element={<Settings />} />
+        <Route path="/" element={<TabPage><Home /></TabPage>} />
+        <Route path="/Zmanim" element={<TabPage><Zmanim /></TabPage>} />
+        <Route path="/Compass" element={<TabPage><Compass /></TabPage>} />
+        <Route path="/Settings" element={<TabPage><Settings /></TabPage>} />
 
         {/* SIDDUR ROUTES — wildcard prevents remount on TOC↔section navigation */}
         <Route
