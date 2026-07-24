@@ -53,13 +53,11 @@ export default function Home() {
     searchLocation,
   } = useSavedLocation();
   const { zmanim, loading: zmanimLoading } = useZmanim(location);
-  // Only ever displayed in the Friday-only Havdalah card below, so only
-  // fetch it on Fridays — every other day of the week this was firing a
-  // second, entirely unused Hebcal request (and cache write) on every load.
-  const { zmanim: tomorrowZmanim } = useZmanim(
-    isFriday ? location : null,
-    tomorrow,
-  );
+  // Used by the Friday-only Havdalah card below AND by "Print Tomorrow's
+  // Zmanim" further down, which isn't Friday-only — fetch every day. (A
+  // prior pass gated this behind isFriday on the assumption it was only for
+  // Havdalah, which silently broke the print button the other six days.)
+  const { zmanim: tomorrowZmanim } = useZmanim(location, tomorrow);
   const { prefs } = useDashboardPrefs();
   const [searchQuery, setSearchQuery] = useState("");
   const [showSearch, setShowSearch] = useState(false);
