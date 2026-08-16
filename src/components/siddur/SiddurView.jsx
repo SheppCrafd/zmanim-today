@@ -1,6 +1,7 @@
 import {
   useState,
   useEffect,
+  useLayoutEffect,
   useRef,
   useMemo,
   useCallback,
@@ -77,6 +78,26 @@ function sanitizeCached(htmlString) {
 const transliterateCached = createCachedTransliterator();
 
 const clampScale = (s) => Math.max(0.5, Math.min(3, Math.round(s * 20) / 20));
+
+// Shared by zoom (applyScale) and the lang-mode/transliteration toggles
+// below: finds whichever text row currently sits at the top of the reader
+// viewport, so a layout-changing action can keep that row visually pinned
+// instead of the page appearing to jump. Scans a few fixed y-offsets rather
+// than just the very top edge, since the topmost point can land on padding
+// between rows rather than text itself.
+function findTopAnchor(container, selector) {
+  if (!container) return null;
+  const cRect = container.getBoundingClientRect();
+  const x = cRect.left + cRect.width / 2;
+  for (const y of [cRect.top + 52, cRect.top + 72, cRect.top + 100]) {
+    const hit = document.elementFromPoint(x, y);
+    if (hit) {
+      const el = hit.closest && hit.closest(selector);
+      if (el) return el;
+    }
+  }
+  return null;
+}
 
 /* ---------------- SUBHEADER DETECTION ---------------- */
 // Sefaria injects a section's title (and its parent-category titles) as the
@@ -334,21 +355,7 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
     const content = contentRef.current;
 
     // Find the text row currently at the top of the reader viewport.
-    let anchorEl = null;
-    if (container && content) {
-      const cRect = container.getBoundingClientRect();
-      const x = cRect.left + cRect.width / 2;
-      for (const y of [cRect.top + 52, cRect.top + 72, cRect.top + 100]) {
-        const hit = document.elementFromPoint(x, y);
-        if (hit) {
-          const seg = hit.closest && hit.closest('[id^="seg-"]');
-          if (seg) {
-            anchorEl = seg;
-            break;
-          }
-        }
-      }
-    }
+    const anchorEl = content ? findTopAnchor(container, '[id^="seg-"]') : null;
     const beforeTop = anchorEl ? anchorEl.getBoundingClientRect().top : null;
 
     scaleRef.current = s;
@@ -370,6 +377,41 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
       }
     }, 350);
   }, []);
+
+  // Same anchored-scroll idea as applyScale above, adapted for React state
+  // changes (langMode, showTranslit) instead of a direct DOM mutation.
+  // Toggling language columns or the transliteration column changes every
+  // segment's height, which would otherwise make the page appear to jump.
+  // Since a state update commits asynchronously, capture the anchor's id +
+  // position *before* the triggering setState call, then restore scroll
+  // position in a layout effect that fires after React has committed the
+  // new DOM — synchronously before paint, same as applyScale's own
+  // measure-after-mutate timing, just deferred to React's commit phase.
+  const scrollAnchorRef = useRef(null);
+  const captureScrollAnchor = useCallback(() => {
+    if (page !== "reader") return;
+    const container = scrollRef.current;
+    // Headers survive every langMode/transliteration toggle (segments don't
+    // always — a segment with no content in the newly-selected mode drops
+    // out of the list entirely), so prefer anchoring to whichever is
+    // topmost rather than segments only.
+    const el = findTopAnchor(container, '[id^="seg-"], [id^="hdr-"]');
+    scrollAnchorRef.current = el
+      ? { id: el.id, beforeTop: el.getBoundingClientRect().top }
+      : null;
+  }, [page]);
+
+  useLayoutEffect(() => {
+    const anchor = scrollAnchorRef.current;
+    if (!anchor) return;
+    scrollAnchorRef.current = null;
+    const container = scrollRef.current;
+    const el = document.getElementById(anchor.id);
+    if (el && container) {
+      const afterTop = el.getBoundingClientRect().top;
+      container.scrollTop += afterTop - anchor.beforeTop;
+    }
+  }, [langMode, showTranslit]);
 
   // Pinch-to-zoom (touch) + trackpad pinch (ctrl+wheel) drive text size.
   // Updates go straight to the DOM via applyScale — zero React re-renders.
@@ -902,28 +944,40 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
           <Button
             size="sm"
             variant={langMode === "en" ? "default" : "outline"}
-            onClick={() => setLangMode("en")}
+            onClick={() => {
+              captureScrollAnchor();
+              setLangMode("en");
+            }}
           >
             EN
           </Button>
           <Button
             size="sm"
             variant={langMode === "he" ? "default" : "outline"}
-            onClick={() => setLangMode("he")}
+            onClick={() => {
+              captureScrollAnchor();
+              setLangMode("he");
+            }}
           >
             HB
           </Button>
           <Button
             size="sm"
             variant={langMode === "both" ? "default" : "outline"}
-            onClick={() => setLangMode("both")}
+            onClick={() => {
+              captureScrollAnchor();
+              setLangMode("both");
+            }}
           >
             BOTH
           </Button>
           <Button
             size="sm"
             variant={showTranslit ? "default" : "outline"}
-            onClick={() => setShowTranslit((v) => !v)}
+            onClick={() => {
+              captureScrollAnchor();
+              setShowTranslit((v) => !v);
+            }}
             title="Transliteration"
           >
             <Languages className="w-4 h-4 mr-1" /> TR

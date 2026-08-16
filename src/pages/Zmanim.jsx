@@ -373,6 +373,7 @@ export default function Zmanim() {
                   icon={group.icon}
                   color={group.color}
                   use24Hour={prefs.use24Hour}
+                  timezone={zmanim.timezone}
                   times={entries.map((e) => ({
                     label: e.label,
                     value: e.value,

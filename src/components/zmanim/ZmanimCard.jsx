@@ -2,7 +2,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { motion } from "framer-motion";
 import { formatTime } from "@/lib/timeUtils";
 
-export default function ZmanimCard({ title, icon, color, times, use24Hour }) {
+export default function ZmanimCard({ title, icon, color, times, use24Hour, timezone }) {
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -50,7 +50,7 @@ export default function ZmanimCard({ title, icon, color, times, use24Hour }) {
                         : "text-slate-700 dark:text-slate-300"
                     }`}
                   >
-                    {formatTime(time.value, use24Hour)}
+                    {formatTime(time.value, use24Hour, timezone)}
                   </div>
                 </div>
               </motion.div>
