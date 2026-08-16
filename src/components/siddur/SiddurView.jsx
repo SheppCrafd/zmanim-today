@@ -706,8 +706,14 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
             id: `seg-${i}-${segIndex}`,
             sanitizedHe: sanitizeCached(seg.he),
             sanitizedEn: sanitizeCached(seg.en),
+            // Skip segments with no nikud at all (e.g. bare-consonant title
+            // lines, short instructional labels like "בחורף:") rather than
+            // rendering a vowel-less garble — better to omit the column for
+            // that one row than show broken-looking output.
             sanitizedHeTranslit:
-              showTranslit && hasH ? transliterateCached(seg.he) : null,
+              showTranslit && hasH && stripNikud(heText) !== heText
+                ? transliterateCached(seg.he)
+                : null,
             hasH,
             hasE,
             sectionIndex: i,
