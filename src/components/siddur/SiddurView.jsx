@@ -28,7 +28,7 @@ import { getLiturgicalFlags } from "@/lib/hebrewDate";
 import { getActiveInsertions, matchInsertion } from "@/lib/liturgicalInsertions";
 import { useSavedLocation } from "@/hooks/useLocation";
 import { useSiddurBookmarks } from "@/hooks/useSiddurBookmarks";
-import { transliterateCached } from "@/lib/hebrewTransliteration";
+import { createCachedTransliterator } from "hebrew-transliterate";
 import TocTree from "@/components/siddur/TocTree";
 import NavMenu from "@/components/NavMenu";
 import {
@@ -71,6 +71,10 @@ function sanitizeCached(htmlString) {
   sanitizeCache.set(htmlString, clean);
   return clean;
 }
+
+// Module-level, so the memoizing cache persists across renders exactly like
+// sanitizeCache above — transliteration is a pure function of its input.
+const transliterateCached = createCachedTransliterator();
 
 const clampScale = (s) => Math.max(0.5, Math.min(3, Math.round(s * 20) / 20));
 
