@@ -16,6 +16,16 @@ const looksHebrew = (line) => {
   return /[\u0590-\u05FF\uFB1D-\uFB4F]/.test(s);
 };
 
+// Nikud (vowel points) specifically \u2014 distinct from looksHebrew, which only
+// checks for Hebrew *script* and passes equally for vocalized or bare-
+// consonant text. Used to prefer a fully-pointed version when more than one
+// Hebrew version exists for the same ref (Sefaria doesn't otherwise order
+// versions by vocalization, and an unvocalized version reads fine on its own
+// but produces vowel-less garbage once fed through transliteration).
+const NIKUD_RE = /[\u05B0-\u05BC\u05C1\u05C2\u05C7]/;
+const versionHasNikud = (v) =>
+  flatten(v.text).some((line) => typeof line === "string" && NIKUD_RE.test(line));
+
 // High-frequency English words (incl. archaic prayer forms) — absent from
 // Portuguese/Spanish/other Latin-letter languages. Their presence confirms the
 // line is genuinely English.
@@ -54,11 +64,20 @@ const extractAndMergeText = (data, expectedLang) => {
 
   if (matchingVersions.length === 0) return [];
 
-  // 2. Explicitly prioritize "Sefaria Community Translation"
-  // so it gets checked first for every single paragraph.
+  // 2. Explicitly prioritize "Sefaria Community Translation" for English, and
+  // a fully-pointed (nikud) version for Hebrew — Sefaria doesn't otherwise
+  // order versions by vocalization, and picking an unvocalized one first
+  // reads fine on its own but silently breaks anything downstream that
+  // depends on vowel points (e.g. transliteration).
   matchingVersions.sort((a, b) => {
     if (a.versionTitle === "Sefaria Community Translation") return -1;
     if (b.versionTitle === "Sefaria Community Translation") return 1;
+    if (expectedLang !== "en") {
+      const aNikud = versionHasNikud(a);
+      const bNikud = versionHasNikud(b);
+      if (aNikud && !bNikud) return -1;
+      if (!aNikud && bNikud) return 1;
+    }
     return 0;
   });
 
