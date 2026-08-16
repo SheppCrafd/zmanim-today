@@ -222,3 +222,51 @@ button:focus-visible {
 .dark {
   --compass-bg: hsl(222, 47%, 10%);
 }
+
+/* ---------------- SIDDUR: footnotes + "say today" insertions ----------------
+ * Both features share one highlight color (the app's primary blue) so the
+ * reader learns a single visual language: "blue = something to notice here." */
+.siddur-text sup {
+  cursor: pointer;
+  padding: 0.05em 0.35em;
+  border-radius: 999px;
+  font-weight: 700;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+.siddur-text sup.siddur-note-open {
+  background-color: hsl(221 83% 53% / 0.15);
+  color: hsl(221 83% 53%);
+}
+.dark .siddur-text sup.siddur-note-open {
+  background-color: hsl(217 91% 60% / 0.22);
+  color: hsl(217 91% 60%);
+}
+.siddur-text sup + i {
+  display: none;
+}
+.siddur-text sup + i.siddur-note-open {
+  display: inline;
+}
+
+.siddur-special-row {
+  border-radius: 0.75rem;
+  background-color: hsl(221 83% 53% / 0.06);
+}
+.dark .siddur-special-row {
+  background-color: hsl(217 91% 60% / 0.09);
+}
+.siddur-special-badge {
+  display: inline-block;
+  margin-bottom: 0.35rem;
+  padding: 0.1rem 0.6rem;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  background-color: hsl(221 83% 53% / 0.15);
+  color: hsl(221 83% 45%);
+}
+.dark .siddur-special-badge {
+  background-color: hsl(217 91% 60% / 0.22);
+  color: hsl(217 91% 70%);
+}

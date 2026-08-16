@@ -16,11 +16,19 @@ import {
   ArrowLeft,
   X,
   Search,
+  Bookmark,
+  BookmarkCheck,
+  Languages,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useNavigate, useLocation } from "react-router-dom";
 import { fetchAndZipSefaria } from "@/hooks/useSefaria";
 import { processSefariaSchema } from "@/lib/siddurSchema";
+import { getLiturgicalFlags } from "@/lib/hebrewDate";
+import { getActiveInsertions, matchInsertion } from "@/lib/liturgicalInsertions";
+import { useSavedLocation } from "@/hooks/useLocation";
+import { useSiddurBookmarks } from "@/hooks/useSiddurBookmarks";
+import { transliterateCached } from "@/lib/hebrewTransliteration";
 import TocTree from "@/components/siddur/TocTree";
 import NavMenu from "@/components/NavMenu";
 import {
@@ -74,6 +82,16 @@ const clampScale = (s) => Math.max(0.5, Math.min(3, Math.round(s * 20) / 20));
 // of EVERY node in the siddur's TOC tree (English + Hebrew), plus a gloss
 // heuristic for foreign parenthetical subtitles (e.g. Portuguese).
 const stripNikud = (s) => (s || "").replace(/[\u0591-\u05C7\u05F3\u05F4]/g, "");
+// No replacement space (not " ") \u2014 Sefaria sometimes wraps letters *inside*
+// a word in a tag (e.g. "\u05E9\u05B0\u05C1\u05DE\u05B7<big>\u05E2</big>", emphasizing Shema's last letter),
+// and a naive space-replacement would split that single word into two
+// unsearchable pieces ("\u05E9\u05DE \u05E2"). Real inter-word tags already have genuine
+// spaces around them in the source text, so dropping tags outright doesn't
+// merge anything that wasn't already meant to stay apart.
+const stripTags = (s) => (s || "").replace(/<[^>]*>/g, "");
+// Nikud- and tag-stripped, lowercased \u2014 applied to both the search query and
+// candidate segment text so "\u05D9\u05E2\u05DC\u05D4" matches "\u05D9\u05B7\u05E2\u05B2\u05DC\u05B6\u05D4" regardless of vowel points.
+const normalizeForSearch = (s) => stripNikud(stripTags(s || "")).toLowerCase();
 const sig = (s) => {
   let t = stripNikud(s);
   t = t.replace(/<[^>]*>/g, " ");
@@ -125,10 +143,54 @@ async function sweepEmpties(sections, queryClient, concurrency = 8) {
   return empty;
 }
 
+// Fetch-only variant of sweepEmpties, for full-text search: walks the whole
+// book so every section's text ends up in the query cache (same query key,
+// same shape — nothing is double-fetched once cached; fetchAndZipSefaria
+// itself checks IndexedDB before network, so repeat searches across sessions
+// are typically fast). Runs only when the user actually searches — never
+// eagerly on TOC mount.
+async function ensureAllFetched(sections, queryClient, concurrency = 8) {
+  let idx = 0;
+  const run = async () => {
+    while (idx < sections.length) {
+      const i = idx++;
+      const sec = sections[i];
+      try {
+        await queryClient.fetchQuery({
+          queryKey: ["sefaria-text-v3", sec.ref],
+          queryFn: () => fetchAndZipSefaria(sec.ref, sec.altRefs),
+          staleTime: 86400000,
+        });
+      } catch {
+        /* skip — leave unsearchable rather than block the rest */
+      }
+    }
+  };
+  await Promise.all(
+    Array.from({ length: Math.min(concurrency, sections.length) }, run),
+  );
+}
+
+// Pure cache read (no fetch) — true if any segment's normalized he/en text
+// for this section contains the (already-normalized) query. Correctness here
+// depends on ensureAllFetched having populated the cache first.
+function sectionMatchesText(sec, queryClient, normalizedQuery) {
+  const data = queryClient.getQueryData(["sefaria-text-v3", sec.ref]);
+  if (!Array.isArray(data)) return false;
+  return data.some(
+    (seg) =>
+      normalizeForSearch(seg.he).includes(normalizedQuery) ||
+      normalizeForSearch(seg.en).includes(normalizedQuery),
+  );
+}
+
 export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
   const navigate = useNavigate();
   const location = useLocation();
   const queryClient = useQueryClient();
+  const { location: savedLocation } = useSavedLocation();
+  const { bookmarks, isBookmarked, toggleBookmark, removeBookmark } =
+    useSiddurBookmarks(bookRef);
 
   const scrollRef = useRef(null);
   const scrollDebounce = useRef(null);
@@ -185,6 +247,73 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
 
   // Search State
   const [searchQuery, setSearchQuery] = useState("");
+  const [deferredSearchQuery, setDeferredSearchQuery] = useState("");
+  const [textSearchReady, setTextSearchReady] = useState(false);
+  const [textSearchLoading, setTextSearchLoading] = useState(false);
+  const searchDebounce = useRef(null);
+
+  // Debounce so fast typing doesn't trigger the full-text ensure-fetch on
+  // every keystroke — only the settled query kicks off ensureAllFetched below.
+  useEffect(() => {
+    clearTimeout(searchDebounce.current);
+    searchDebounce.current = setTimeout(() => {
+      setDeferredSearchQuery(searchQuery);
+    }, 300);
+    return () => clearTimeout(searchDebounce.current);
+  }, [searchQuery]);
+
+  // Full-text search only fetches when the user actually searches — never
+  // eagerly on TOC mount. Once every section's text is in the query cache,
+  // filteredTree below can trust sectionMatchesText's cache reads.
+  useEffect(() => {
+    if (!deferredSearchQuery.trim() || !sections.length) {
+      setTextSearchReady(false);
+      return;
+    }
+    let cancelled = false;
+    setTextSearchReady(false);
+    setTextSearchLoading(true);
+    ensureAllFetched(sections, queryClient).then(() => {
+      if (cancelled) return;
+      setTextSearchReady(true);
+      setTextSearchLoading(false);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [deferredSearchQuery, sections, queryClient]);
+
+  // Bookmarks-only filter for the TOC page
+  const [showBookmarksOnly, setShowBookmarksOnly] = useState(false);
+  // Transliteration toggle — independent of langMode, renders as its own column
+  const [showTranslit, setShowTranslit] = useState(false);
+
+  // Today's conditional-insertion flags (Rosh Chodesh, festivals, fasts...) —
+  // loaded once so the reader can highlight segments containing insertions
+  // that apply today (e.g. Ya'aleh V'yavo, Al Hanisim, Tal U'matar).
+  const [liturgicalFlags, setLiturgicalFlags] = useState(null);
+  useEffect(() => {
+    let cancelled = false;
+    getLiturgicalFlags(new Date(), savedLocation?.country === "Israel")
+      .then((flags) => {
+        if (!cancelled) setLiturgicalFlags(flags);
+      })
+      .catch(() => {
+        /* leave null — reader just shows no highlights */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [savedLocation?.country]);
+
+  const activeInsertions = useMemo(
+    () => getActiveInsertions(liturgicalFlags),
+    [liturgicalFlags],
+  );
+  const activeInsertionsKey = useMemo(
+    () => activeInsertions.map((i) => i.id).join(","),
+    [activeInsertions],
+  );
 
   const showEN = langMode !== "he";
   const showHB = langMode !== "en";
@@ -419,12 +548,17 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
 
     const query = searchQuery.toLowerCase();
 
+    const normalizedQuery = normalizeForSearch(searchQuery);
+
     const filterNodes = (nodes) => {
       return nodes
         .map((node) => {
           const matches =
             node.title?.toLowerCase().includes(query) ||
-            node.heTitle?.includes(query);
+            node.heTitle?.includes(query) ||
+            (textSearchReady &&
+              node.children.length === 0 &&
+              sectionMatchesText(node, queryClient, normalizedQuery));
 
           const filteredChildren = filterNodes(node.children || []);
 
@@ -437,7 +571,7 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
     };
 
     return filterNodes(visibleTree);
-  }, [visibleTree, searchQuery]);
+  }, [visibleTree, searchQuery, textSearchReady, queryClient]);
 
   // Jump trigger
   const jumpTo = useCallback((i) => {
@@ -540,7 +674,7 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
         return;
       }
 
-      const cacheKey = `${sec.ref}::${showHB ? 1 : 0}::${showEN ? 1 : 0}`;
+      const cacheKey = `${sec.ref}::${showHB ? 1 : 0}::${showEN ? 1 : 0}::${showTranslit ? 1 : 0}::${activeInsertionsKey}`;
       const cached = cache.get(cacheKey);
       if (cached) {
         items.push(header, ...cached);
@@ -566,14 +700,18 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
           if ((hasH || hasE) && heIsTitle && enIsTitle) return;
 
           if (!(showHB && hasH) && !(showEN && hasE)) return;
+          const insertion = matchInsertion(heText, activeInsertions);
           sectionBody.push({
             type: "segment",
             id: `seg-${i}-${segIndex}`,
             sanitizedHe: sanitizeCached(seg.he),
             sanitizedEn: sanitizeCached(seg.en),
+            sanitizedHeTranslit:
+              showTranslit && hasH ? transliterateCached(seg.he) : null,
             hasH,
             hasE,
             sectionIndex: i,
+            specialLabel: insertion?.label || null,
           });
         });
       }
@@ -581,7 +719,16 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
       items.push(header, ...sectionBody);
     });
     return items;
-  }, [activeSections, sectionQueries, showEN, showHB, titleSets]);
+  }, [
+    activeSections,
+    sectionQueries,
+    showEN,
+    showHB,
+    showTranslit,
+    titleSets,
+    activeInsertions,
+    activeInsertionsKey,
+  ]);
 
   // Group flat items by section index once — avoids an O(n²) filter per render
   const itemsBySection = useMemo(() => {
@@ -700,6 +847,14 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
           onChange={(e) => setSearchQuery(e.target.value)}
           className="w-full pl-9 pr-4 py-2 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-md text-sm focus:ring-2 focus:ring-blue-500 outline-none transition-all dark:text-slate-200"
         />
+        {textSearchLoading && (
+          <div
+            className="absolute inset-y-0 right-9 flex items-center"
+            title="Searching full text..."
+          >
+            <Loader2 className="h-4 w-4 text-slate-400 animate-spin" />
+          </div>
+        )}
         {searchQuery && (
           <button
             onClick={() => setSearchQuery("")}
@@ -755,6 +910,14 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
           >
             BOTH
           </Button>
+          <Button
+            size="sm"
+            variant={showTranslit ? "default" : "outline"}
+            onClick={() => setShowTranslit((v) => !v)}
+            title="Transliteration"
+          >
+            <Languages className="w-4 h-4 mr-1" /> TR
+          </Button>
 
           {page === "reader" && (
             <>
@@ -804,6 +967,20 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
         {page === "toc" && (
           <div className="h-full flex flex-col overflow-hidden">
             {renderSearchBar()}
+            <div className="shrink-0 bg-white dark:bg-slate-950 border-b border-slate-200 dark:border-slate-800 px-4 py-2">
+              <Button
+                size="sm"
+                variant={showBookmarksOnly ? "default" : "outline"}
+                onClick={() => setShowBookmarksOnly((v) => !v)}
+              >
+                {showBookmarksOnly ? (
+                  <BookmarkCheck className="w-4 h-4 mr-1" />
+                ) : (
+                  <Bookmark className="w-4 h-4 mr-1" />
+                )}
+                Bookmarks{bookmarks.length ? ` (${bookmarks.length})` : ""}
+              </Button>
+            </div>
             <div className="flex-1 overflow-y-auto px-4 pb-4 overscroll-y-contain">
               {(loading || pruning) && (
                 <div className="py-10 flex justify-center">
@@ -815,7 +992,53 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
                   <AlertCircle className="w-8 h-8" />
                 </div>
               )}
-              {!loading && !error && !pruning && (
+              {!loading && !error && !pruning && showBookmarksOnly && (
+                <div className="flex flex-col divide-y divide-slate-100 dark:divide-slate-800">
+                  {bookmarks.length === 0 && (
+                    <p className="text-sm text-slate-500 py-6 text-center">
+                      No bookmarks yet — tap the bookmark icon while reading
+                      to save a section.
+                    </p>
+                  )}
+                  {[...bookmarks]
+                    .sort(
+                      (a, b) =>
+                        (visibleRefToIndex[a.ref] ?? Infinity) -
+                        (visibleRefToIndex[b.ref] ?? Infinity),
+                    )
+                    .map((b) => {
+                      const idx = visibleRefToIndex[b.ref];
+                      const available = idx !== undefined;
+                      return (
+                        <div
+                          key={b.ref}
+                          className="flex items-center justify-between py-2.5"
+                        >
+                          <button
+                            onClick={() => available && jumpTo(idx)}
+                            disabled={!available}
+                            className={`flex-1 text-left text-sm ${
+                              available
+                                ? "text-slate-700 dark:text-slate-300 hover:underline"
+                                : "text-slate-400 dark:text-slate-600 cursor-not-allowed"
+                            }`}
+                          >
+                            {b.label}
+                            {!available && " (unavailable)"}
+                          </button>
+                          <button
+                            onClick={() => removeBookmark(b.ref)}
+                            className="p-1 text-slate-400 hover:text-slate-600"
+                            aria-label="Remove bookmark"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        </div>
+                      );
+                    })}
+                </div>
+              )}
+              {!loading && !error && !pruning && !showBookmarksOnly && (
                 <TocTree
                   nodes={filteredTree}
                   onSelect={jumpTo}
@@ -874,6 +1097,15 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
                           <SiddurHeader
                             label={headerItem.label}
                             heLabel={headerItem.heLabel}
+                            sectionRef={sec.ref}
+                            bookmarked={isBookmarked(sec.ref)}
+                            onToggleBookmark={() =>
+                              toggleBookmark({
+                                ref: sec.ref,
+                                label: sec.label,
+                                heLabel: sec.heLabel,
+                              })
+                            }
                           />
                         </div>
                       )}
@@ -889,10 +1121,13 @@ export default function SiddurView({ title, subtitle, bookRef, sefariaUrl }) {
                               <SiddurSegment
                                 sanitizedHe={item.sanitizedHe}
                                 sanitizedEn={item.sanitizedEn}
+                                sanitizedHeTranslit={item.sanitizedHeTranslit}
                                 hasH={item.hasH}
                                 hasE={item.hasE}
                                 showHB={showHB}
                                 showEN={showEN}
+                                showTranslit={showTranslit}
+                                specialLabel={item.specialLabel}
                               />
                             )}
                             {item.type === "loading" && <SiddurLoading />}
