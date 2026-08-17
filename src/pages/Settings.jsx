@@ -8,6 +8,8 @@ import {
   LogOut,
   Trash2,
   Loader2,
+  Mail,
+  Github,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import PageHeader, { iconButtonClass } from "@/components/PageHeader";
@@ -30,6 +32,16 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+
+// Maintainer contact card, sourced from the Gravatar profile at
+// gravatar.com/sheppcrafd.
+const MAINTAINER = {
+  name: "SheppCrafd",
+  bio: "Builds mods, builds robots, builds modded robots",
+  avatar: "https://0.gravatar.com/avatar/2daa5fe613a74df44eda666f4db3967a88369f873fd614400b4660d986d0d3d6?s=200",
+  github: "https://github.com/SheppCrafd",
+  email: "mwallis31@outlook.com",
+};
 
 export default function Settings() {
   const navigate = useNavigate();
@@ -279,6 +291,46 @@ export default function Settings() {
           </a>
         </div>
 
+        {/* About */}
+        <div className="mb-6">
+          <p className="text-xs font-semibold uppercase tracking-widest text-slate-400 mb-2 px-1">
+            About
+          </p>
+          <div className="bg-card rounded-xl border border-border shadow-sm p-4">
+            <div className="flex items-center gap-3">
+              <img
+                src={MAINTAINER.avatar}
+                alt={MAINTAINER.name}
+                className="w-12 h-12 rounded-full border border-border shrink-0"
+              />
+              <div>
+                <p className="text-sm font-medium text-slate-800 dark:text-slate-100">
+                  {MAINTAINER.name}
+                </p>
+                <p className="text-xs text-slate-400">{MAINTAINER.bio}</p>
+              </div>
+            </div>
+            <div className="mt-3 pt-3 border-t border-border flex flex-col gap-2">
+              <a
+                href={`mailto:${MAINTAINER.email}`}
+                className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300 hover:text-foreground transition-colors"
+              >
+                <Mail className="w-4 h-4 shrink-0" />
+                {MAINTAINER.email}
+              </a>
+              <a
+                href={MAINTAINER.github}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300 hover:text-foreground transition-colors"
+              >
+                <Github className="w-4 h-4 shrink-0" />
+                GitHub
+              </a>
+            </div>
+          </div>
+        </div>
+
         {/* Account */}
         <div className="mb-6">
           <p className="text-xs font-semibold uppercase tracking-widest text-slate-400 mb-2 px-1">
@@ -339,6 +391,18 @@ export default function Settings() {
             </AlertDialog>
           </div>
         </div>
+
+        <p className="text-center text-xs text-slate-400 pb-2">
+          Zmanim Today, built by{" "}
+          <a
+            href={MAINTAINER.github}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="underline underline-offset-2 hover:text-foreground transition-colors"
+          >
+            {MAINTAINER.name}
+          </a>
+        </p>
       </div>
     </div>
   );
