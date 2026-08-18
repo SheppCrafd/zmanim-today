@@ -8,10 +8,11 @@ import {
   LogOut,
   Trash2,
   Loader2,
+  Mail,
+  Github,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import PageHeader, { iconButtonClass } from "@/components/PageHeader";
-import GravatarCard from "@/components/GravatarCard";
 import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd";
 import {
   useDashboardPrefs,
@@ -36,8 +37,10 @@ import {
 // gravatar.com/sheppcrafd.
 const MAINTAINER = {
   name: "SheppCrafd",
+  bio: "Builds mods, builds robots, builds modded robots",
+  avatar: "https://0.gravatar.com/avatar/2daa5fe613a74df44eda666f4db3967a88369f873fd614400b4660d986d0d3d6?s=200",
   github: "https://github.com/SheppCrafd",
-  gravatarUsername: "sheppcrafd",
+  email: "mwallis31@outlook.com",
 };
 
 export default function Settings() {
@@ -293,13 +296,38 @@ export default function Settings() {
           <p className="text-xs font-semibold uppercase tracking-widest text-slate-400 mb-2 px-1">
             About
           </p>
-          <div className="min-w-0">
-            <GravatarCard
-              username={MAINTAINER.gravatarUsername}
-              name={MAINTAINER.name}
-              dark={dark}
-              className="border border-border"
-            />
+          <div className="bg-card rounded-xl border border-border shadow-sm p-4">
+            <div className="flex items-center gap-3">
+              <img
+                src={MAINTAINER.avatar}
+                alt={MAINTAINER.name}
+                className="w-12 h-12 rounded-full border border-border shrink-0"
+              />
+              <div>
+                <p className="text-sm font-medium text-slate-800 dark:text-slate-100">
+                  {MAINTAINER.name}
+                </p>
+                <p className="text-xs text-slate-400">{MAINTAINER.bio}</p>
+              </div>
+            </div>
+            <div className="mt-3 pt-3 border-t border-border flex flex-col gap-2">
+              <a
+                href={`mailto:${MAINTAINER.email}`}
+                className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300 hover:text-foreground transition-colors"
+              >
+                <Mail className="w-4 h-4 shrink-0" />
+                {MAINTAINER.email}
+              </a>
+              <a
+                href={MAINTAINER.github}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300 hover:text-foreground transition-colors"
+              >
+                <Github className="w-4 h-4 shrink-0" />
+                GitHub
+              </a>
+            </div>
           </div>
         </div>
 
