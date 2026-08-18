@@ -88,7 +88,7 @@ export default function Zmanim() {
             <CardContent className="p-6">
               <form onSubmit={handleManualLocation} className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                  <label className="block text-sm font-medium text-foreground mb-2">
                     Enter Your Location
                   </label>
                   <div className="flex gap-2">
@@ -103,7 +103,6 @@ export default function Zmanim() {
                     <Button
                       type="submit"
                       disabled={searchingLocation || !manualLocation.trim()}
-                      className="bg-blue-600 hover:bg-blue-700"
                     >
                       {searchingLocation ? (
                         <Loader2 className="w-4 h-4 animate-spin" />
@@ -114,9 +113,9 @@ export default function Zmanim() {
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
-                  <div className="flex-1 border-t border-slate-300"></div>
-                  <span className="text-sm text-slate-500">or</span>
-                  <div className="flex-1 border-t border-slate-300"></div>
+                  <div className="flex-1 border-t border-border"></div>
+                  <span className="text-sm text-muted-foreground">or</span>
+                  <div className="flex-1 border-t border-border"></div>
                 </div>
                 <Button
                   type="button"
@@ -139,14 +138,14 @@ export default function Zmanim() {
                 </Button>
               </form>
               {error && (
-                <p className="text-sm text-red-600 mt-3 text-center">{error}</p>
+                <p className="text-sm text-destructive mt-3 text-center">{error}</p>
               )}
             </CardContent>
           </Card>
         )}
 
         {!location && (
-          <div className="text-center text-slate-500 text-sm mt-8">
+          <div className="text-center text-muted-foreground text-sm mt-8">
             Enter a city or address to get accurate zmanim for your location
           </div>
         )}
@@ -164,17 +163,17 @@ export default function Zmanim() {
                     clearLocation();
                     setManualLocation("");
                   }}
-                  className="text-slate-500 hover:text-slate-700"
+                  className="text-muted-foreground hover:text-foreground"
                 >
                   Change
                 </Button>
               </div>
 
-              <div className="mt-4 pt-4 border-t border-slate-200">
+              <div className="mt-4 pt-4 border-t border-border">
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center gap-3">
-                    <CalendarIcon className="w-5 h-5 text-amber-600" />
-                    <p className="text-sm font-medium text-slate-600">
+                    <CalendarIcon className="w-5 h-5 text-primary" />
+                    <p className="text-sm font-medium text-foreground">
                       Select Date
                     </p>
                   </div>
@@ -184,7 +183,6 @@ export default function Zmanim() {
                       size="sm"
                       onClick={() => setCurrentDate(new Date())}
                       disabled={calculating}
-                      className="border-slate-300 hover:bg-slate-50"
                     >
                       Today
                     </Button>
@@ -207,7 +205,6 @@ export default function Zmanim() {
                             timezone: zmanim.timezone,
                           });
                         }}
-                        className="border-slate-300 hover:bg-slate-50"
                         title="Print zmanim"
                       >
                         <Printer className="w-4 h-4" />
@@ -218,7 +215,6 @@ export default function Zmanim() {
                       size="sm"
                       onClick={handleRefresh}
                       disabled={calculating}
-                      className="border-slate-300 hover:bg-slate-50"
                     >
                       <RefreshCw
                         className={`w-4 h-4 ${calculating ? "animate-spin" : ""}`}
@@ -277,49 +273,49 @@ export default function Zmanim() {
               </div>
 
               {hebrewInfo && (
-                <div className="mt-4 pt-4 border-t border-slate-200 space-y-2">
+                <div className="mt-4 pt-4 border-t border-border space-y-2">
                   <div className="flex justify-between items-start gap-4">
-                    <span className="text-sm text-slate-600 shrink-0">
+                    <span className="text-sm text-muted-foreground shrink-0">
                       Hebrew Date
                     </span>
                     <div className="text-right">
                       <div
-                        className="font-semibold text-slate-800 text-lg leading-tight"
+                        className="font-display font-semibold text-foreground text-lg leading-tight"
                         dir="rtl"
                       >
                         {hebrewInfo.hebrew_date}
                       </div>
-                      <div className="text-sm text-slate-500">
+                      <div className="text-sm text-muted-foreground">
                         {hebrewInfo.hebrew_date_transliterated}
                       </div>
                     </div>
                   </div>
                   <div className="flex justify-between items-start gap-4">
-                    <span className="text-sm text-slate-600 shrink-0">Day</span>
+                    <span className="text-sm text-muted-foreground shrink-0">Day</span>
                     <div className="text-right">
-                      <div className="font-semibold text-slate-800" dir="rtl">
+                      <div className="font-semibold text-foreground" dir="rtl">
                         {hebrewInfo.day_of_week_hebrew}
                       </div>
-                      <div className="text-sm text-slate-500">
+                      <div className="text-sm text-muted-foreground">
                         {hebrewInfo.day_of_week_transliterated}
                       </div>
                     </div>
                   </div>
                   {hebrewInfo.parsha && (
                     <div className="flex justify-between items-start gap-4">
-                      <span className="text-sm text-slate-600 shrink-0">
+                      <span className="text-sm text-muted-foreground shrink-0">
                         Parsha
                       </span>
                       <div className="text-right">
                         {hebrewInfo.parsha_hebrew && (
                           <div
-                            className="font-semibold text-blue-700"
+                            className="font-semibold text-primary"
                             dir="rtl"
                           >
                             {hebrewInfo.parsha_hebrew}
                           </div>
                         )}
-                        <div className="text-sm text-blue-600">
+                        <div className="text-sm text-primary">
                           {hebrewInfo.parsha}
                         </div>
                       </div>
@@ -335,20 +331,21 @@ export default function Zmanim() {
         {calculating && (
           <Card className="border border-border shadow-sm bg-card">
             <CardContent className="flex flex-col items-center justify-center py-12">
-              <Loader2 className="w-10 h-10 text-blue-600 animate-spin mb-4" />
-              <p className="text-slate-700">Calculating zmanim...</p>
+              <Loader2 className="w-10 h-10 text-primary animate-spin mb-4" />
+              <p className="text-foreground">Calculating zmanim...</p>
             </CardContent>
           </Card>
         )}
 
         {/* Error State */}
         {error && !zmanim && location && (
-          <Card className="shadow-lg border-0 bg-red-50">
+          <Card className="shadow-sm border-0 bg-destructive/10">
             <CardContent className="py-6 text-center">
-              <p className="text-red-700">{error}</p>
+              <p className="text-destructive">{error}</p>
               <Button
                 onClick={handleRefresh}
-                className="mt-4 bg-red-600 hover:bg-red-700"
+                variant="destructive"
+                className="mt-4"
               >
                 Try Again
               </Button>
@@ -387,7 +384,7 @@ export default function Zmanim() {
         )}
 
         {/* Footer */}
-        <div className="text-center mt-8 text-sm text-slate-500">
+        <div className="text-center mt-8 text-sm text-muted-foreground">
           <p>Times calculated based on your GPS location</p>
           {zmanim?.timezone && (
             <p className="mt-1">Timezone: {zmanim.timezone}</p>
@@ -398,7 +395,7 @@ export default function Zmanim() {
               href="https://outorah.org/p/41921/"
               target="_blank"
               rel="noopener noreferrer"
-              className="text-blue-600 hover:underline"
+              className="text-primary hover:underline"
             >
               https://outorah.org/p/41921/
             </a>

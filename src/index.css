@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -106,6 +106,7 @@ button:focus-visible {
     --chart-5: 27 87% 67%;
     --radius: 0.5rem;
     --font-display: "Fraunces", ui-serif, Georgia, serif;
+    --font-body: "Inter", ui-sans-serif, system-ui, sans-serif;
     --sidebar-background: 0 0% 98%;
     --sidebar-foreground: 240 5.3% 26.1%;
     --sidebar-primary: 240 5.9% 10%;
@@ -157,6 +158,37 @@ button:focus-visible {
   }
   body {
     @apply bg-background text-foreground;
+    font-family: var(--font-body);
+  }
+}
+
+/* Accessibility floor: a visible focus ring for elements that don't already
+   define one (plain <a>/<button> outside the Button primitive — nav links,
+   icon buttons, settings rows). The Button/Input primitives set their own
+   focus-visible ring via Tailwind utilities; this is the fallback so
+   keyboard users always see where they are. */
+@layer base {
+  a:focus-visible,
+  button:focus-visible,
+  [role="button"]:focus-visible,
+  input:focus-visible,
+  [tabindex]:focus-visible {
+    outline: 2px solid hsl(var(--ring));
+    outline-offset: 2px;
+  }
+}
+
+/* Respect the OS-level reduced-motion preference: kill decorative
+   transitions/animations (card entrance motion, hover scale, spinners
+   excepted since they communicate active work, not decoration). */
+@media (prefers-reduced-motion: reduce) {
+  *:not(.animate-spin),
+  *:not(.animate-spin)::before,
+  *:not(.animate-spin)::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
   }
 }
 
@@ -218,9 +250,21 @@ button:focus-visible {
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5) !important;
 }
 
-/* Compass SVG ring in dark mode */
+/* Compass SVG — tick/ring colors as CSS vars so the dial matches the theme
+   instead of staying light-mode slate hex values when dark mode is on. */
+:root {
+  --compass-bg: hsl(0, 0%, 100%);
+  --compass-ring: hsl(214, 32%, 91%);
+  --compass-tick-major: hsl(215, 25%, 35%);
+  --compass-tick-minor: hsl(214, 20%, 80%);
+  --compass-cardinal-n: hsl(221, 83%, 53%);
+}
 .dark {
   --compass-bg: hsl(222, 47%, 10%);
+  --compass-ring: hsl(222, 30%, 20%);
+  --compass-tick-major: hsl(210, 25%, 75%);
+  --compass-tick-minor: hsl(222, 25%, 30%);
+  --compass-cardinal-n: hsl(217, 91%, 60%);
 }
 
 /* ---------------- SIDDUR: footnotes + "say today" insertions ----------------

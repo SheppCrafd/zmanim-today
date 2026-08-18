@@ -75,8 +75,7 @@ export default function MiniCompass({ location }) {
             cx={cx}
             cy={cy}
             r={R}
-            fill="white"
-            stroke="#e2e8f0"
+            className="fill-card stroke-border"
             strokeWidth="1.5"
           />
           {/* Arrow */}
@@ -100,18 +99,17 @@ export default function MiniCompass({ location }) {
           <circle cx={cx} cy={cy} r="3" fill="#d97706" />
         </svg>
         <div className="min-w-0">
-          <p className="text-xs text-slate-400 mb-0.5">Direction to</p>
-          <p className="font-semibold text-slate-800 text-sm">Jerusalem</p>
-          <p className="text-amber-600 font-bold text-lg leading-tight">
+          <p className="text-xs text-muted-foreground mb-0.5">Direction to</p>
+          <p className="font-semibold text-foreground text-sm">Jerusalem</p>
+          <p className="text-amber-600 dark:text-amber-500 font-bold text-lg leading-tight">
             {Math.round(bearing)}°{" "}
             <span className="text-sm font-medium">{bearingLabel(bearing)}</span>
           </p>
         </div>
         <div className="ml-auto shrink-0">
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" className="stroke-muted-foreground">
             <path
               d="M6 12l4-4-4-4"
-              stroke="#cbd5e1"
               strokeWidth="1.5"
               strokeLinecap="round"
               strokeLinejoin="round"

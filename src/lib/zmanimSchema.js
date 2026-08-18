@@ -162,31 +162,37 @@ export function getZmanLabel(id, dayOfWeek) {
   return meta.label;
 }
 
-/** Group definitions for the full Zmanim page */
+/**
+ * Group definitions for the full Zmanim page. Card headers stay in one
+ * disciplined hue (the app's primary blue) rather than a different color
+ * per group — the day itself supplies the differentiation: each group gets
+ * deeper/darker as the day goes from dawn to night, so the color literally
+ * tracks the light outside instead of decorating the card arbitrarily.
+ */
 export const ZMANIM_GROUPS = [
   {
     id: "morning",
     title: "Dawn & Morning",
     icon: "☀️",
-    color: "from-amber-500 to-orange-500",
-    printFrom: "#f59e0b",
-    printTo: "#f97316",
+    color: "from-blue-400 to-blue-500",
+    printFrom: "#60a5fa",
+    printTo: "#3b82f6",
   },
   {
     id: "afternoon",
     title: "Midday & Afternoon",
     icon: "🌤️",
-    color: "from-blue-500 to-cyan-500",
-    printFrom: "#3b82f6",
-    printTo: "#06b6d4",
+    color: "from-blue-600 to-blue-700",
+    printFrom: "#2563eb",
+    printTo: "#1d4ed8",
   },
   {
     id: "evening",
     title: "Evening & Night",
     icon: "🌙",
-    color: "from-indigo-600 to-purple-600",
-    printFrom: "#4f46e5",
-    printTo: "#9333ea",
+    color: "from-blue-900 to-slate-900",
+    printFrom: "#1e3a8a",
+    printTo: "#0f172a",
   },
 ];
 

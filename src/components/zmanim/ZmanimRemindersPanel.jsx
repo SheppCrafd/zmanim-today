@@ -189,12 +189,12 @@ export default function ZmanimRemindersPanel({ zmanimData, currentDate }) {
       <SheetTrigger asChild>
         <button className={`${iconButtonClass} relative`} title="Set reminders">
           {hasEnabled ? (
-            <BellRing className="w-5 h-5 text-blue-600" />
+            <BellRing className="w-5 h-5 text-primary" />
           ) : (
             <Bell className="w-5 h-5 text-foreground" />
           )}
           {hasEnabled && (
-            <span className="absolute top-1 right-1 w-2 h-2 bg-blue-500 rounded-full" />
+            <span className="absolute top-1 right-1 w-2 h-2 bg-primary rounded-full" />
           )}
         </button>
       </SheetTrigger>
@@ -208,11 +208,11 @@ export default function ZmanimRemindersPanel({ zmanimData, currentDate }) {
 
         <div className="mt-4 space-y-4">
           {iosNotStandalone ? (
-            <div className="bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800 rounded-lg p-3 text-sm">
-              <p className="text-blue-900 dark:text-blue-200 font-semibold mb-1">
+            <div className="bg-primary/5 border border-primary/20 rounded-lg p-3 text-sm">
+              <p className="text-foreground font-semibold mb-1">
                 📲 Add to Home Screen
               </p>
-              <p className="text-blue-800 dark:text-blue-300 text-xs">
+              <p className="text-muted-foreground text-xs">
                 To enable reminders on iOS, tap the <strong>Share</strong>{" "}
                 button in Safari, then choose{" "}
                 <strong>"Add to Home Screen"</strong>. Open the app from there
@@ -236,7 +236,7 @@ export default function ZmanimRemindersPanel({ zmanimData, currentDate }) {
                   </div>
                 )}
               {notifPermission === "denied" && (
-                <p className="text-xs text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950/40 rounded-lg p-2 text-center">
+                <p className="text-xs text-destructive bg-destructive/10 rounded-lg p-2 text-center">
                   Notifications are blocked. Please allow them in your browser
                   settings.
                 </p>
@@ -245,12 +245,12 @@ export default function ZmanimRemindersPanel({ zmanimData, currentDate }) {
           )}
 
           {!isToday && (
-            <p className="text-xs text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-900 rounded-lg p-2 text-center">
+            <p className="text-xs text-muted-foreground bg-muted rounded-lg p-2 text-center">
               Reminders only fire for today's zmanim.
             </p>
           )}
 
-          <p className="text-xs text-slate-500">
+          <p className="text-xs text-muted-foreground">
             Toggle any zman to get notified before it starts, then choose your
             lead time.
           </p>
@@ -266,7 +266,7 @@ export default function ZmanimRemindersPanel({ zmanimData, currentDate }) {
                   key={key}
                   className={`rounded-xl border p-3 transition-colors ${
                     pref.enabled
-                      ? "border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/40"
+                      ? "border-primary/20 bg-primary/5"
                       : "border-border bg-card"
                   }`}
                 >
@@ -278,16 +278,16 @@ export default function ZmanimRemindersPanel({ zmanimData, currentDate }) {
                       <span className="text-lg leading-none">{emoji}</span>
                       <div>
                         <p
-                          className={`text-sm font-medium leading-tight ${pref.enabled ? "text-blue-800 dark:text-blue-300" : "text-slate-700"}`}
+                          className={`text-sm font-medium leading-tight ${pref.enabled ? "text-primary" : "text-foreground"}`}
                         >
                           {label}{" "}
                           {dayNote && (
-                            <span className="text-xs font-normal text-slate-400">
+                            <span className="text-xs font-normal text-muted-foreground">
                               {dayNote}
                             </span>
                           )}
                         </p>
-                        <p className="text-xs text-slate-400">
+                        <p className="text-xs text-muted-foreground">
                           {zmanTime ? zmanTime : description}
                         </p>
                       </div>
@@ -296,11 +296,11 @@ export default function ZmanimRemindersPanel({ zmanimData, currentDate }) {
                     <div
                       onClick={() => toggleReminder(key)}
                       className={`w-10 h-5 rounded-full transition-colors cursor-pointer flex-shrink-0 ml-2 ${
-                        pref.enabled ? "bg-blue-500" : "bg-slate-200"
+                        pref.enabled ? "bg-primary" : "bg-muted"
                       }`}
                     >
                       <div
-                        className={`w-4 h-4 rounded-full bg-white shadow-sm mt-0.5 transition-transform ${
+                        className={`w-4 h-4 rounded-full bg-background shadow-sm mt-0.5 transition-transform ${
                           pref.enabled ? "translate-x-5" : "translate-x-0.5"
                         }`}
                       />
@@ -315,7 +315,7 @@ export default function ZmanimRemindersPanel({ zmanimData, currentDate }) {
                           onClick={() => setMinutes(key, m)}
                           className={`flex-1 text-xs py-1 rounded-lg transition-colors ${
                             pref.minutesBefore === m
-                              ? "bg-blue-600 text-white"
+                              ? "bg-primary text-primary-foreground"
                               : "bg-card border border-border text-muted-foreground hover:bg-accent"
                           }`}
                         >
@@ -335,7 +335,7 @@ export default function ZmanimRemindersPanel({ zmanimData, currentDate }) {
             </p>
           )}
           {pushStatus === "subscribed" && (
-            <p className="text-xs text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-950/40 rounded-lg p-2 text-center flex items-center justify-center gap-1">
+            <p className="text-xs text-primary bg-primary/5 rounded-lg p-2 text-center flex items-center justify-center gap-1">
               <Wifi className="w-3 h-3" /> Background delivery on — works even when the app is closed
             </p>
           )}
