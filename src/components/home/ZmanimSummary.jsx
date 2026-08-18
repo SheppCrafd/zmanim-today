@@ -31,11 +31,11 @@ export default function ZmanimSummary({ zmanim, enabledIds, use24Hour }) {
         >
           <div className="flex items-center gap-3">
             <span className="text-base">{item.icon}</span>
-            <span className="text-sm font-medium text-slate-700">
+            <span className="text-sm font-medium text-foreground">
               {item.label}
             </span>
           </div>
-          <span className="text-sm font-semibold text-slate-800 tabular-nums">
+          <span className="text-sm font-semibold text-foreground tabular-nums">
             {item.value}
           </span>
         </div>

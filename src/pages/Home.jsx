@@ -105,13 +105,13 @@ export default function Home() {
         {/* Location */}
         {location ? (
           <div className="flex items-center gap-2 mb-6">
-            <MapPin className="w-4 h-4 text-blue-500 shrink-0" />
-            <p className="text-sm font-medium text-slate-700 flex-1">
+            <MapPin className="w-4 h-4 text-primary shrink-0" />
+            <p className="text-sm font-medium text-foreground flex-1">
               <LocationLabel location={displayLocation} />
             </p>
             <button
               onClick={() => setShowSearch(!showSearch)}
-              className="text-xs text-blue-500 hover:text-blue-700 font-medium"
+              className="text-xs text-primary hover:text-primary/80 font-medium"
             >
               Change
             </button>
@@ -124,7 +124,7 @@ export default function Home() {
                 <p className="text-xs text-amber-800">{locError}</p>
               </div>
             )}
-            <p className="text-sm text-slate-500 mb-3">
+            <p className="text-sm text-muted-foreground mb-3">
               Set your location to get prayer times.
             </p>
             <div className="flex gap-2">
@@ -132,7 +132,7 @@ export default function Home() {
                 size="sm"
                 onClick={detectGPS}
                 disabled={locLoading}
-                className="bg-blue-600 hover:bg-blue-700 flex-1"
+                className="flex-1"
               >
                 {locLoading ? (
                   <Loader2 className="w-4 h-4 animate-spin" />
@@ -170,7 +170,6 @@ export default function Home() {
                 type="submit"
                 size="sm"
                 disabled={locLoading || !searchQuery.trim()}
-                className="bg-blue-600 hover:bg-blue-700"
               >
                 {locLoading ? (
                   <Loader2 className="w-4 h-4 animate-spin" />
@@ -213,8 +212,8 @@ export default function Home() {
             {/* Zmanim loading */}
             {zmanimLoading && (
               <div className="bg-card rounded-xl border border-border shadow-sm p-6 flex items-center gap-3">
-                <Loader2 className="w-5 h-5 text-blue-500 animate-spin" />
-                <p className="text-sm text-slate-500">
+                <Loader2 className="w-5 h-5 text-primary animate-spin" />
+                <p className="text-sm text-muted-foreground">
                   Calculating prayer times…
                 </p>
               </div>
@@ -233,13 +232,13 @@ export default function Home() {
                   <div className="flex items-center gap-3">
                     <span className="text-base">🕍</span>
                     <div>
-                      <p className="text-sm font-medium text-slate-700">
+                      <p className="text-sm font-medium text-foreground">
                         Tomorrow's Havdalah
                       </p>
-                      <p className="text-xs text-slate-400">Motzei Shabbat</p>
+                      <p className="text-xs text-muted-foreground">Motzei Shabbat</p>
                     </div>
                   </div>
-                  <span className="text-sm font-semibold text-slate-800 tabular-nums">
+                  <span className="text-sm font-semibold text-foreground tabular-nums">
                     {formatTime(
                       tomorrowZmanim.zmanim.havdalah ||
                         tomorrowZmanim.zmanim.tzait_hakochavim,
@@ -296,7 +295,7 @@ export default function Home() {
             {/* Link to full zmanim */}
             {zmanim && !zmanimLoading && (
               <Link to="/Zmanim">
-                <div className="flex items-center justify-center gap-1.5 py-3 text-sm text-blue-600 hover:text-blue-700 font-medium">
+                <div className="flex items-center justify-center gap-1.5 py-3 text-sm text-primary hover:text-primary/80 font-medium">
                   View full zmanim list
                   <ChevronRight className="w-4 h-4" />
                 </div>

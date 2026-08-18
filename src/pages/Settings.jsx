@@ -102,31 +102,31 @@ export default function Settings() {
 
         {/* Location */}
         <div className="mb-6">
-          <p className="text-xs font-semibold uppercase tracking-widest text-slate-400 mb-2 px-1">
+          <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground mb-2 px-1">
             Location
           </p>
           <div className="bg-card rounded-xl border border-border shadow-sm divide-y divide-border">
             {location ? (
               <div className="flex items-center justify-between px-4 py-3">
                 <div>
-                  <p className="text-sm font-medium text-slate-800">
+                  <p className="text-sm font-medium text-foreground">
                     {[location.city, location.state, location.country]
                       .filter(Boolean)
                       .join(", ") ||
                       `${location.latitude?.toFixed(3)}°, ${location.longitude?.toFixed(3)}°`}
                   </p>
-                  <p className="text-xs text-slate-400">Current location</p>
+                  <p className="text-xs text-muted-foreground">Current location</p>
                 </div>
                 <button
                   onClick={clearLocation}
-                  className="text-xs text-red-500 hover:text-red-700 font-medium"
+                  className="text-xs text-destructive hover:text-destructive/80 font-medium"
                 >
                   Clear
                 </button>
               </div>
             ) : (
               <div className="px-4 py-3">
-                <p className="text-sm text-slate-500">
+                <p className="text-sm text-muted-foreground">
                   No location set. Set one from the Home screen.
                 </p>
               </div>
@@ -136,7 +136,7 @@ export default function Settings() {
 
         {/* Appearance */}
         <div className="mb-6">
-          <p className="text-xs font-semibold uppercase tracking-widest text-slate-400 mb-2 px-1">
+          <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground mb-2 px-1">
             Appearance
           </p>
           <div className="bg-card rounded-xl border border-border shadow-sm">
@@ -145,21 +145,21 @@ export default function Settings() {
               className="w-full flex items-center justify-between px-4 py-3"
             >
               <div className="flex items-center gap-3">
-                <Moon className="w-4 h-4 text-indigo-400" />
+                <Moon className="w-4 h-4 text-primary" />
                 <div className="text-left">
-                  <p className="text-sm font-medium text-slate-800 dark:text-slate-100">
+                  <p className="text-sm font-medium text-foreground">
                     Dark Mode
                   </p>
-                  <p className="text-xs text-slate-400">
+                  <p className="text-xs text-muted-foreground">
                     Easy on the eyes for night prayer
                   </p>
                 </div>
               </div>
               <div
-                className={`w-10 h-6 rounded-full transition-colors flex items-center px-0.5 ${dark ? "bg-indigo-600" : "bg-slate-200"}`}
+                className={`w-10 h-6 rounded-full transition-colors flex items-center px-0.5 ${dark ? "bg-primary" : "bg-muted"}`}
               >
                 <div
-                  className={`w-5 h-5 bg-white rounded-full shadow transition-transform ${dark ? "translate-x-4" : "translate-x-0"}`}
+                  className={`w-5 h-5 bg-background rounded-full shadow transition-transform ${dark ? "translate-x-4" : "translate-x-0"}`}
                 />
               </div>
             </button>
@@ -168,7 +168,7 @@ export default function Settings() {
 
         {/* Time Format */}
         <div className="mb-6">
-          <p className="text-xs font-semibold uppercase tracking-widest text-slate-400 mb-2 px-1">
+          <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground mb-2 px-1">
             Time Format
           </p>
           <div className="bg-card rounded-xl border border-border shadow-sm">
@@ -177,18 +177,18 @@ export default function Settings() {
               className="w-full flex items-center justify-between px-4 py-3"
             >
               <div>
-                <p className="text-sm font-medium text-slate-800">
+                <p className="text-sm font-medium text-foreground">
                   24-Hour Time
                 </p>
-                <p className="text-xs text-slate-400">
+                <p className="text-xs text-muted-foreground">
                   Show times in 24h format (e.g. 18:30)
                 </p>
               </div>
               <div
-                className={`w-10 h-6 rounded-full transition-colors flex items-center px-0.5 ${prefs.use24Hour ? "bg-blue-600" : "bg-slate-200"}`}
+                className={`w-10 h-6 rounded-full transition-colors flex items-center px-0.5 ${prefs.use24Hour ? "bg-primary" : "bg-muted"}`}
               >
                 <div
-                  className={`w-5 h-5 bg-white rounded-full shadow transition-transform ${prefs.use24Hour ? "translate-x-4" : "translate-x-0"}`}
+                  className={`w-5 h-5 bg-background rounded-full shadow transition-transform ${prefs.use24Hour ? "translate-x-4" : "translate-x-0"}`}
                 />
               </div>
             </button>
@@ -197,10 +197,10 @@ export default function Settings() {
 
         {/* Dashboard Items */}
         <div className="mb-6">
-          <p className="text-xs font-semibold uppercase tracking-widest text-slate-400 mb-2 px-1">
+          <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground mb-2 px-1">
             Home Dashboard
           </p>
-          <p className="text-xs text-slate-400 mb-3 px-1">
+          <p className="text-xs text-muted-foreground mb-3 px-1">
             Toggle items and drag to reorder.
           </p>
 
@@ -228,22 +228,22 @@ export default function Settings() {
                             {...provided.dragHandleProps}
                             className="cursor-grab active:cursor-grabbing"
                           >
-                            <GripVertical className="w-4 h-4 text-slate-300" />
+                            <GripVertical className="w-4 h-4 text-muted-foreground/60" />
                           </div>
                           <span className="text-base">{getIcon(item.id)}</span>
-                          <span className="flex-1 text-sm font-medium text-slate-700">
+                          <span className="flex-1 text-sm font-medium text-foreground">
                             {getLabel(item.id)}
                           </span>
                           <button
                             onClick={() => toggleItem(item.id)}
                             className={`w-6 h-6 rounded border-2 flex items-center justify-center transition-colors ${
                               item.enabled
-                                ? "bg-blue-600 border-blue-600"
-                                : "bg-white border-slate-300"
+                                ? "bg-primary border-primary"
+                                : "bg-background border-border"
                             }`}
                           >
                             {item.enabled && (
-                              <Check className="w-3.5 h-3.5 text-white stroke-[3]" />
+                              <Check className="w-3.5 h-3.5 text-primary-foreground stroke-[3]" />
                             )}
                           </button>
                         </div>
@@ -259,7 +259,7 @@ export default function Settings() {
 
         {/* Documentation */}
         <div className="mb-6">
-          <p className="text-xs font-semibold uppercase tracking-widest text-slate-400 mb-2 px-1">
+          <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground mb-2 px-1">
             Documentation
           </p>
           <a
@@ -269,20 +269,19 @@ export default function Settings() {
             className="flex items-center justify-between px-4 py-3 bg-card rounded-xl border border-border shadow-sm hover:bg-accent active:scale-[0.98] transition-all"
           >
             <div className="flex items-center gap-3">
-              <BookOpen className="w-4 h-4 text-blue-500" />
+              <BookOpen className="w-4 h-4 text-primary" />
               <div>
-                <p className="text-sm font-medium text-slate-800">
+                <p className="text-sm font-medium text-foreground">
                   App Documentation
                 </p>
-                <p className="text-xs text-slate-400">
+                <p className="text-xs text-muted-foreground">
                   Guides, zmanim references, and help
                 </p>
               </div>
             </div>
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" className="stroke-muted-foreground shrink-0">
               <path
                 d="M6 12l4-4-4-4"
-                stroke="#cbd5e1"
                 strokeWidth="1.5"
                 strokeLinecap="round"
                 strokeLinejoin="round"
@@ -293,7 +292,7 @@ export default function Settings() {
 
         {/* About */}
         <div className="mb-6">
-          <p className="text-xs font-semibold uppercase tracking-widest text-slate-400 mb-2 px-1">
+          <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground mb-2 px-1">
             About
           </p>
           <div className="bg-card rounded-xl border border-border shadow-sm p-4">
@@ -304,16 +303,16 @@ export default function Settings() {
                 className="w-12 h-12 rounded-full border border-border shrink-0"
               />
               <div>
-                <p className="text-sm font-medium text-slate-800 dark:text-slate-100">
+                <p className="text-sm font-medium text-foreground">
                   {MAINTAINER.name}
                 </p>
-                <p className="text-xs text-slate-400">{MAINTAINER.bio}</p>
+                <p className="text-xs text-muted-foreground">{MAINTAINER.bio}</p>
               </div>
             </div>
             <div className="mt-3 pt-3 border-t border-border flex flex-col gap-2">
               <a
                 href={`mailto:${MAINTAINER.email}`}
-                className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300 hover:text-foreground transition-colors"
+                className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
               >
                 <Mail className="w-4 h-4 shrink-0" />
                 {MAINTAINER.email}
@@ -322,7 +321,7 @@ export default function Settings() {
                 href={MAINTAINER.github}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300 hover:text-foreground transition-colors"
+                className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
               >
                 <Github className="w-4 h-4 shrink-0" />
                 GitHub
@@ -333,7 +332,7 @@ export default function Settings() {
 
         {/* Account */}
         <div className="mb-6">
-          <p className="text-xs font-semibold uppercase tracking-widest text-slate-400 mb-2 px-1">
+          <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground mb-2 px-1">
             Account
           </p>
           <div className="bg-card rounded-xl border border-border shadow-sm divide-y divide-border">
@@ -343,20 +342,20 @@ export default function Settings() {
               className="w-full flex items-center gap-3 px-4 py-3 hover:bg-accent transition-colors disabled:opacity-60"
             >
               {loggingOut ? (
-                <Loader2 className="w-4 h-4 text-slate-500 animate-spin" />
+                <Loader2 className="w-4 h-4 text-muted-foreground animate-spin" />
               ) : (
-                <LogOut className="w-4 h-4 text-slate-500" />
+                <LogOut className="w-4 h-4 text-muted-foreground" />
               )}
-              <span className="text-sm font-medium text-slate-700">
+              <span className="text-sm font-medium text-foreground">
                 {loggingOut ? "Logging out…" : "Log Out"}
               </span>
             </button>
 
             <AlertDialog>
               <AlertDialogTrigger asChild>
-                <button className="w-full flex items-center gap-3 px-4 py-3 hover:bg-red-50 transition-colors">
-                  <Trash2 className="w-4 h-4 text-red-500" />
-                  <span className="text-sm font-medium text-red-600">
+                <button className="w-full flex items-center gap-3 px-4 py-3 hover:bg-destructive/10 transition-colors">
+                  <Trash2 className="w-4 h-4 text-destructive" />
+                  <span className="text-sm font-medium text-destructive">
                     Delete Account
                   </span>
                 </button>
@@ -370,7 +369,7 @@ export default function Settings() {
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 {deleteError && (
-                  <p className="text-sm text-red-600">{deleteError}</p>
+                  <p className="text-sm text-destructive">{deleteError}</p>
                 )}
                 <AlertDialogFooter>
                   <AlertDialogCancel disabled={deleting}>
@@ -379,7 +378,7 @@ export default function Settings() {
                   <AlertDialogAction
                     onClick={handleDeleteAccount}
                     disabled={deleting}
-                    className="bg-red-600 hover:bg-red-700 text-white"
+                    className="bg-destructive hover:bg-destructive/90 text-destructive-foreground"
                   >
                     {deleting ? (
                       <Loader2 className="w-4 h-4 mr-2 animate-spin" />
@@ -392,7 +391,7 @@ export default function Settings() {
           </div>
         </div>
 
-        <p className="text-center text-xs text-slate-400 pb-2">
+        <p className="text-center text-xs text-muted-foreground pb-2">
           Zmanim Today, built by{" "}
           <a
             href={MAINTAINER.github}

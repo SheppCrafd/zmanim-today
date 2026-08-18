@@ -106,7 +106,7 @@ function CompassSVG({ heading, bearing }) {
         y1={y1}
         x2={x2}
         y2={y2}
-        stroke={isMajor ? "#475569" : "#cbd5e1"}
+        stroke={isMajor ? "var(--compass-tick-major)" : "var(--compass-tick-minor)"}
         strokeWidth={isMajor ? 1.5 : 1}
         strokeLinecap="round"
       />,
@@ -114,10 +114,10 @@ function CompassSVG({ heading, bearing }) {
   }
 
   const cardinals = [
-    { label: "N", deg: 0, color: "#2563eb", fontWeight: "700", fontSize: 18 },
-    { label: "E", deg: 90, color: "#475569", fontWeight: "600", fontSize: 15 },
-    { label: "S", deg: 180, color: "#475569", fontWeight: "600", fontSize: 15 },
-    { label: "W", deg: 270, color: "#475569", fontWeight: "600", fontSize: 15 },
+    { label: "N", deg: 0, color: "var(--compass-cardinal-n, #3b82f6)", fontWeight: "700", fontSize: 18 },
+    { label: "E", deg: 90, color: "var(--compass-tick-major)", fontWeight: "600", fontSize: 15 },
+    { label: "S", deg: 180, color: "var(--compass-tick-major)", fontWeight: "600", fontSize: 15 },
+    { label: "W", deg: 270, color: "var(--compass-tick-major)", fontWeight: "600", fontSize: 15 },
   ];
 
   const cardinalElements = cardinals.map(
@@ -193,8 +193,8 @@ function CompassSVG({ heading, bearing }) {
         cx={cx}
         cy={cy}
         r={R}
-        fill="var(--compass-bg, white)"
-        stroke="#e2e8f0"
+        fill="var(--compass-bg)"
+        stroke="var(--compass-ring)"
         strokeWidth="1.5"
       />
 
@@ -366,8 +366,8 @@ export default function Compass() {
         <div className="bg-card rounded-2xl border border-border shadow-sm p-6 mb-5 flex flex-col items-center">
           {!location && !locationError ? (
             <div className="flex flex-col items-center py-10 gap-3">
-              <Loader2 className="w-7 h-7 text-blue-500 animate-spin" />
-              <p className="text-slate-400 text-sm">Acquiring location…</p>
+              <Loader2 className="w-7 h-7 text-primary animate-spin" />
+              <p className="text-muted-foreground text-sm">Acquiring location…</p>
             </div>
           ) : (
             <CompassSVG heading={effectiveHeading} bearing={bearing} />
@@ -381,7 +381,7 @@ export default function Compass() {
               <Button
                 onClick={requestIOSPermission}
                 size="sm"
-                className="mt-4 bg-blue-600 hover:bg-blue-700"
+                className="mt-4"
               >
                 Enable Compass Sensor
               </Button>
@@ -390,7 +390,7 @@ export default function Compass() {
           {/* Manual heading fallback */}
           {!orientationSupported && (
             <div className="mt-5 w-full px-2">
-              <p className="text-xs text-slate-400 dark:text-slate-500 mb-2 text-center">
+              <p className="text-xs text-muted-foreground mb-2 text-center">
                 Rotate manually — sensor unavailable
               </p>
               <Slider
@@ -400,7 +400,7 @@ export default function Compass() {
                 value={[manualHeading]}
                 onValueChange={([v]) => setManualHeading(v)}
               />
-              <p className="text-xs text-slate-400 dark:text-slate-500 text-center mt-1">
+              <p className="text-xs text-muted-foreground text-center mt-1">
                 {manualHeading}°
               </p>
             </div>
@@ -412,39 +412,39 @@ export default function Compass() {
           <>
             <div className="grid grid-cols-3 gap-3 mb-4">
               <div className="bg-card rounded-xl border border-border shadow-sm p-3 text-center">
-                <p className="text-xs text-slate-400 dark:text-slate-500 mb-1">
+                <p className="text-xs text-muted-foreground mb-1">
                   Heading
                 </p>
-                <p className="text-xl font-bold text-slate-800 dark:text-slate-100">
+                <p className="text-xl font-bold text-foreground">
                   {Math.round(effectiveHeading)}°
                 </p>
               </div>
               <div className="bg-card rounded-xl border border-border shadow-sm p-3 text-center">
-                <p className="text-xs text-slate-400 dark:text-slate-500 mb-1">
+                <p className="text-xs text-muted-foreground mb-1">
                   Bearing
                 </p>
-                <p className="text-xl font-bold text-amber-600 dark:text-amber-400">
+                <p className="text-xl font-bold text-amber-600 dark:text-amber-500">
                   {Math.round(bearing)}°
                 </p>
               </div>
               <div className="bg-card rounded-xl border border-border shadow-sm p-3 text-center">
-                <p className="text-xs text-slate-400 dark:text-slate-500 mb-1">
+                <p className="text-xs text-muted-foreground mb-1">
                   Distance
                 </p>
-                <p className="text-lg font-bold text-slate-800 dark:text-slate-100 leading-tight">
+                <p className="text-lg font-bold text-foreground leading-tight">
                   {distDisplay}
                 </p>
               </div>
             </div>
 
             <div className="bg-card rounded-xl border border-border shadow-sm px-4 py-3 mb-4">
-              <p className="text-sm text-slate-500 dark:text-slate-400 text-center">
+              <p className="text-sm text-muted-foreground text-center">
                 Jerusalem is{" "}
-                <span className="text-amber-600 dark:text-amber-400 font-semibold">
+                <span className="text-amber-600 dark:text-amber-500 font-semibold">
                   {distDisplay}
                 </span>{" "}
                 away at a bearing of{" "}
-                <span className="text-amber-600 dark:text-amber-400 font-semibold">
+                <span className="text-amber-600 dark:text-amber-500 font-semibold">
                   {Math.round(bearing)}°
                 </span>
                 .
@@ -452,8 +452,8 @@ export default function Compass() {
             </div>
 
             <div className="flex items-center justify-center gap-1.5">
-              <MapPin className="w-3 h-3 text-slate-400" />
-              <p className="text-xs text-slate-400 font-mono">
+              <MapPin className="w-3 h-3 text-muted-foreground" />
+              <p className="text-xs text-muted-foreground font-mono">
                 {location.lat.toFixed(4)}°, {location.lon.toFixed(4)}°
               </p>
             </div>
