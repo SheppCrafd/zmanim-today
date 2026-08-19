@@ -167,6 +167,41 @@ export function useSavedLocation() {
     }
   };
 
+  // First-visit-only, silent IP-based fallback: anonymous visitors (and
+  // crawlers/Lighthouse) get a real computed zmanim view immediately instead
+  // of an empty "set your location" prompt. Only fires when nothing is saved
+  // yet — an explicit GPS fix or manual search always wins and is never
+  // overwritten. Best-effort: on any failure this just leaves location null
+  // and the existing manual "Use My Location" / search UI is shown as before.
+  useEffect(() => {
+    if (location) return;
+    let cancelled = false;
+    fetch("https://ipwho.is/")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((geo) => {
+        if (cancelled || !geo?.success) return;
+        if (typeof geo.latitude !== "number" || typeof geo.longitude !== "number")
+          return;
+        saveLocation({
+          latitude: geo.latitude,
+          longitude: geo.longitude,
+          city: geo.city || "",
+          state: geo.region || "",
+          country: cleanCountry(geo.country || ""),
+          timezone:
+            geo.timezone?.id ||
+            Intl.DateTimeFormat().resolvedOptions().timeZone,
+          source: "ip",
+        });
+      })
+      .catch(() => {
+        /* silent — falls back to the manual GPS/search UI */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const detectGPS = () => {
     if (!navigator.geolocation) {
       setError("Geolocation is not supported by your browser.");

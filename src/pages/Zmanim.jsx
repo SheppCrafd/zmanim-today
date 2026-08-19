@@ -390,15 +390,31 @@ export default function Zmanim() {
             <p className="mt-1">Timezone: {zmanim.timezone}</p>
           )}
           <p className="mt-2">
-            Based on{" "}
+            Times computed via{" "}
             <a
-              href="https://outorah.org/p/41921/"
+              href="https://www.hebcal.com/home/195/zmanim-halachic-times-api"
               target="_blank"
               rel="noopener noreferrer"
               className="text-primary hover:underline"
             >
-              https://outorah.org/p/41921/
+              Hebcal&apos;s zmanim API
             </a>
+            . See our{" "}
+            <a
+              href="https://zmanimtoday.mintlify.app/technical/zman-calculations"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-primary hover:underline"
+            >
+              zman calculation methodology
+            </a>{" "}
+            for the exact assumptions used.
+          </p>
+          <p className="mt-2 max-w-md mx-auto">
+            Times are computed from Hebcal&apos;s published formulas under the
+            assumptions described above. If these don&apos;t match your
+            community&apos;s custom, or you have a halachic question, consult
+            your rabbi.
           </p>
         </div>
       </div>

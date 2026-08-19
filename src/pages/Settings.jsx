@@ -5,6 +5,7 @@ import {
   ArrowLeft,
   Moon,
   BookOpen,
+  ShieldCheck,
   LogOut,
   Trash2,
   Loader2,
@@ -288,6 +289,30 @@ export default function Settings() {
               />
             </svg>
           </a>
+          <button
+            onClick={() => navigate("/Privacy")}
+            className="w-full flex items-center justify-between px-4 py-3 mt-2 bg-card rounded-xl border border-border shadow-sm hover:bg-accent active:scale-[0.98] transition-all"
+          >
+            <div className="flex items-center gap-3">
+              <ShieldCheck className="w-4 h-4 text-primary" />
+              <div className="text-left">
+                <p className="text-sm font-medium text-foreground">
+                  Privacy Policy
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  What we collect and why
+                </p>
+              </div>
+            </div>
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" className="stroke-muted-foreground shrink-0">
+              <path
+                d="M6 12l4-4-4-4"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          </button>
         </div>
 
         {/* About */}
