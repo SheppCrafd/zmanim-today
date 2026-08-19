@@ -21,6 +21,7 @@ const loadAshkenaziSiddur = () => import("./pages/AshkenaziSiddur");
 const loadChabadSiddur = () => import("./pages/ChabadSiddur");
 const loadCompass = () => import("./pages/Compass");
 const loadSettings = () => import("./pages/Settings");
+const loadPrivacy = () => import("./pages/Privacy");
 
 const Zmanim = lazy(loadZmanim);
 const SephardicSiddur = lazy(loadSephardicSiddur);
@@ -28,6 +29,7 @@ const AshkenaziSiddur = lazy(loadAshkenaziSiddur);
 const ChabadSiddur = lazy(loadChabadSiddur);
 const Compass = lazy(loadCompass);
 const Settings = lazy(loadSettings);
+const Privacy = lazy(loadPrivacy);
 
 // VisualEditAgent (~700 lines) exists purely to let the base44 builder
 // highlight/edit elements live inside its own iframe — it does nothing for a
@@ -57,6 +59,7 @@ const ROUTE_PREFETCHERS = [
   loadChabadSiddur,
   loadCompass,
   loadSettings,
+  loadPrivacy,
 ];
 
 // Warms every non-Home route's chunk once the browser is idle, so
@@ -82,22 +85,36 @@ const RouteFallback = () => (
   </div>
 );
 
+// Wraps a route that genuinely needs an authenticated user (saved-settings
+// persistence, push-reminder sync tied to an account). Unlike the old
+// app-wide gate, this only sends someone to /login when they actually try to
+// reach a gated route — the public zmanim views never trigger it.
+const RequireAuth = ({ children }) => {
+  const { isAuthenticated, navigateToLogin } = useAuth();
+  useEffect(() => {
+    if (!isAuthenticated) navigateToLogin();
+  }, [isAuthenticated, navigateToLogin]);
+
+  if (!isAuthenticated) return <RouteFallback />;
+  return children;
+};
+
 const AuthenticatedApp = () => {
-  const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } =
-    useAuth();
+  const { isLoadingAuth, isLoadingPublicSettings, authError } = useAuth();
   useIdlePrefetchRoutes();
 
   if (isLoadingPublicSettings || isLoadingAuth) {
     return <RouteFallback />;
   }
 
-  if (authError) {
-    if (authError.type === "user_not_registered")
-      return <UserNotRegisteredError />;
-    if (authError.type === "auth_required") {
-      navigateToLogin();
-      return null;
-    }
+  // "user_not_registered" means a real token was presented but the account
+  // isn't provisioned for this app — that's a genuine access error, not an
+  // anonymous visitor, so it still blocks. Every other authError (including
+  // "auth_required" from the public-settings check, and any unknown/backend
+  // failure) now falls through to the routes below: the core zmanim view is
+  // public, so an anonymous visitor is just... anonymous, not an error state.
+  if (authError && authError.type === "user_not_registered") {
+    return <UserNotRegisteredError />;
   }
 
   return (
@@ -106,7 +123,15 @@ const AuthenticatedApp = () => {
         <Route path="/" element={<Home />} />
         <Route path="/Zmanim" element={<Zmanim />} />
         <Route path="/Compass" element={<Compass />} />
-        <Route path="/Settings" element={<Settings />} />
+        <Route
+          path="/Settings"
+          element={
+            <RequireAuth>
+              <Settings />
+            </RequireAuth>
+          }
+        />
+        <Route path="/Privacy" element={<Privacy />} />
 
         {/* SIDDUR ROUTES — wildcard prevents remount on TOC↔section navigation */}
         <Route

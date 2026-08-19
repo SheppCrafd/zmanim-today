@@ -1,0 +1,22 @@
+# Zmanim Today
+
+> A free, location-aware Progressive Web App for daily Jewish prayer times (zmanim), a live compass to Jerusalem, and three complete digital siddurim. Built for one person's own daily use and shared publicly.
+
+Zmanim Today shows halachic zmanim (alot hashachar, sof zman shma, mincha, candle lighting, tzeit, and more) computed by the [Hebcal](https://www.hebcal.com/) zmanim API for the user's detected or searched location — no account or manual setup required. It also includes a device-orientation compass that points toward Jerusalem, full Ashkenazi, Sephardic, and Chabad siddur texts with table-of-contents navigation, and opt-in browser push reminders sent ahead of each zman. It installs as an offline-capable PWA.
+
+It is intended for individuals who want quick, accurate daily prayer times and siddur text for their own use — not a synagogue, organizational, or scholarly reference product. It is independently built and maintained by a single developer; it is not affiliated with Hebcal, Sefaria, or any Jewish organization.
+
+## Pages
+
+- [Home](https://zmanimtoday.base44.app/): Landing page — next upcoming zman, mini compass, and daily summary for the user's current location.
+- [Zmanim](https://zmanimtoday.base44.app/Zmanim): Full daily halachic zmanim for the detected or searched location, with push reminder controls.
+- [Compass](https://zmanimtoday.base44.app/Compass): Live, device-orientation-based compass pointing toward Jerusalem.
+- [Ashkenazi Siddur](https://zmanimtoday.base44.app/AshkenaziSiddur): Full Ashkenazi prayer text with table-of-contents and segment navigation.
+- [Sephardic Siddur](https://zmanimtoday.base44.app/SephardicSiddur): Full Sephardic prayer text with table-of-contents and segment navigation.
+- [Chabad Siddur](https://zmanimtoday.base44.app/ChabadSiddur): Full Chabad (Nusach Ari) prayer text with table-of-contents and segment navigation.
+- [Settings](https://zmanimtoday.base44.app/Settings): Location, notification, and display preferences.
+
+## Notes
+
+- Zmanim calculations are sourced live from the Hebcal API, not computed independently by this app.
+- This is a personal project with no organizational backing, editorial board, or halachic authority — treat zmanim and siddur text as convenience references, not a substitute for a qualified posek.

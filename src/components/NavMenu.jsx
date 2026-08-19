@@ -152,6 +152,22 @@ export default function NavMenu() {
             </div>
           )}
         </nav>
+
+        {/* Low-key footer links — no dedicated "app footer" exists, so this
+            drawer (rendered on every page via PageHeader) is the one place
+            that's actually reachable from anywhere in the app. */}
+        <div className="p-4 border-t border-border space-y-1.5">
+          <Link
+            to="/Privacy"
+            onClick={() => setOpen(false)}
+            className="text-xs text-muted-foreground hover:text-foreground underline underline-offset-2 transition-colors"
+          >
+            Privacy Policy
+          </Link>
+          <p className="text-[11px] text-muted-foreground/70">
+            © 2026 Zmanim Today. All rights reserved.
+          </p>
+        </div>
       </div>
     </>
   );

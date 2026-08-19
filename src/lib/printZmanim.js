@@ -111,7 +111,8 @@ export function printZmanim({
         <div class="footer">
             <p style="margin:0;">Times calculated based on your location</p>
             ${timezone ? `<p style="margin:4px 0 0;">Timezone: ${escapeHTML(timezone)}</p>` : ""}
-            <p style="margin:8px 0 0;">Based on https://outorah.org/p/41921/ · Zmanim Today</p>
+            <p style="margin:8px 0 0;">Times computed via Hebcal's zmanim API (hebcal.com) · Zmanim Today</p>
+            <p style="margin:4px 0 0;">Not a substitute for rabbinic guidance — consult your rabbi with halachic questions.</p>
         </div>
     </div>
     <script>

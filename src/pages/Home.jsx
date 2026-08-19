@@ -11,6 +11,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Link } from "react-router-dom";
+import { useAuth } from "@/lib/AuthContext";
 import { useSavedLocation } from "@/hooks/useLocation";
 import { useZmanim } from "@/hooks/useZmanim";
 import { useDashboardPrefs } from "@/hooks/useDashboardPrefs";
@@ -52,6 +53,7 @@ export default function Home() {
     detectGPS,
     searchLocation,
   } = useSavedLocation();
+  const { isAuthenticated, navigateToLogin } = useAuth();
   const { zmanim, loading: zmanimLoading } = useZmanim(location);
   // Used by the Friday-only Havdalah card below AND by "Print Tomorrow's
   // Zmanim" further down, which isn't Friday-only — fetch every day. (A
@@ -302,6 +304,18 @@ export default function Home() {
               </Link>
             )}
           </div>
+        )}
+
+        {/* Non-blocking sign-in nudge — the zmanim view above works fully
+            without an account; signing in only adds cross-device saved
+            location and push reminders, so this never gates the core view. */}
+        {!isAuthenticated && (
+          <button
+            onClick={navigateToLogin}
+            className="mt-6 w-full flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl border border-dashed border-border text-xs text-muted-foreground hover:text-foreground hover:border-foreground/30 transition-colors"
+          >
+            Sign in to sync your location & enable push reminders
+          </button>
         )}
       </div>
     </div>
